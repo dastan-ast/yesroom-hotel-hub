@@ -41,6 +41,7 @@ const bookingSchema = z.object({
   checkInDate: z.date({ required_error: 'Check-in date is required' }),
   checkOutDate: z.date({ required_error: 'Check-out date is required' }),
   roomTypeId: z.string().min(1, 'Please select a room type'),
+  guestCount: z.number().min(1).max(10).default(1),
   comment: z.string().max(500).optional(),
 });
 
@@ -69,6 +70,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
       guestName: '',
       guestPhone: '',
       roomTypeId: searchParams.get('roomType') || '',
+      guestCount: 1,
       comment: '',
     },
   });
@@ -95,6 +97,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
         check_out_date: format(data.checkOutDate, 'yyyy-MM-dd'),
         room_type_id: data.roomTypeId,
         guest_comment: data.comment || null,
+        guest_count: data.guestCount,
         source: 'web',
         status: 'pending',
         hotel_id: hotelId || null,
