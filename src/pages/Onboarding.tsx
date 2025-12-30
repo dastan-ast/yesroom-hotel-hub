@@ -64,11 +64,9 @@ export default function Onboarding() {
 
       if (profileError) throw profileError;
 
-      // Update user role to owner
+      // Update user role to owner using SECURITY DEFINER function
       const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ role: 'owner' })
-        .eq('user_id', user.id);
+        .rpc('update_user_role_to_owner', { _user_id: user.id });
 
       if (roleError) throw roleError;
 
