@@ -368,6 +368,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_user_role_to_owner: {
+        Args: { _user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "guest" | "superadmin" | "owner"
