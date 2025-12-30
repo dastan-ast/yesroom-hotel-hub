@@ -17,7 +17,7 @@ interface RoomType {
   image_url: string | null;
 }
 
-export function RoomTypesTab() {
+export function RoomTypesTab({ hotelId }: { hotelId?: string }) {
   const { t } = useTranslation();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(true);

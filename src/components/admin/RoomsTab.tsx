@@ -33,7 +33,7 @@ const statusColors: Record<RoomStatus, string> = {
   maintenance: 'bg-muted border-muted-foreground/30 text-muted-foreground',
 };
 
-export function RoomsTab() {
+export function RoomsTab({ hotelId }: { hotelId?: string }) {
   const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);

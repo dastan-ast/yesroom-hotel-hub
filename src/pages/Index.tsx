@@ -1,39 +1,99 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Navbar } from '@/components/Navbar';
-import { RoomCard } from '@/components/RoomCard';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Star, Shield, Clock } from 'lucide-react';
-
-interface RoomType {
-  id: string;
-  name: string;
-  description: string | null;
-  price_per_night: number;
-  capacity: number;
-  amenities: string[] | null;
-  image_url: string | null;
-}
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Navbar } from '@/components/Navbar';
+import { 
+  ArrowRight, 
+  Building2, 
+  CalendarDays, 
+  BarChart3, 
+  Users, 
+  Shield, 
+  Zap,
+  Check,
+  Star
+} from 'lucide-react';
 
 const Index = () => {
   const { t } = useTranslation();
-  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchRoomTypes = async () => {
-      const { data } = await supabase
-        .from('room_types')
-        .select('*')
-        .order('price_per_night', { ascending: true });
-      
-      if (data) setRoomTypes(data);
-      setLoading(false);
-    };
-    fetchRoomTypes();
-  }, []);
+  const features = [
+    {
+      icon: CalendarDays,
+      title: 'Умное бронирование',
+      description: 'Автоматизируйте приём заявок с сайта, Booking.com и других каналов'
+    },
+    {
+      icon: Building2,
+      title: 'Управление номерами',
+      description: 'Визуальная карта номеров с отслеживанием статусов в реальном времени'
+    },
+    {
+      icon: Users,
+      title: 'База клиентов',
+      description: 'Храните историю бронирований и предпочтения каждого гостя'
+    },
+    {
+      icon: BarChart3,
+      title: 'Аналитика',
+      description: 'Отслеживайте загрузку, доход и эффективность работы'
+    },
+    {
+      icon: Shield,
+      title: 'Безопасность',
+      description: 'Надёжное хранение данных с разграничением доступа'
+    },
+    {
+      icon: Zap,
+      title: 'AI-ready',
+      description: 'Готовы к интеграции с искусственным интеллектом'
+    }
+  ];
+
+  const pricingPlans = [
+    {
+      name: 'Стартовый',
+      price: '9 900',
+      period: 'месяц',
+      description: 'Для небольших отелей до 20 номеров',
+      features: [
+        'До 20 номеров',
+        'Неограниченные бронирования',
+        'Базовая аналитика',
+        'Email-поддержка'
+      ],
+      popular: false
+    },
+    {
+      name: 'Бизнес',
+      price: '19 900',
+      period: 'месяц',
+      description: 'Для растущих отелей до 50 номеров',
+      features: [
+        'До 50 номеров',
+        'Всё из Стартового',
+        'Расширенная аналитика',
+        'Интеграция с Booking.com',
+        'Приоритетная поддержка'
+      ],
+      popular: true
+    },
+    {
+      name: 'Премиум',
+      price: '39 900',
+      period: 'месяц',
+      description: 'Для крупных отелей без ограничений',
+      features: [
+        'Неограниченно номеров',
+        'Всё из Бизнес',
+        'White-label решение',
+        'API доступ',
+        'Персональный менеджер'
+      ],
+      popular: false
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,21 +101,36 @@ const Index = () => {
       
       {/* Hero Section */}
       <section className="relative overflow-hidden gradient-hero text-primary-foreground">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1920&auto=format&fit=crop')] opacity-20 bg-cover bg-center" />
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{ 
+            backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%)'
+          }} />
+        </div>
         <div className="relative container mx-auto px-4 py-24 md:py-32">
-          <div className="max-w-2xl animate-slide-up">
+          <div className="max-w-3xl mx-auto text-center animate-slide-up">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
+              <Star className="h-4 w-4 text-accent" />
+              <span className="text-sm">14 дней бесплатно</span>
+            </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold mb-6 leading-tight">
-              {t('hero.title')}
+              Умное управление отелем
             </h1>
-            <p className="text-lg md:text-xl opacity-90 mb-8">
-              {t('hero.subtitle')}
+            <p className="text-lg md:text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+              YesRoom — облачная система для современных отелей. Бронирования, номера, гости — всё в одном месте
             </p>
-            <Button size="lg" asChild className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-gold">
-              <Link to="/booking">
-                {t('hero.cta')}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" asChild className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-gold">
+                <Link to="/auth">
+                  Начать бесплатно
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+                <a href="#pricing">
+                  Тарифы
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
         
@@ -68,69 +143,90 @@ const Index = () => {
       </section>
 
       {/* Features */}
-      <section className="py-16 bg-background">
+      <section className="py-20 bg-background">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { icon: Star, title: 'Премиум сервис', desc: 'Высокий уровень обслуживания' },
-              { icon: Shield, title: 'Безопасность', desc: 'Надежная система бронирования' },
-              { icon: Clock, title: '24/7 Поддержка', desc: 'Круглосуточная помощь гостям' },
-            ].map((feature, index) => (
-              <div 
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
+              Всё для эффективной работы
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Инструменты, которые экономят время и повышают качество обслуживания
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature, index) => (
+              <Card 
                 key={index}
-                className="flex items-start gap-4 p-6 rounded-lg bg-card shadow-card animate-fade-in"
+                className="card-hover border-0 shadow-card animate-fade-in"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <feature.icon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.desc}</p>
-                </div>
-              </div>
+                <CardContent className="pt-6">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                    <feature.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="font-display font-semibold text-lg mb-2">{feature.title}</h3>
+                  <p className="text-muted-foreground">{feature.description}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Rooms Section */}
-      <section className="py-16 bg-muted/50">
+      {/* Pricing */}
+      <section id="pricing" className="py-20 bg-muted/50">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-display font-bold text-center mb-12">
-            {t('rooms.title')}
-          </h2>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">
+              Простые и понятные тарифы
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Выберите план, который подходит вашему отелю. Первые 14 дней бесплатно.
+            </p>
+          </div>
           
-          {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-96 bg-card rounded-lg animate-pulse" />
-              ))}
-            </div>
-          ) : roomTypes.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {roomTypes.map((room, index) => (
-                <div key={room.id} className="animate-slide-up" style={{ animationDelay: `${index * 100}ms` }}>
-                  <RoomCard
-                    id={room.id}
-                    name={room.name}
-                    description={room.description}
-                    price={Number(room.price_per_night)}
-                    capacity={room.capacity}
-                    amenities={room.amenities}
-                    imageUrl={room.image_url}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-muted-foreground mb-6">Номера скоро появятся</p>
-              <Button asChild>
-                <Link to="/booking">{t('hero.cta')}</Link>
-              </Button>
-            </div>
-          )}
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {pricingPlans.map((plan, index) => (
+              <Card 
+                key={index}
+                className={`relative ${plan.popular ? 'border-2 border-primary shadow-xl' : 'border shadow-card'}`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
+                      Популярный
+                    </span>
+                  </div>
+                )}
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="font-display text-xl">{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                  <div className="pt-4">
+                    <span className="text-4xl font-bold">₸{plan.price}</span>
+                    <span className="text-muted-foreground">/{plan.period}</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-500 shrink-0" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button 
+                    asChild 
+                    className="w-full" 
+                    variant={plan.popular ? 'default' : 'outline'}
+                  >
+                    <Link to="/auth">Начать бесплатно</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -138,14 +234,14 @@ const Index = () => {
       <section className="py-20 gradient-hero text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-display font-bold mb-6">
-            Готовы забронировать?
+            Готовы начать?
           </h2>
           <p className="text-lg opacity-90 mb-8 max-w-xl mx-auto">
-            Оставьте заявку и наш администратор свяжется с вами для подтверждения бронирования
+            Зарегистрируйте ваш отель и получите 14 дней бесплатного доступа ко всем функциям
           </p>
           <Button size="lg" asChild className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-gold">
-            <Link to="/booking">
-              {t('hero.cta')}
+            <Link to="/auth">
+              Зарегистрировать отель
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
           </Button>
@@ -155,10 +251,42 @@ const Index = () => {
       {/* Footer */}
       <footer className="bg-primary text-primary-foreground py-12">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2 font-display text-xl font-semibold">
-              <span>YesRoom</span>
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center gap-2 font-display text-xl font-semibold mb-4">
+                <Building2 className="h-6 w-6" />
+                <span>YesRoom</span>
+              </div>
+              <p className="text-sm opacity-70">
+                Облачная система управления отелем
+              </p>
             </div>
+            <div>
+              <h4 className="font-semibold mb-4">Продукт</h4>
+              <ul className="space-y-2 text-sm opacity-70">
+                <li><a href="#" className="hover:opacity-100">Возможности</a></li>
+                <li><a href="#pricing" className="hover:opacity-100">Тарифы</a></li>
+                <li><a href="#" className="hover:opacity-100">Интеграции</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Компания</h4>
+              <ul className="space-y-2 text-sm opacity-70">
+                <li><a href="#" className="hover:opacity-100">О нас</a></li>
+                <li><a href="#" className="hover:opacity-100">Контакты</a></li>
+                <li><a href="#" className="hover:opacity-100">Блог</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Поддержка</h4>
+              <ul className="space-y-2 text-sm opacity-70">
+                <li><a href="#" className="hover:opacity-100">Документация</a></li>
+                <li><a href="#" className="hover:opacity-100">FAQ</a></li>
+                <li><a href="#" className="hover:opacity-100">Обратная связь</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center">
             <p className="text-sm opacity-70">
               © {new Date().getFullYear()} YesRoom. Все права защищены.
             </p>

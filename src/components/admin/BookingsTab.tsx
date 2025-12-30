@@ -30,7 +30,7 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-red-500/20 text-red-700 border-red-500',
 };
 
-export function BookingsTab() {
+export function BookingsTab({ hotelId }: { hotelId?: string }) {
   const { t } = useTranslation();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
