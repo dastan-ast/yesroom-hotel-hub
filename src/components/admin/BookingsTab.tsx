@@ -30,20 +30,24 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-red-500/20 text-red-700 border-red-500',
 };
 
-export function BookingsTab({ hotelId }: { hotelId?: string }) {
+export function BookingsTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    if (hotelId) {
+      fetchBookings();
+    }
+  }, [hotelId]);
 
   const fetchBookings = async () => {
+    setLoading(true);
     const { data } = await supabase
       .from('bookings')
       .select('*, room_types(name)')
+      .eq('hotel_id', hotelId)
       .order('created_at', { ascending: false })
       .limit(50);
     
@@ -162,6 +166,7 @@ export function BookingsTab({ hotelId }: { hotelId?: string }) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSuccess={fetchBookings}
+        hotelId={hotelId}
       />
     </div>
   );
