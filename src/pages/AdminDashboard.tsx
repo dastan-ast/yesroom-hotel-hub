@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Link, useLocation } from 'react-router-dom';
+import { Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
@@ -15,16 +15,18 @@ import { ClientsTab } from '@/components/admin/ClientsTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user, isAdmin, loading, hotelId, signOut, profile } = useAuth();
   const location = useLocation();
   const [stats, setStats] = useState({ total: 0, pending: 0, occupied: 0 });
   const [hotelName, setHotelName] = useState('');
+  const [hotelStatus, setHotelStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     if (isAdmin && hotelId) {
       fetchStats();
-      fetchHotelName();
+      fetchHotelInfo();
     }
   }, [isAdmin, hotelId]);
 
@@ -51,14 +53,24 @@ export default function AdminDashboard() {
     setStats({ total: total || 0, pending: pending || 0, occupied: occupied || 0 });
   };
 
-  const fetchHotelName = async () => {
+  const fetchHotelInfo = async () => {
     if (!hotelId) return;
     const { data } = await supabase
       .from('hotels')
-      .select('name')
+      .select('name, status')
       .eq('id', hotelId)
-      .single();
-    if (data) setHotelName(data.name);
+      .maybeSingle();
+    if (data) {
+      setHotelName(data.name);
+      setHotelStatus(data.status);
+      
+      // Redirect if hotel is pending or rejected
+      if (data.status === 'pending') {
+        navigate('/pending-approval');
+      } else if (data.status === 'rejected') {
+        navigate('/');
+      }
+    }
   };
 
   if (loading) {

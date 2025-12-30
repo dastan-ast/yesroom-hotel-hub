@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { RoomCard } from '@/components/RoomCard';
 import { BookingForm } from '@/components/BookingForm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Building2, MapPin, Wifi, Car, Coffee, Utensils, Dumbbell, Waves } from 'lucide-react';
 
 interface Hotel {
   id: string;
   name: string;
+  slug: string;
   location: string | null;
   description: string | null;
   logo_url: string | null;
+  settings: any;
 }
 
 interface RoomType {
@@ -26,9 +28,17 @@ interface RoomType {
   image_url: string | null;
 }
 
-export default function PublicBooking() {
+const amenityIcons: Record<string, any> = {
+  'wifi': Wifi,
+  'parking': Car,
+  'breakfast': Coffee,
+  'restaurant': Utensils,
+  'gym': Dumbbell,
+  'pool': Waves,
+};
+
+export default function HotelProfile() {
   const { hotelSlug } = useParams();
-  const { t } = useTranslation();
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,11 +52,12 @@ export default function PublicBooking() {
         return;
       }
 
-      // Fetch hotel by slug
+      // Fetch hotel by slug - only active hotels
       const { data: hotelData, error: hotelError } = await supabase
         .from('hotels')
         .select('*')
         .eq('slug', hotelSlug)
+        .eq('status', 'active')
         .in('subscription_status', ['trial', 'active'])
         .maybeSingle();
 
@@ -91,47 +102,90 @@ export default function PublicBooking() {
           <Building2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h1 className="text-2xl font-display font-bold mb-2">Отель не найден</h1>
           <p className="text-muted-foreground">
-            Проверьте правильность ссылки или обратитесь к администратору отеля
+            Проверьте правильность ссылки или отель ещё не активирован
           </p>
         </div>
       </div>
     );
   }
 
+  // Calculate min price
+  const minPrice = roomTypes.length > 0 
+    ? Math.min(...roomTypes.map(r => Number(r.price_per_night)))
+    : null;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero */}
-      <section className="gradient-hero text-primary-foreground py-16">
+      <Navbar />
+      
+      {/* Hero Section with Image Gallery Placeholder */}
+      <section className="relative">
+        {/* Image Gallery Placeholder */}
+        <div className="h-[300px] md:h-[400px] bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+          {hotel.logo_url ? (
+            <img 
+              src={hotel.logo_url} 
+              alt={hotel.name} 
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="text-center">
+              <Building2 className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">Фотографии отеля</p>
+            </div>
+          )}
+        </div>
+
+        {/* Hotel Info Overlay */}
         <div className="container mx-auto px-4">
-          <div className="flex items-center gap-4 mb-4">
-            {hotel.logo_url ? (
-              <img src={hotel.logo_url} alt={hotel.name} className="w-16 h-16 rounded-lg object-cover" />
-            ) : (
-              <div className="w-16 h-16 bg-white/10 rounded-lg flex items-center justify-center">
-                <Building2 className="h-8 w-8" />
+          <div className="relative -mt-20 bg-background rounded-xl shadow-lg p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-display font-bold">{hotel.name}</h1>
+                {hotel.location && (
+                  <p className="flex items-center gap-2 text-muted-foreground mt-2">
+                    <MapPin className="h-4 w-4" />
+                    {hotel.location}
+                  </p>
+                )}
+                {hotel.description && (
+                  <p className="text-muted-foreground mt-4 max-w-2xl">{hotel.description}</p>
+                )}
               </div>
-            )}
-            <div>
-              <h1 className="text-3xl md:text-4xl font-display font-bold">{hotel.name}</h1>
-              {hotel.location && (
-                <p className="flex items-center gap-1 opacity-80 mt-1">
-                  <MapPin className="h-4 w-4" />
-                  {hotel.location}
-                </p>
+              {minPrice && (
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">от</p>
+                  <p className="text-3xl font-bold text-primary">{minPrice.toLocaleString()} ₸</p>
+                  <p className="text-sm text-muted-foreground">за ночь</p>
+                </div>
               )}
             </div>
+
+            {/* Amenities */}
+            <div className="flex flex-wrap gap-2 mt-6">
+              <Badge variant="secondary" className="gap-1">
+                <Wifi className="h-3 w-3" /> Wi-Fi
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <Car className="h-3 w-3" /> Парковка
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <Coffee className="h-3 w-3" /> Завтрак
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <Utensils className="h-3 w-3" /> Ресторан
+              </Badge>
+            </div>
           </div>
-          {hotel.description && (
-            <p className="text-lg opacity-90 max-w-2xl">{hotel.description}</p>
-          )}
         </div>
       </section>
 
+      {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Room Types */}
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-display font-bold mb-6">{t('rooms.title')}</h2>
+            <h2 className="text-2xl font-display font-bold mb-6">Доступные номера</h2>
             {roomTypes.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
                 {roomTypes.map((room) => (
@@ -150,17 +204,18 @@ export default function PublicBooking() {
             ) : (
               <Card>
                 <CardContent className="py-12 text-center">
+                  <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">Номера скоро появятся</p>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          {/* Booking Form */}
+          {/* Booking Form - Sticky */}
           <div>
-            <Card className="sticky top-4">
+            <Card className="sticky top-20">
               <CardHeader>
-                <CardTitle>{t('booking.title')}</CardTitle>
+                <CardTitle>Забронировать номер</CardTitle>
               </CardHeader>
               <CardContent>
                 <BookingForm hotelId={hotel.id} />

@@ -155,6 +155,7 @@ export type Database = {
           owner_id: string | null
           settings: Json | null
           slug: string
+          status: string
           subscription_status: string
           trial_ends_at: string | null
           updated_at: string
@@ -169,6 +170,7 @@ export type Database = {
           owner_id?: string | null
           settings?: Json | null
           slug: string
+          status?: string
           subscription_status?: string
           trial_ends_at?: string | null
           updated_at?: string
@@ -183,6 +185,7 @@ export type Database = {
           owner_id?: string | null
           settings?: Json | null
           slug?: string
+          status?: string
           subscription_status?: string
           trial_ends_at?: string | null
           updated_at?: string

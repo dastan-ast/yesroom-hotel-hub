@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Hotel, LogOut, LayoutDashboard, Menu, X } from 'lucide-react';
+import { Hotel, LogOut, LayoutDashboard, Menu, X, Shield } from 'lucide-react';
 import { useState } from 'react';
 
 export function Navbar() {
   const { t } = useTranslation();
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, isSuperAdmin, signOut } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -47,7 +47,15 @@ export function Navbar() {
             <LanguageSwitcher />
             {user ? (
               <div className="flex items-center gap-2">
-                {isAdmin && (
+                {isSuperAdmin && (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/super-admin">
+                      <Shield className="h-4 w-4 mr-2" />
+                      Super Admin
+                    </Link>
+                  </Button>
+                )}
+                {isAdmin && !isSuperAdmin && (
                   <Button variant="outline" size="sm" asChild>
                     <Link to="/admin">
                       <LayoutDashboard className="h-4 w-4 mr-2" />

@@ -76,10 +76,10 @@ export default function Onboarding() {
 
       toast({
         title: 'Отель создан!',
-        description: 'Добро пожаловать в YesRoom. Настройте ваш отель в панели управления.'
+        description: 'Ваша заявка отправлена на рассмотрение.'
       });
 
-      navigate('/admin/dashboard');
+      navigate('/pending-approval');
     } catch (error: any) {
       toast({
         title: 'Ошибка',

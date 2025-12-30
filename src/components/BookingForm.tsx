@@ -52,7 +52,11 @@ interface RoomType {
   price_per_night: number;
 }
 
-export function BookingForm() {
+interface BookingFormProps {
+  hotelId?: string;
+}
+
+export function BookingForm({ hotelId }: BookingFormProps) {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -71,11 +75,15 @@ export function BookingForm() {
 
   useEffect(() => {
     const fetchRoomTypes = async () => {
-      const { data } = await supabase.from('room_types').select('id, name, price_per_night');
+      let query = supabase.from('room_types').select('id, name, price_per_night');
+      if (hotelId) {
+        query = query.eq('hotel_id', hotelId);
+      }
+      const { data } = await query;
       if (data) setRoomTypes(data);
     };
     fetchRoomTypes();
-  }, []);
+  }, [hotelId]);
 
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
@@ -89,6 +97,7 @@ export function BookingForm() {
         guest_comment: data.comment || null,
         source: 'web',
         status: 'pending',
+        hotel_id: hotelId || null,
       });
 
       if (error) throw error;
