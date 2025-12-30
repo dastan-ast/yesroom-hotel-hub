@@ -13,6 +13,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
 import Onboarding from "./pages/Onboarding";
 import PublicBooking from "./pages/PublicBooking";
+import PendingApproval from "./pages/PendingApproval";
+import HotelProfile from "./pages/HotelProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,8 +30,10 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/book/:hotelSlug" element={<PublicBooking />} />
+            <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/super-admin" element={<SuperAdmin />} />

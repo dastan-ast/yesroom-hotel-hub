@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navbar } from '@/components/Navbar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,23 +16,44 @@ import { ClientsTab } from '@/components/admin/ClientsTab';
 interface Hotel {
   id: string;
   name: string;
+  status?: string;
 }
 
 export default function Admin() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin, hotelId: userHotelId, loading } = useAuth();
   const [stats, setStats] = useState({ total: 0, pending: 0, occupied: 0 });
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [selectedHotelId, setSelectedHotelId] = useState<string | null>(null);
+  const [hotelStatus, setHotelStatus] = useState<string | null>(null);
 
-  // For SuperAdmin: fetch all hotels; for others: use their hotelId
+  // For SuperAdmin: fetch all hotels; for others: use their hotelId and check status
   useEffect(() => {
     if (isSuperAdmin) {
       fetchHotels();
     } else if (userHotelId) {
       setSelectedHotelId(userHotelId);
+      checkHotelStatus(userHotelId);
     }
   }, [isSuperAdmin, userHotelId]);
+
+  const checkHotelStatus = async (hotelId: string) => {
+    const { data } = await supabase
+      .from('hotels')
+      .select('status')
+      .eq('id', hotelId)
+      .maybeSingle();
+    
+    if (data) {
+      setHotelStatus(data.status);
+      if (data.status === 'pending') {
+        navigate('/pending-approval');
+      } else if (data.status === 'rejected') {
+        navigate('/');
+      }
+    }
+  };
 
   // Fetch stats when selectedHotelId changes
   useEffect(() => {

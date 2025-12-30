@@ -10,10 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, CreditCard, Settings, Search, LogOut } from 'lucide-react';
+import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UsersTab } from '@/components/superadmin/UsersTab';
+import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
 
 interface Hotel {
   id: string;
@@ -32,8 +33,8 @@ export default function SuperAdmin() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0 });
-  const [activeTab, setActiveTab] = useState<'hotels' | 'users'>('hotels');
+  const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0, pending: 0 });
+  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users'>('requests');
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -53,7 +54,8 @@ export default function SuperAdmin() {
         total: data.length,
         trial: data.filter(h => h.subscription_status === 'trial').length,
         active: data.filter(h => h.subscription_status === 'active').length,
-        expired: data.filter(h => h.subscription_status === 'expired').length
+        expired: data.filter(h => h.subscription_status === 'expired').length,
+        pending: data.filter(h => (h as any).status === 'pending').length
       });
     }
   };
@@ -111,6 +113,20 @@ export default function SuperAdmin() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton 
+                  isActive={activeTab === 'requests'}
+                  onClick={() => setActiveTab('requests')}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span>Заявки</span>
+                  {stats.pending > 0 && (
+                    <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
+                      {stats.pending}
+                    </span>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
                   isActive={activeTab === 'hotels'}
                   onClick={() => setActiveTab('hotels')}
                 >
@@ -156,6 +172,8 @@ export default function SuperAdmin() {
           </header>
 
           <main className="p-6 space-y-6">
+            {activeTab === 'requests' && <HotelRequestsTab />}
+            
             {activeTab === 'hotels' && (
               <>
                 {/* Stats */}
