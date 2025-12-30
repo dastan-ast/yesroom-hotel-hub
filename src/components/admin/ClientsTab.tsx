@@ -18,7 +18,7 @@ interface Client {
   notes: string | null;
 }
 
-export function ClientsTab() {
+export function ClientsTab({ hotelId }: { hotelId?: string }) {
   const { t } = useTranslation();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);

@@ -2,14 +2,29 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+type AppRole = 'superadmin' | 'owner' | 'admin' | 'guest';
+
+interface UserProfile {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  hotel_id: string | null;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  role: AppRole | null;
+  hotelId: string | null;
+  profile: UserProfile | null;
+  isSuperAdmin: boolean;
+  isOwner: boolean;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,17 +33,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<AppRole | null>(null);
+  const [hotelId, setHotelId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  const checkAdminRole = async (userId: string) => {
-    const { data } = await supabase
+  const fetchUserData = async (userId: string) => {
+    // Fetch role
+    const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
-      .eq('role', 'admin')
       .maybeSingle();
     
-    setIsAdmin(!!data);
+    if (roleData) {
+      setRole(roleData.role as AppRole);
+    } else {
+      setRole('guest');
+    }
+
+    // Fetch profile with hotel_id
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (profileData) {
+      setProfile(profileData as UserProfile);
+      setHotelId(profileData.hotel_id);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchUserData(user.id);
+    }
   };
 
   useEffect(() => {
@@ -40,10 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (session?.user) {
           setTimeout(() => {
-            checkAdminRole(session.user.id);
+            fetchUserData(session.user.id);
           }, 0);
         } else {
-          setIsAdmin(false);
+          setRole(null);
+          setHotelId(null);
+          setProfile(null);
         }
       }
     );
@@ -54,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       
       if (session?.user) {
-        checkAdminRole(session.user.id);
+        fetchUserData(session.user.id);
       }
     });
 
@@ -81,11 +122,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setIsAdmin(false);
+    setRole(null);
+    setHotelId(null);
+    setProfile(null);
   };
 
+  const isSuperAdmin = role === 'superadmin';
+  const isOwner = role === 'owner' || role === 'superadmin';
+  const isAdmin = role === 'admin' || role === 'owner' || role === 'superadmin';
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      role,
+      hotelId,
+      profile,
+      isSuperAdmin,
+      isOwner,
+      isAdmin,
+      signIn, 
+      signUp, 
+      signOut,
+      refreshProfile
+    }}>
       {children}
     </AuthContext.Provider>
   );
