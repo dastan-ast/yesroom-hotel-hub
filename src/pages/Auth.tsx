@@ -39,6 +39,12 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleToggleMode = () => {
+    loginForm.reset();
+    signupForm.reset();
+    setIsLogin(!isLogin);
+  };
+
   useEffect(() => {
     if (user) {
       navigate('/');
@@ -100,7 +106,7 @@ export default function Auth() {
           </CardHeader>
           <CardContent>
             {isLogin ? (
-              <Form {...loginForm}>
+              <Form {...loginForm} key="login-form">
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                   <FormField
                     control={loginForm.control}
@@ -109,7 +115,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t('auth.email')}</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="email@example.com" {...field} />
+                          <Input type="email" placeholder="email@example.com" autoFocus {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -134,7 +140,7 @@ export default function Auth() {
                 </form>
               </Form>
             ) : (
-              <Form {...signupForm}>
+              <Form {...signupForm} key="signup-form">
                 <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
                   <FormField
                     control={signupForm.control}
@@ -143,7 +149,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t('auth.fullName')}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Иван Иванов" {...field} />
+                          <Input placeholder="Иван Иванов" autoFocus {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -188,7 +194,7 @@ export default function Auth() {
                   {t('auth.noAccount')}{' '}
                   <button
                     type="button"
-                    onClick={() => setIsLogin(false)}
+                    onClick={handleToggleMode}
                     className="text-primary font-medium hover:underline"
                   >
                     {t('auth.signup')}
@@ -199,7 +205,7 @@ export default function Auth() {
                   {t('auth.hasAccount')}{' '}
                   <button
                     type="button"
-                    onClick={() => setIsLogin(true)}
+                    onClick={handleToggleMode}
                     className="text-primary font-medium hover:underline"
                   >
                     {t('auth.login')}
