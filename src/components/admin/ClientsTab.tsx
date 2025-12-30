@@ -28,13 +28,18 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   useEffect(() => {
-    fetchClients();
-  }, []);
+    if (hotelId) {
+      fetchClients();
+    }
+  }, [hotelId]);
 
   const fetchClients = async () => {
+    if (!hotelId) return;
+    
     const { data, error } = await supabase
       .from('clients')
       .select('*')
+      .eq('hotel_id', hotelId)
       .order('full_name');
     
     if (error) {
@@ -71,7 +76,14 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
         return;
       }
     } else {
-      const { error } = await supabase.from('clients').insert([data as any]);
+      const { error } = await supabase.from('clients').insert([{
+        full_name: data.full_name!,
+        phone: data.phone!,
+        email: data.email,
+        document_number: data.document_number,
+        notes: data.notes,
+        hotel_id: hotelId
+      }]);
       if (error) {
         toast.error(t('common.error'));
         return;
