@@ -46,9 +46,10 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  hotelId: string;
 }
 
-export function ManualBookingDialog({ open, onOpenChange, onSuccess }: Props) {
+export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: Props) {
   const { t } = useTranslation();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -66,7 +67,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: Props) {
   });
 
   useEffect(() => {
-    if (open) {
+    if (open && hotelId) {
       fetchRoomTypes();
       form.reset({
         guest_name: '',
@@ -77,10 +78,13 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: Props) {
         guest_comment: '',
       });
     }
-  }, [open, form]);
+  }, [open, hotelId, form]);
 
   const fetchRoomTypes = async () => {
-    const { data } = await supabase.from('room_types').select('id, name, price_per_night');
+    const { data } = await supabase
+      .from('room_types')
+      .select('id, name, price_per_night')
+      .eq('hotel_id', hotelId);
     if (data) setRoomTypes(data);
   };
 
@@ -97,6 +101,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: Props) {
       prepayment_received: data.prepayment_received,
       guest_comment: data.guest_comment || null,
       status: 'pending',
+      hotel_id: hotelId,
     });
 
     setLoading(false);

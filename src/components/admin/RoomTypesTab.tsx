@@ -17,7 +17,7 @@ interface RoomType {
   image_url: string | null;
 }
 
-export function RoomTypesTab({ hotelId }: { hotelId?: string }) {
+export function RoomTypesTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,13 +25,17 @@ export function RoomTypesTab({ hotelId }: { hotelId?: string }) {
   const [editingType, setEditingType] = useState<RoomType | null>(null);
 
   useEffect(() => {
-    fetchRoomTypes();
-  }, []);
+    if (hotelId) {
+      fetchRoomTypes();
+    }
+  }, [hotelId]);
 
   const fetchRoomTypes = async () => {
+    setLoading(true);
     const { data, error } = await supabase
       .from('room_types')
       .select('*')
+      .eq('hotel_id', hotelId)
       .order('price_per_night', { ascending: true });
     
     if (error) {
@@ -73,7 +77,16 @@ export function RoomTypesTab({ hotelId }: { hotelId?: string }) {
         return;
       }
     } else {
-      const { error } = await supabase.from('room_types').insert([data as any]);
+      const insertData = {
+        name: data.name!,
+        price_per_night: data.price_per_night!,
+        description: data.description,
+        capacity: data.capacity,
+        amenities: data.amenities,
+        image_url: data.image_url,
+        hotel_id: hotelId,
+      };
+      const { error } = await supabase.from('room_types').insert([insertData]);
       if (error) {
         toast.error(t('common.error'));
         return;

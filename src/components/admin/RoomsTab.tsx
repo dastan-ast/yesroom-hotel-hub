@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus } from 'lucide-react';
 import { RoomDialog } from './RoomDialog';
@@ -33,7 +32,7 @@ const statusColors: Record<RoomStatus, string> = {
   maintenance: 'bg-muted border-muted-foreground/30 text-muted-foreground',
 };
 
-export function RoomsTab({ hotelId }: { hotelId?: string }) {
+export function RoomsTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -42,13 +41,24 @@ export function RoomsTab({ hotelId }: { hotelId?: string }) {
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (hotelId) {
+      fetchData();
+    }
+  }, [hotelId]);
 
   const fetchData = async () => {
+    setLoading(true);
     const [roomsRes, typesRes] = await Promise.all([
-      supabase.from('rooms').select('*, room_types(name, price_per_night)').order('floor').order('room_number'),
-      supabase.from('room_types').select('id, name, price_per_night'),
+      supabase
+        .from('rooms')
+        .select('*, room_types(name, price_per_night)')
+        .eq('hotel_id', hotelId)
+        .order('floor')
+        .order('room_number'),
+      supabase
+        .from('room_types')
+        .select('id, name, price_per_night')
+        .eq('hotel_id', hotelId),
     ]);
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
@@ -91,7 +101,15 @@ export function RoomsTab({ hotelId }: { hotelId?: string }) {
         return;
       }
     } else {
-      const { error } = await supabase.from('rooms').insert([data as any]);
+      const insertData = {
+        room_number: data.room_number!,
+        room_type_id: data.room_type_id!,
+        floor: data.floor,
+        status: data.status,
+        notes: data.notes,
+        hotel_id: hotelId,
+      };
+      const { error } = await supabase.from('rooms').insert([insertData]);
       if (error) {
         toast.error(t('common.error'));
         return;
