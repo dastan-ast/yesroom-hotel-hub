@@ -10,12 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Building2, MapPin, Hash } from 'lucide-react';
+import { OnboardingStepper } from '@/components/OnboardingStepper';
 
 export default function Onboarding() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(2);
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -37,6 +39,7 @@ export default function Onboarding() {
     if (!user) return;
 
     setLoading(true);
+    setCurrentStep(3);
     try {
       const slug = generateSlug(formData.name) + '-' + Date.now().toString(36);
 
@@ -91,8 +94,10 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
+      <div className="w-full max-w-lg">
+        <OnboardingStepper currentStep={currentStep} />
+        <Card className="w-full">
+          <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
             <Building2 className="h-8 w-8 text-primary" />
           </div>
@@ -165,6 +170,7 @@ export default function Onboarding() {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
