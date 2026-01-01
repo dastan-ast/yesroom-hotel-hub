@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, Building2, RefreshCw, Home } from 'lucide-react';
+import { OnboardingStepper } from '@/components/OnboardingStepper';
 
 export default function PendingApproval() {
   const { user, hotelId } = useAuth();
@@ -59,8 +60,10 @@ export default function PendingApproval() {
 
   return (
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md text-center">
-        <CardHeader>
+      <div className="w-full max-w-lg">
+        <OnboardingStepper currentStep={4} />
+        <Card className="w-full text-center">
+          <CardHeader>
           <div className="mx-auto w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mb-4">
             <Clock className="h-10 w-10 text-amber-600 dark:text-amber-400" />
           </div>
@@ -120,6 +123,7 @@ export default function PendingApproval() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -83,7 +83,7 @@ export default function Auth() {
       }
     } else {
       toast.success('Регистрация успешна!');
-      navigate('/');
+      navigate('/onboarding');
     }
     setIsLoading(false);
   };
