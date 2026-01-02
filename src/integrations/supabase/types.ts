@@ -360,6 +360,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_user_role: {
+        Args: {
+          _hotel_id: string
+          _new_role: Database["public"]["Enums"]["app_role"]
+          _target_user_id: string
+        }
+        Returns: undefined
+      }
       get_user_hotel_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
