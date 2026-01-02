@@ -92,31 +92,14 @@ export function UsersTab() {
 
   const handleSaveRole = async (userId: string, role: 'admin' | 'owner', hotelId: string) => {
     try {
-      // Update user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ role })
-        .eq('user_id', userId);
+      // Use secure RPC function for role assignment with server-side validation
+      const { error } = await supabase.rpc('assign_user_role', {
+        _target_user_id: userId,
+        _new_role: role,
+        _hotel_id: hotelId
+      });
 
-      if (roleError) throw roleError;
-
-      // Update profile hotel_id
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ hotel_id: hotelId })
-        .eq('user_id', userId);
-
-      if (profileError) throw profileError;
-
-      // If assigning owner, update hotel owner_id
-      if (role === 'owner') {
-        const { error: hotelError } = await supabase
-          .from('hotels')
-          .update({ owner_id: userId })
-          .eq('id', hotelId);
-
-        if (hotelError) throw hotelError;
-      }
+      if (error) throw error;
 
       toast.success('Роль успешно назначена');
       setDialogOpen(false);
