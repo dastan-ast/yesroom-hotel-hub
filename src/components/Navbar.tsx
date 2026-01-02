@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { Hotel, LogOut, LayoutDashboard, Menu, X, Shield } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, Shield } from 'lucide-react';
 import { useState } from 'react';
+import logo from '@/assets/logo.png';
 
 export function Navbar() {
   const { t } = useTranslation();
@@ -23,7 +24,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 font-display text-xl font-semibold text-primary">
-            <Hotel className="h-6 w-6" />
+            <img src={logo} alt="YesRoom" className="h-8 w-8" />
             {t('brand')}
           </Link>
 
