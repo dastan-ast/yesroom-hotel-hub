@@ -156,7 +156,7 @@ export default function HotelProfile() {
       setIsSuccess(true);
       toast.success('Заявка успешно отправлена!');
     } catch (error) {
-      console.error('Booking error:', error);
+      // Error details logged server-side only for security
       toast.error('Произошла ошибка при отправке заявки');
     } finally {
       setIsSubmitting(false);

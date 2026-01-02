@@ -108,7 +108,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
       setIsSuccess(true);
       toast.success(t('booking.success'));
     } catch (error) {
-      console.error('Booking error:', error);
+      // Error details logged server-side only for security
       toast.error(t('common.error'));
     } finally {
       setIsSubmitting(false);

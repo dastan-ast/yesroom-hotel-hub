@@ -49,7 +49,7 @@ const Index = () => {
         .in('subscription_status', ['trial', 'active']);
 
       if (hotelsError) {
-        console.error('Error fetching hotels:', hotelsError);
+        // Error details not logged to console for security
         setLoading(false);
         return;
       }
