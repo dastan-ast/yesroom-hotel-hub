@@ -16,9 +16,13 @@ interface SearchBarProps {
   checkIn: Date | undefined;
   checkOut: Date | undefined;
   guests: number;
+  children: number;
+  childrenAges: number[];
   onCheckInChange: (date: Date | undefined) => void;
   onCheckOutChange: (date: Date | undefined) => void;
   onGuestsChange: (guests: number) => void;
+  onChildrenChange: (children: number) => void;
+  onChildrenAgesChange: (ages: number[]) => void;
   onSearch: () => void;
 }
 
@@ -26,13 +30,34 @@ export function SearchBar({
   checkIn,
   checkOut,
   guests,
+  children,
+  childrenAges,
   onCheckInChange,
   onCheckOutChange,
   onGuestsChange,
+  onChildrenChange,
+  onChildrenAgesChange,
   onSearch,
 }: SearchBarProps) {
   const { t } = useTranslation();
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // Handle children count change
+  const handleChildrenChange = (newCount: number) => {
+    onChildrenChange(newCount);
+    // Adjust ages array
+    if (newCount > childrenAges.length) {
+      onChildrenAgesChange([...childrenAges, ...Array(newCount - childrenAges.length).fill(5)]);
+    } else {
+      onChildrenAgesChange(childrenAges.slice(0, newCount));
+    }
+  };
+
+  const handleAgeChange = (index: number, age: number) => {
+    const newAges = [...childrenAges];
+    newAges[index] = age;
+    onChildrenAgesChange(newAges);
+  };
 
   // Auto-set checkout to next day when check-in changes
   useEffect(() => {
@@ -106,10 +131,10 @@ export function SearchBar({
           </Popover>
         </div>
 
-        {/* Guests */}
+        {/* Guests & Children */}
         <div className="flex-1 px-2 md:px-4 py-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            {t('rooms.guests')}
+            Гости
           </label>
           <Popover open={guestsOpen} onOpenChange={setGuestsOpen}>
             <PopoverTrigger asChild>
@@ -118,33 +143,85 @@ export function SearchBar({
                 className="w-full justify-start text-left font-normal p-0 h-auto hover:bg-transparent"
               >
                 <Users className="mr-2 h-4 w-4 shrink-0" />
-                {guests} {guests === 1 ? 'гость' : guests < 5 ? 'гостя' : 'гостей'}
+                <span className="truncate">
+                  {guests} взр.{children > 0 && `, ${children} дет.`}
+                </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-48" align="start">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{t('rooms.guests')}</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onGuestsChange(Math.max(1, guests - 1))}
-                    disabled={guests <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="w-8 text-center font-medium">{guests}</span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onGuestsChange(Math.min(10, guests + 1))}
-                    disabled={guests >= 10}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+            <PopoverContent className="w-64" align="start">
+              <div className="space-y-4">
+                {/* Adults */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Взрослые</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onGuestsChange(Math.max(1, guests - 1))}
+                      disabled={guests <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center font-medium">{guests}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onGuestsChange(Math.min(10, guests + 1))}
+                      disabled={guests >= 10}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Children */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Дети</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleChildrenChange(Math.max(0, children - 1))}
+                      disabled={children <= 0}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center font-medium">{children}</span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleChildrenChange(Math.min(6, children + 1))}
+                      disabled={children >= 6}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Children Ages */}
+                {children > 0 && (
+                  <div className="pt-2 border-t space-y-2">
+                    <span className="text-xs text-muted-foreground">Возраст детей</span>
+                    <div className="flex flex-wrap gap-2">
+                      {childrenAges.map((age, index) => (
+                        <select
+                          key={index}
+                          value={age}
+                          onChange={(e) => handleAgeChange(index, parseInt(e.target.value))}
+                          className="h-8 w-16 text-sm border rounded-md bg-background px-2"
+                        >
+                          {Array.from({ length: 18 }, (_, i) => (
+                            <option key={i} value={i}>{i} лет</option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </PopoverContent>
           </Popover>
@@ -154,7 +231,7 @@ export function SearchBar({
         <div className="px-2 py-2 md:pl-4 md:pr-2">
           <Button onClick={onSearch} className="w-full md:w-auto h-full md:px-8">
             <Search className="h-4 w-4 md:mr-2" />
-            <span className="md:inline">{t('common.search') || 'Найти'}</span>
+            <span className="md:inline">Найти</span>
           </Button>
         </div>
       </div>
