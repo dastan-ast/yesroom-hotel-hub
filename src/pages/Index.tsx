@@ -30,6 +30,8 @@ const Index = () => {
   const checkInParam = searchParams.get('checkIn');
   const checkOutParam = searchParams.get('checkOut');
   const guestsParam = searchParams.get('guests');
+  const childrenParam = searchParams.get('children');
+  const childrenAgesParam = searchParams.get('childrenAges');
 
   const [checkIn, setCheckIn] = useState<Date | undefined>(
     checkInParam ? new Date(checkInParam) : undefined
@@ -38,6 +40,10 @@ const Index = () => {
     checkOutParam ? new Date(checkOutParam) : undefined
   );
   const [guests, setGuests] = useState(guestsParam ? parseInt(guestsParam) : 2);
+  const [children, setChildren] = useState(childrenParam ? parseInt(childrenParam) : 0);
+  const [childrenAges, setChildrenAges] = useState<number[]>(
+    childrenAgesParam ? childrenAgesParam.split(',').map(Number) : []
+  );
 
   useEffect(() => {
     fetchHotels();
@@ -152,6 +158,12 @@ const Index = () => {
     if (checkIn) params.set('checkIn', format(checkIn, 'yyyy-MM-dd'));
     if (checkOut) params.set('checkOut', format(checkOut, 'yyyy-MM-dd'));
     params.set('guests', guests.toString());
+    if (children > 0) {
+      params.set('children', children.toString());
+      if (childrenAges.length > 0) {
+        params.set('childrenAges', childrenAges.join(','));
+      }
+    }
     setSearchParams(params);
   };
 
@@ -160,6 +172,12 @@ const Index = () => {
     if (checkIn) params.set('checkIn', format(checkIn, 'yyyy-MM-dd'));
     if (checkOut) params.set('checkOut', format(checkOut, 'yyyy-MM-dd'));
     params.set('guests', guests.toString());
+    if (children > 0) {
+      params.set('children', children.toString());
+      if (childrenAges.length > 0) {
+        params.set('childrenAges', childrenAges.join(','));
+      }
+    }
     return params.toString();
   };
 
@@ -198,9 +216,13 @@ const Index = () => {
               checkIn={checkIn}
               checkOut={checkOut}
               guests={guests}
+              children={children}
+              childrenAges={childrenAges}
               onCheckInChange={setCheckIn}
               onCheckOutChange={setCheckOut}
               onGuestsChange={setGuests}
+              onChildrenChange={setChildren}
+              onChildrenAgesChange={setChildrenAges}
               onSearch={handleSearch}
             />
           </div>
