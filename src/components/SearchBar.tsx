@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { CalendarIcon, Search, Users, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,15 @@ export function SearchBar({
   onGuestsChange,
   onSearch,
 }: SearchBarProps) {
+  const { t } = useTranslation();
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // Auto-set checkout to next day when check-in changes
+  useEffect(() => {
+    if (checkIn && (!checkOut || checkOut <= checkIn)) {
+      onCheckOutChange(addDays(checkIn, 1));
+    }
+  }, [checkIn]);
 
   return (
     <div className="bg-card rounded-xl shadow-xl border p-2 md:p-3">
@@ -38,7 +47,7 @@ export function SearchBar({
         {/* Check-in */}
         <div className="flex-1 px-2 md:px-4 py-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Заезд
+            {t('booking.checkIn')}
           </label>
           <Popover>
             <PopoverTrigger asChild>
@@ -50,7 +59,7 @@ export function SearchBar({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                {checkIn ? format(checkIn, 'dd MMM yyyy', { locale: ru }) : 'Выберите дату'}
+                {checkIn ? format(checkIn, 'dd MMM yyyy', { locale: ru }) : t('booking.checkIn')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -69,7 +78,7 @@ export function SearchBar({
         {/* Check-out */}
         <div className="flex-1 px-2 md:px-4 py-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Выезд
+            {t('booking.checkOut')}
           </label>
           <Popover>
             <PopoverTrigger asChild>
@@ -81,7 +90,7 @@ export function SearchBar({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                {checkOut ? format(checkOut, 'dd MMM yyyy', { locale: ru }) : 'Выберите дату'}
+                {checkOut ? format(checkOut, 'dd MMM yyyy', { locale: ru }) : t('booking.checkOut')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -100,7 +109,7 @@ export function SearchBar({
         {/* Guests */}
         <div className="flex-1 px-2 md:px-4 py-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Гости
+            {t('rooms.guests')}
           </label>
           <Popover open={guestsOpen} onOpenChange={setGuestsOpen}>
             <PopoverTrigger asChild>
@@ -114,7 +123,7 @@ export function SearchBar({
             </PopoverTrigger>
             <PopoverContent className="w-48" align="start">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Гости</span>
+                <span className="text-sm font-medium">{t('rooms.guests')}</span>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -145,7 +154,7 @@ export function SearchBar({
         <div className="px-2 py-2 md:pl-4 md:pr-2">
           <Button onClick={onSearch} className="w-full md:w-auto h-full md:px-8">
             <Search className="h-4 w-4 md:mr-2" />
-            <span className="md:inline">Найти</span>
+            <span className="md:inline">{t('common.search') || 'Найти'}</span>
           </Button>
         </div>
       </div>

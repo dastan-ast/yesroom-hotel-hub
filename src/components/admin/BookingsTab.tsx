@@ -5,8 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
+import { GuestHistoryModal } from './GuestHistoryModal';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -35,6 +36,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [historyPhone, setHistoryPhone] = useState<string | null>(null);
 
   useEffect(() => {
     if (hotelId) {
@@ -85,6 +87,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     return labels[source] || source;
   };
 
+  const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
   }
@@ -119,13 +123,28 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   </Badge>
                   {booking.prepayment_received && (
                     <Badge variant="outline" className="text-green-600 border-green-600">
-                      ₸ Предоплата
+                      ₸ {t('admin.prepayment')}
                     </Badge>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {booking.guest_phone} • {booking.room_types?.name}
-                </p>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <button
+                    onClick={() => setHistoryPhone(booking.guest_phone)}
+                    className="hover:text-primary flex items-center gap-1"
+                  >
+                    <Phone className="h-3 w-3" />
+                    {booking.guest_phone}
+                  </button>
+                  <a
+                    href={`https://wa.me/${formatPhone(booking.guest_phone).replace('+', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-600 hover:text-green-700"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </a>
+                  <span>• {booking.room_types?.name}</span>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {format(new Date(booking.check_in_date), 'dd.MM')} —{' '}
                   {format(new Date(booking.check_out_date), 'dd.MM.yyyy')}
@@ -166,6 +185,13 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSuccess={fetchBookings}
+        hotelId={hotelId}
+      />
+
+      <GuestHistoryModal
+        open={!!historyPhone}
+        onOpenChange={(open) => !open && setHistoryPhone(null)}
+        phone={historyPhone || ''}
         hotelId={hotelId}
       />
     </div>

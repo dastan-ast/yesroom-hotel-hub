@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
+import { format, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
@@ -38,6 +39,7 @@ import {
   Minus,
   Plus,
   CheckCircle2,
+  Baby,
 } from 'lucide-react';
 
 interface Hotel {
@@ -61,6 +63,7 @@ interface RoomType {
 }
 
 export default function HotelProfile() {
+  const { t } = useTranslation();
   const { hotelSlug } = useParams();
   const [searchParams] = useSearchParams();
   const [hotel, setHotel] = useState<Hotel | null>(null);
@@ -82,11 +85,55 @@ export default function HotelProfile() {
   const [guests, setGuests] = useState(guestsParam ? parseInt(guestsParam) : 2);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [city, setCity] = useState('');
+  const [street, setStreet] = useState('');
+  const [childrenCount, setChildrenCount] = useState(0);
+  const [childrenAges, setChildrenAges] = useState<number[]>([]);
   const [selectedRoomType, setSelectedRoomType] = useState('');
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // Phone mask handler
+  const formatPhone = (input: string) => {
+    const digits = input.replace(/\D/g, '');
+    let normalized = digits;
+    if (digits.startsWith('8') && digits.length > 1) {
+      normalized = '7' + digits.slice(1);
+    } else if (!digits.startsWith('7') && digits.length > 0) {
+      normalized = '7' + digits;
+    }
+    const d = normalized;
+    let formatted = '';
+    if (d.length >= 1) formatted = '+' + d.charAt(0);
+    if (d.length >= 2) formatted += ' ' + d.substring(1, Math.min(4, d.length));
+    if (d.length >= 5) formatted += '-' + d.substring(4, Math.min(7, d.length));
+    if (d.length >= 8) formatted += '-' + d.substring(7, Math.min(9, d.length));
+    if (d.length >= 10) formatted += '-' + d.substring(9, Math.min(11, d.length));
+    return formatted;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGuestPhone(formatPhone(e.target.value));
+  };
+
+  // Auto-set checkout when check-in changes
+  useEffect(() => {
+    if (checkIn && (!checkOut || checkOut <= checkIn)) {
+      setCheckOut(addDays(checkIn, 1));
+    }
+  }, [checkIn]);
+
+  // Update children ages array when count changes
+  useEffect(() => {
+    setChildrenAges(prev => {
+      if (childrenCount > prev.length) {
+        return [...prev, ...Array(childrenCount - prev.length).fill(0)];
+      }
+      return prev.slice(0, childrenCount);
+    });
+  }, [childrenCount]);
 
   useEffect(() => {
     const fetchHotelData = async () => {
@@ -132,12 +179,51 @@ export default function HotelProfile() {
     e.preventDefault();
 
     if (!guestName || !guestPhone || !checkIn || !checkOut || !selectedRoomType) {
-      toast.error('Пожалуйста, заполните все обязательные поля');
+      toast.error(t('common.error'));
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // Check if client exists by phone
+      let clientId: string | null = null;
+      const rawPhone = guestPhone.replace(/\D/g, '');
+      
+      const { data: existingClient } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('hotel_id', hotel?.id)
+        .eq('phone', guestPhone)
+        .maybeSingle();
+
+      if (existingClient) {
+        clientId = existingClient.id;
+      } else {
+        // Create new client
+        const { data: newClient } = await supabase
+          .from('clients')
+          .insert({
+            hotel_id: hotel?.id,
+            full_name: guestName,
+            phone: guestPhone,
+          })
+          .select('id')
+          .single();
+
+        if (newClient) {
+          clientId = newClient.id;
+        }
+      }
+
+      // Build additional_info object
+      const additionalInfo: Record<string, any> = {};
+      if (city) additionalInfo.city = city;
+      if (street) additionalInfo.street = street;
+      if (childrenCount > 0) {
+        additionalInfo.children_count = childrenCount;
+        additionalInfo.children_ages = childrenAges;
+      }
+
       const { error } = await supabase.from('bookings').insert({
         guest_name: guestName,
         guest_phone: guestPhone,
@@ -149,15 +235,16 @@ export default function HotelProfile() {
         source: 'web',
         status: 'pending',
         hotel_id: hotel?.id || null,
+        client_id: clientId,
+        additional_info: Object.keys(additionalInfo).length > 0 ? additionalInfo : null,
       });
 
       if (error) throw error;
 
       setIsSuccess(true);
-      toast.success('Заявка успешно отправлена!');
+      toast.success(t('booking.success'));
     } catch (error) {
-      // Error details logged server-side only for security
-      toast.error('Произошла ошибка при отправке заявки');
+      toast.error(t('common.error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -177,14 +264,14 @@ export default function HotelProfile() {
         <Navbar />
         <div className="container mx-auto px-4 py-20 text-center">
           <Building2 className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-display font-bold mb-2">Отель не найден</h1>
+          <h1 className="text-2xl font-display font-bold mb-2">{t('common.error')}</h1>
           <p className="text-muted-foreground mb-6">
-            Проверьте правильность ссылки или отель ещё не активирован
+            Hotel not found
           </p>
           <Button asChild>
             <Link to="/">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Вернуться к поиску
+              {t('common.back')}
             </Link>
           </Button>
         </div>
@@ -214,7 +301,7 @@ export default function HotelProfile() {
         <Button variant="ghost" asChild className="gap-2">
           <Link to="/">
             <ArrowLeft className="h-4 w-4" />
-            Назад к поиску
+            {t('common.back')}
           </Link>
         </Button>
       </div>
@@ -231,7 +318,7 @@ export default function HotelProfile() {
           ) : (
             <div className="text-center">
               <Building2 className="h-20 w-20 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">Фотографии отеля</p>
+              <p className="text-muted-foreground">{t('rooms.title')}</p>
             </div>
           )}
         </div>
@@ -255,7 +342,7 @@ export default function HotelProfile() {
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">от</p>
                   <p className="text-3xl font-bold text-primary">{minPrice.toLocaleString()} ₸</p>
-                  <p className="text-sm text-muted-foreground">за ночь</p>
+                  <p className="text-sm text-muted-foreground">{t('rooms.perNight')}</p>
                 </div>
               )}
             </div>
@@ -265,13 +352,13 @@ export default function HotelProfile() {
                 <Wifi className="h-3 w-3" /> Wi-Fi
               </Badge>
               <Badge variant="secondary" className="gap-1">
-                <Car className="h-3 w-3" /> Парковка
+                <Car className="h-3 w-3" /> {t('rooms.amenities')}
               </Badge>
               <Badge variant="secondary" className="gap-1">
-                <Coffee className="h-3 w-3" /> Завтрак
+                <Coffee className="h-3 w-3" /> {t('rooms.amenities')}
               </Badge>
               <Badge variant="secondary" className="gap-1">
-                <Utensils className="h-3 w-3" /> Ресторан
+                <Utensils className="h-3 w-3" /> {t('rooms.amenities')}
               </Badge>
             </div>
           </div>
@@ -283,7 +370,7 @@ export default function HotelProfile() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Room Types */}
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-display font-bold mb-6">Доступные номера</h2>
+            <h2 className="text-2xl font-display font-bold mb-6">{t('rooms.title')}</h2>
             {roomTypes.length > 0 ? (
               <div className="grid md:grid-cols-2 gap-6">
                 {roomTypes.map((room) => (
@@ -303,7 +390,7 @@ export default function HotelProfile() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Номера скоро появятся</p>
+                  <p className="text-muted-foreground">{t('common.loading')}</p>
                 </CardContent>
               </Card>
             )}
@@ -313,7 +400,7 @@ export default function HotelProfile() {
           <div>
             <Card className="sticky top-20">
               <CardHeader>
-                <CardTitle className="font-display">Забронировать номер</CardTitle>
+                <CardTitle className="font-display">{t('booking.title')}</CardTitle>
               </CardHeader>
               <CardContent>
                 {isSuccess ? (
@@ -321,9 +408,9 @@ export default function HotelProfile() {
                     <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                       <CheckCircle2 className="h-8 w-8 text-green-600" />
                     </div>
-                    <h3 className="font-semibold mb-2">Заявка отправлена!</h3>
+                    <h3 className="font-semibold mb-2">{t('booking.success')}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Мы свяжемся с вами для подтверждения
+                      {t('booking.successMessage')}
                     </p>
                   </div>
                 ) : (
@@ -331,7 +418,7 @@ export default function HotelProfile() {
                     {/* Dates */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Заезд</label>
+                        <label className="text-sm font-medium mb-1.5 block">{t('booking.checkIn')}</label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -342,7 +429,7 @@ export default function HotelProfile() {
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {checkIn ? format(checkIn, 'dd.MM.yy') : 'Дата'}
+                              {checkIn ? format(checkIn, 'dd.MM.yy') : t('booking.checkIn')}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -358,7 +445,7 @@ export default function HotelProfile() {
                         </Popover>
                       </div>
                       <div>
-                        <label className="text-sm font-medium mb-1.5 block">Выезд</label>
+                        <label className="text-sm font-medium mb-1.5 block">{t('booking.checkOut')}</label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
@@ -369,7 +456,7 @@ export default function HotelProfile() {
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {checkOut ? format(checkOut, 'dd.MM.yy') : 'Дата'}
+                              {checkOut ? format(checkOut, 'dd.MM.yy') : t('booking.checkOut')}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -388,7 +475,7 @@ export default function HotelProfile() {
 
                     {/* Guests */}
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Гости</label>
+                      <label className="text-sm font-medium mb-1.5 block">{t('rooms.guests')}</label>
                       <Popover open={guestsOpen} onOpenChange={setGuestsOpen}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="w-full justify-start">
@@ -397,31 +484,91 @@ export default function HotelProfile() {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-full" align="start">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">Количество гостей</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                type="button"
-                                onClick={() => setGuests(Math.max(1, guests - 1))}
-                                disabled={guests <= 1}
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="w-8 text-center font-medium">{guests}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                type="button"
-                                onClick={() => setGuests(Math.min(10, guests + 1))}
-                                disabled={guests >= 10}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">{t('rooms.guests')}</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  type="button"
+                                  onClick={() => setGuests(Math.max(1, guests - 1))}
+                                  disabled={guests <= 1}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="w-8 text-center font-medium">{guests}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  type="button"
+                                  onClick={() => setGuests(Math.min(10, guests + 1))}
+                                  disabled={guests >= 10}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium flex items-center gap-1">
+                                <Baby className="h-4 w-4" />
+                                {t('booking.children')}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  type="button"
+                                  onClick={() => setChildrenCount(Math.max(0, childrenCount - 1))}
+                                  disabled={childrenCount <= 0}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="w-8 text-center font-medium">{childrenCount}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  type="button"
+                                  onClick={() => setChildrenCount(Math.min(5, childrenCount + 1))}
+                                  disabled={childrenCount >= 5}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            {childrenCount > 0 && (
+                              <div className="pt-2 border-t">
+                                <p className="text-xs text-muted-foreground mb-2">{t('booking.childrenAges')}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {childrenAges.map((age, idx) => (
+                                    <Select
+                                      key={idx}
+                                      value={age.toString()}
+                                      onValueChange={(val) => {
+                                        const newAges = [...childrenAges];
+                                        newAges[idx] = parseInt(val);
+                                        setChildrenAges(newAges);
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-16 h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {Array.from({ length: 18 }, (_, i) => (
+                                          <SelectItem key={i} value={i.toString()}>
+                                            {i}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </PopoverContent>
                       </Popover>
@@ -429,10 +576,10 @@ export default function HotelProfile() {
 
                     {/* Room Type */}
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Тип номера</label>
+                      <label className="text-sm font-medium mb-1.5 block">{t('booking.roomType')}</label>
                       <Select value={selectedRoomType} onValueChange={setSelectedRoomType}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Выберите номер" />
+                          <SelectValue placeholder={t('booking.selectRoom')} />
                         </SelectTrigger>
                         <SelectContent>
                           {roomTypes.map((type) => (
@@ -446,9 +593,9 @@ export default function HotelProfile() {
 
                     {/* Guest Info */}
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Ваше имя</label>
+                      <label className="text-sm font-medium mb-1.5 block">{t('booking.guestName')}</label>
                       <Input
-                        placeholder="Иван Иванов"
+                        placeholder="Иванов Иван Иванович"
                         value={guestName}
                         onChange={(e) => setGuestName(e.target.value)}
                         required
@@ -456,19 +603,38 @@ export default function HotelProfile() {
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Телефон</label>
+                      <label className="text-sm font-medium mb-1.5 block">{t('booking.phone')}</label>
                       <Input
-                        placeholder="+7 (777) 123-45-67"
+                        placeholder="+7 777-123-45-67"
                         value={guestPhone}
-                        onChange={(e) => setGuestPhone(e.target.value)}
+                        onChange={handlePhoneChange}
                         required
                       />
                     </div>
 
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">{t('booking.city')}</label>
+                        <Input
+                          placeholder="Алматы"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">{t('booking.street')}</label>
+                        <Input
+                          placeholder="ул. Абая 1"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Комментарий</label>
+                      <label className="text-sm font-medium mb-1.5 block">{t('booking.comment')}</label>
                       <Textarea
-                        placeholder="Пожелания к бронированию..."
+                        placeholder={t('booking.commentPlaceholder')}
                         value={comment}
                         onChange={(e) => setComment(e.target.value)}
                         className="resize-none"
@@ -493,7 +659,7 @@ export default function HotelProfile() {
                     )}
 
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
-                      {isSubmitting ? 'Отправка...' : 'Отправить заявку'}
+                      {isSubmitting ? t('common.loading') : t('booking.submit')}
                     </Button>
                   </form>
                 )}

@@ -40,55 +40,112 @@ const Index = () => {
   const [guests, setGuests] = useState(guestsParam ? parseInt(guestsParam) : 2);
 
   useEffect(() => {
-    const fetchHotels = async () => {
-      // Fetch active hotels
-      const { data: hotelsData, error: hotelsError } = await supabase
-        .from('hotels')
-        .select('id, name, slug, location, description, logo_url')
-        .eq('status', 'active')
-        .in('subscription_status', ['trial', 'active']);
-
-      if (hotelsError) {
-        // Error details not logged to console for security
-        setLoading(false);
-        return;
-      }
-
-      if (!hotelsData || hotelsData.length === 0) {
-        setHotels([]);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch min prices for each hotel
-      const hotelIds = hotelsData.map(h => h.id);
-      const { data: roomTypesData } = await supabase
-        .from('room_types')
-        .select('hotel_id, price_per_night')
-        .in('hotel_id', hotelIds);
-
-      // Calculate min price per hotel
-      const minPriceMap: Record<string, number> = {};
-      roomTypesData?.forEach(rt => {
-        if (rt.hotel_id) {
-          const price = Number(rt.price_per_night);
-          if (!minPriceMap[rt.hotel_id] || price < minPriceMap[rt.hotel_id]) {
-            minPriceMap[rt.hotel_id] = price;
-          }
-        }
-      });
-
-      const hotelsWithPrices: HotelWithPrice[] = hotelsData.map(hotel => ({
-        ...hotel,
-        minPrice: minPriceMap[hotel.id] || null,
-      }));
-
-      setHotels(hotelsWithPrices);
-      setLoading(false);
-    };
-
     fetchHotels();
-  }, []);
+  }, [checkIn, checkOut, guests]);
+
+  const fetchHotels = async () => {
+    setLoading(true);
+
+    // Fetch active hotels
+    const { data: hotelsData, error: hotelsError } = await supabase
+      .from('hotels')
+      .select('id, name, slug, location, description, logo_url')
+      .eq('status', 'active')
+      .in('subscription_status', ['trial', 'active']);
+
+    if (hotelsError) {
+      setLoading(false);
+      return;
+    }
+
+    if (!hotelsData || hotelsData.length === 0) {
+      setHotels([]);
+      setLoading(false);
+      return;
+    }
+
+    const hotelIds = hotelsData.map(h => h.id);
+
+    // Fetch room types with capacity filtering
+    let roomTypesQuery = supabase
+      .from('room_types')
+      .select('hotel_id, price_per_night, capacity')
+      .in('hotel_id', hotelIds);
+    
+    if (guests > 1) {
+      roomTypesQuery = roomTypesQuery.gte('capacity', guests);
+    }
+    
+    const { data: roomTypesData } = await roomTypesQuery;
+
+    // If filtering by dates, check room availability
+    let availableHotelIds = new Set(hotelIds);
+    
+    if (checkIn && checkOut) {
+      // Get hotels that have at least one available room
+      const { data: roomsData } = await supabase
+        .from('rooms')
+        .select('hotel_id, id, room_type_id')
+        .in('hotel_id', hotelIds)
+        .eq('status', 'available');
+
+      if (roomsData && roomsData.length > 0) {
+        const roomIds = roomsData.map(r => r.id);
+        
+        // Check for conflicting bookings
+        const { data: bookingsData } = await supabase
+          .from('bookings')
+          .select('room_id')
+          .in('room_id', roomIds)
+          .in('status', ['pending', 'approved', 'checked_in'])
+          .lt('check_in_date', format(checkOut, 'yyyy-MM-dd'))
+          .gt('check_out_date', format(checkIn, 'yyyy-MM-dd'));
+
+        const bookedRoomIds = new Set(bookingsData?.map(b => b.room_id) || []);
+        
+        // Filter to hotels with at least one available room
+        const hotelRoomCounts = new Map<string, number>();
+        roomsData.forEach(room => {
+          if (!bookedRoomIds.has(room.id)) {
+            hotelRoomCounts.set(room.hotel_id!, (hotelRoomCounts.get(room.hotel_id!) || 0) + 1);
+          }
+        });
+
+        availableHotelIds = new Set(hotelRoomCounts.keys());
+      } else {
+        availableHotelIds = new Set();
+      }
+    }
+
+    // Calculate min price per hotel (considering capacity filter)
+    const minPriceMap: Record<string, number> = {};
+    roomTypesData?.forEach(rt => {
+      if (rt.hotel_id) {
+        const price = Number(rt.price_per_night);
+        if (!minPriceMap[rt.hotel_id] || price < minPriceMap[rt.hotel_id]) {
+          minPriceMap[rt.hotel_id] = price;
+        }
+      }
+    });
+
+    // Filter hotels based on availability and capacity
+    const filteredHotels = hotelsData.filter(hotel => {
+      // If no dates selected, show hotels with rooms matching capacity
+      if (!checkIn || !checkOut) {
+        return !guests || guests <= 1 || minPriceMap[hotel.id] !== undefined;
+      }
+      // If dates selected, filter by availability
+      return availableHotelIds.has(hotel.id);
+    });
+
+    const hotelsWithPrices: HotelWithPrice[] = filteredHotels.map(hotel => ({
+      ...hotel,
+      minPrice: minPriceMap[hotel.id] || null,
+    }));
+
+    setHotels(hotelsWithPrices);
+    setLoading(false);
+  };
 
   const handleSearch = () => {
     const params = new URLSearchParams();

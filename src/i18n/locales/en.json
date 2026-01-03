@@ -24,8 +24,10 @@
   },
   "booking": {
     "title": "Book a Room",
-    "guestName": "Your Name",
+    "guestName": "Full Name",
     "phone": "Phone",
+    "city": "City",
+    "street": "Street",
     "checkIn": "Check-in Date",
     "checkOut": "Check-out Date",
     "roomType": "Room Type",
@@ -34,7 +36,11 @@
     "commentPlaceholder": "Special requests...",
     "submit": "Submit Request",
     "success": "Request Sent!",
-    "successMessage": "The administrator will contact you shortly to confirm your booking."
+    "successMessage": "The administrator will contact you shortly to confirm your booking.",
+    "children": "Children",
+    "childrenCount": "Number of children",
+    "childrenAges": "Children ages",
+    "addChild": "Add child"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -42,6 +48,7 @@
     "rooms": "Rooms",
     "roomTypes": "Room Types",
     "clients": "Clients",
+    "shahmatka": "Occupancy Grid",
     "newBooking": "New Booking",
     "approve": "Approve",
     "checkIn": "Check In",
@@ -95,6 +102,8 @@
     "success": "Success!",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "back": "Back"
+    "back": "Back",
+    "search": "Search"
   }
 }
+
