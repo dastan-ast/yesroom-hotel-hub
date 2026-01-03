@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       bookings: {
         Row: {
+          additional_info: Json | null
           check_in_date: string
           check_out_date: string
           client_id: string | null
@@ -35,6 +36,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          additional_info?: Json | null
           check_in_date: string
           check_out_date: string
           client_id?: string | null
@@ -54,6 +56,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          additional_info?: Json | null
           check_in_date?: string
           check_out_date?: string
           client_id?: string | null
