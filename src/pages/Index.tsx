@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Navbar } from '@/components/Navbar';
 import { SearchBar } from '@/components/SearchBar';
 import { HotelCard } from '@/components/HotelCard';
@@ -22,9 +23,24 @@ interface HotelWithPrice extends Hotel {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, isAdmin, isSuperAdmin, hotelId, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Redirect admins to their dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (isSuperAdmin) {
+        navigate('/super-admin');
+      } else if (isAdmin && hotelId) {
+        navigate('/admin/dashboard');
+      } else if (isAdmin && !hotelId) {
+        navigate('/onboarding');
+      }
+    }
+  }, [user, authLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
 
   // Parse URL params
   const checkInParam = searchParams.get('checkIn');

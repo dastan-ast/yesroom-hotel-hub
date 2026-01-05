@@ -5,9 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
+import { RoomAssignDialog } from './RoomAssignDialog';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -22,6 +23,7 @@ interface Booking {
   prepayment_received: boolean;
   room_types: { name: string } | null;
   room_id: string | null;
+  room_type_id: string | null;
 }
 
 const statusColors: Record<BookingStatus, string> = {
@@ -37,6 +39,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [historyPhone, setHistoryPhone] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,7 +53,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const { data } = await supabase
       .from('bookings')
-      .select('*, room_types(name)')
+      .select('*, room_types(name), room_id, room_type_id')
       .eq('hotel_id', hotelId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -122,6 +126,21 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
     toast.success(t('common.success'));
+    fetchBookings();
+  };
+
+  const handleQuickApprove = async (bookingId: string) => {
+    const { error } = await supabase
+      .from('bookings')
+      .update({ status: 'approved' })
+      .eq('id', bookingId);
+
+    if (error) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    toast.success('Бронирование подтверждено (без номера)');
     fetchBookings();
   };
 
@@ -211,7 +230,14 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
               <div className="flex gap-2 flex-wrap">
                 {booking.status === 'pending' && (
                   <>
-                    <Button size="sm" onClick={() => updateStatus(booking.id, 'approved')}>
+                    <Button size="sm" onClick={() => {
+                      setSelectedBooking(booking);
+                      setAssignDialogOpen(true);
+                    }}>
+                      <DoorOpen className="h-4 w-4 mr-1" />
+                      Назначить номер
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleQuickApprove(booking.id)}>
                       <CheckCircle className="h-4 w-4 mr-1" />
                       {t('admin.approve')}
                     </Button>
@@ -220,6 +246,15 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                       {t('admin.cancel')}
                     </Button>
                   </>
+                )}
+                {booking.status === 'approved' && !booking.room_id && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setSelectedBooking(booking);
+                    setAssignDialogOpen(true);
+                  }}>
+                    <DoorOpen className="h-4 w-4 mr-1" />
+                    Назначить номер
+                  </Button>
                 )}
                 {booking.status === 'approved' && (
                   <Button size="sm" onClick={() => handleCheckIn(booking)}>
@@ -252,6 +287,17 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         phone={historyPhone || ''}
         hotelId={hotelId}
       />
+
+      {selectedBooking && (
+        <RoomAssignDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          bookingId={selectedBooking.id}
+          hotelId={hotelId}
+          roomTypeId={selectedBooking.room_type_id}
+          onSuccess={fetchBookings}
+        />
+      )}
     </div>
   );
 }
