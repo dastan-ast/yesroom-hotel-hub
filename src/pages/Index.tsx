@@ -254,9 +254,9 @@ const Index = () => {
           </div>
 
           {loading ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-card rounded-xl animate-pulse">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="bg-card rounded-xl animate-pulse h-[340px]">
                   <div className="aspect-[16/10] bg-muted rounded-t-xl" />
                   <div className="p-5 space-y-3">
                     <div className="h-5 bg-muted rounded w-3/4" />
@@ -267,7 +267,7 @@ const Index = () => {
               ))}
             </div>
           ) : hotels.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
               {hotels.map((hotel, index) => (
                 <div
                   key={hotel.id}

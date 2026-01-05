@@ -28,7 +28,7 @@ export function HotelCard({
 
   return (
     <Link to={hotelUrl} className="block h-full">
-      <Card className="overflow-hidden card-hover group h-full flex flex-col">
+      <Card className="overflow-hidden card-hover group h-full flex flex-col min-h-[320px]">
         <div className="aspect-[16/10] bg-gradient-to-br from-primary/10 to-primary/5 relative overflow-hidden flex-shrink-0">
           {logoUrl ? (
             <img
@@ -48,11 +48,11 @@ export function HotelCard({
           )}
         </div>
         <CardContent className="p-5 flex flex-col flex-grow">
-          <h3 className="font-display font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
+          <h3 className="font-display font-semibold text-lg mb-1 group-hover:text-primary transition-colors line-clamp-1">
             {name}
           </h3>
           {location && (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3">
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground mb-2">
               <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="truncate">{location}</span>
             </p>
@@ -62,8 +62,8 @@ export function HotelCard({
               {description}
             </p>
           )}
-          <div className="mt-4 pt-3 border-t border-border">
-            <span className="text-sm font-medium text-primary">Смотреть номера →</span>
+          <div className="mt-auto pt-3 border-t border-border">
+            <span className="text-sm font-medium text-primary">Подробнее →</span>
           </div>
         </CardContent>
       </Card>
