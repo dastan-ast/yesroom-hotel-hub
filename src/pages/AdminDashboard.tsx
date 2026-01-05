@@ -6,13 +6,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
 import { ClientsTab } from '@/components/admin/ClientsTab';
 import { ShahmatkaGrid } from '@/components/admin/ShahmatkaGrid';
 import { LiveFeedSidebar } from '@/components/admin/LiveFeedSidebar';
+import { ServiceLogTab } from '@/components/admin/ServiceLogTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -98,6 +99,7 @@ export default function AdminDashboard() {
     { id: 'rooms', icon: DoorOpen, label: t('admin.rooms') },
     { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes') },
     { id: 'clients', icon: Users, label: t('admin.clients') },
+    { id: 'services', icon: Coffee, label: 'Журнал услуг' },
   ];
 
   return (
@@ -283,6 +285,14 @@ export default function AdminDashboard() {
                   <Card>
                     <CardContent className="pt-6">
                       <ClientsTab hotelId={hotelId} />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeTab === 'services' && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <ServiceLogTab hotelId={hotelId} />
                     </CardContent>
                   </Card>
                 )}

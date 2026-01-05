@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { Bell, CheckCircle, XCircle, Phone, MessageCircle } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Phone, MessageCircle, DoorOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RoomAssignDialog } from './RoomAssignDialog';
 
 interface PendingBooking {
   id: string;
@@ -16,6 +17,7 @@ interface PendingBooking {
   check_in_date: string;
   check_out_date: string;
   created_at: string;
+  room_type_id: string | null;
   room_types: { name: string } | null;
 }
 
@@ -28,6 +30,8 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
   const { t } = useTranslation();
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedBookingForAssign, setSelectedBookingForAssign] = useState<PendingBooking | null>(null);
 
   useEffect(() => {
     if (hotelId) {
@@ -60,7 +64,7 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     setLoading(true);
     const { data } = await supabase
       .from('bookings')
-      .select('id, guest_name, guest_phone, check_in_date, check_out_date, created_at, room_types(name)')
+      .select('id, guest_name, guest_phone, check_in_date, check_out_date, created_at, room_type_id, room_types(name)')
       .eq('hotel_id', hotelId)
       .eq('status', 'pending')
       .eq('source', 'web')
@@ -71,13 +75,12 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     setLoading(false);
   };
 
-  const handleApprove = async (id: string) => {
-    const { error } = await supabase.from('bookings').update({ status: 'approved' }).eq('id', id);
-    if (error) {
-      toast.error(t('common.error'));
-      return;
-    }
-    toast.success('Бронирование подтверждено');
+  const handleOpenAssignDialog = (booking: PendingBooking) => {
+    setSelectedBookingForAssign(booking);
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssignSuccess = () => {
     fetchPendingBookings();
     onBookingUpdated?.();
   };
@@ -156,10 +159,10 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
                   <Button
                     size="sm"
                     className="flex-1 h-7 text-xs"
-                    onClick={() => handleApprove(booking.id)}
+                    onClick={() => handleOpenAssignDialog(booking)}
                   >
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    {t('admin.approve')}
+                    <DoorOpen className="h-3 w-3 mr-1" />
+                    Назначить номер
                   </Button>
                   <Button
                     size="sm"
@@ -175,6 +178,18 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
           </div>
         )}
       </ScrollArea>
+
+      {/* Room assignment dialog */}
+      {selectedBookingForAssign && (
+        <RoomAssignDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          bookingId={selectedBookingForAssign.id}
+          hotelId={hotelId}
+          roomTypeId={selectedBookingForAssign.room_type_id}
+          onSuccess={handleAssignSuccess}
+        />
+      )}
     </div>
   );
 }
