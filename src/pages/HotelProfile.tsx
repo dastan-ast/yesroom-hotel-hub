@@ -71,24 +71,39 @@ export default function HotelProfile() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Booking form state - pre-fill from URL params
+  // Booking form state - pre-fill from URL params with defaults
   const checkInParam = searchParams.get('checkIn');
   const checkOutParam = searchParams.get('checkOut');
   const guestsParam = searchParams.get('guests');
+  const childrenParam = searchParams.get('children');
+  const childrenAgesParam = searchParams.get('childrenAges');
+
+  // Default: check-in = today, check-out = tomorrow
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = addDays(today, 1);
 
   const [checkIn, setCheckIn] = useState<Date | undefined>(
-    checkInParam ? new Date(checkInParam) : undefined
+    checkInParam ? new Date(checkInParam) : today
   );
   const [checkOut, setCheckOut] = useState<Date | undefined>(
-    checkOutParam ? new Date(checkOutParam) : undefined
+    checkOutParam ? new Date(checkOutParam) : tomorrow
   );
   const [guests, setGuests] = useState(guestsParam ? parseInt(guestsParam) : 2);
+  
+  // Parse children from URL params
+  const initialChildrenCount = childrenParam ? parseInt(childrenParam) : 0;
+  const initialChildrenAges = childrenAgesParam 
+    ? childrenAgesParam.split(',').map(a => parseInt(a) || 0)
+    : [];
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [city, setCity] = useState('');
   const [street, setStreet] = useState('');
-  const [childrenCount, setChildrenCount] = useState(0);
-  const [childrenAges, setChildrenAges] = useState<number[]>([]);
+  const [childrenCount, setChildrenCount] = useState(initialChildrenCount);
+  const [childrenAges, setChildrenAges] = useState<number[]>(
+    initialChildrenAges.length > 0 ? initialChildrenAges : []
+  );
   const [selectedRoomType, setSelectedRoomType] = useState('');
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
