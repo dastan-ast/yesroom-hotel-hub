@@ -46,7 +46,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [loading, setLoading] = useState(true);
 
   const days = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => addDays(startDate, i));
+    return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
   }, [startDate]);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const fetchData = async () => {
     setLoading(true);
     
-    const endDate = addDays(startDate, 14);
+    const endDate = addDays(startDate, 7);
     
     const [roomsRes, bookingsRes] = await Promise.all([
       supabase
@@ -157,7 +157,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={15} className="p-8 text-center text-muted-foreground">
+                <td colSpan={8} className="p-8 text-center text-muted-foreground">
                   Нет номеров
                 </td>
               </tr>
