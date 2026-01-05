@@ -21,6 +21,7 @@ interface Booking {
   source: string;
   prepayment_received: boolean;
   room_types: { name: string } | null;
+  room_id: string | null;
 }
 
 const statusColors: Record<BookingStatus, string> = {
@@ -55,6 +56,63 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     
     if (data) setBookings(data as Booking[]);
     setLoading(false);
+  };
+
+  const handleCheckIn = async (booking: Booking) => {
+    if (!booking.room_id) {
+      toast.error('Номер не назначен');
+      return;
+    }
+
+    const { error: bookingError } = await supabase
+      .from('bookings')
+      .update({ status: 'checked_in' })
+      .eq('id', booking.id);
+
+    if (bookingError) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    const { error: roomError } = await supabase
+      .from('rooms')
+      .update({ status: 'occupied' })
+      .eq('id', booking.room_id);
+
+    if (roomError) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    toast.success(t('common.success'));
+    fetchBookings();
+  };
+
+  const handleCheckOut = async (booking: Booking) => {
+    const { error: bookingError } = await supabase
+      .from('bookings')
+      .update({ status: 'checked_out' })
+      .eq('id', booking.id);
+
+    if (bookingError) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    if (booking.room_id) {
+      const { error: roomError } = await supabase
+        .from('rooms')
+        .update({ status: 'available' })
+        .eq('id', booking.room_id);
+
+      if (roomError) {
+        toast.error(t('common.error'));
+        return;
+      }
+    }
+
+    toast.success(t('common.success'));
+    fetchBookings();
   };
 
   const updateStatus = async (id: string, status: BookingStatus) => {
@@ -164,13 +222,13 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   </>
                 )}
                 {booking.status === 'approved' && (
-                  <Button size="sm" onClick={() => updateStatus(booking.id, 'checked_in')}>
+                  <Button size="sm" onClick={() => handleCheckIn(booking)}>
                     <LogIn className="h-4 w-4 mr-1" />
                     {t('admin.checkIn')}
                   </Button>
                 )}
                 {booking.status === 'checked_in' && (
-                  <Button size="sm" variant="secondary" onClick={() => updateStatus(booking.id, 'checked_out')}>
+                  <Button size="sm" variant="secondary" onClick={() => handleCheckOut(booking)}>
                     <LogOut className="h-4 w-4 mr-1" />
                     {t('admin.checkOut')}
                   </Button>
