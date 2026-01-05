@@ -34,7 +34,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function Auth() {
   const { t } = useTranslation();
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, isAdmin, isSuperAdmin, hotelId, loading } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,10 +46,18 @@ export default function Auth() {
   };
 
   useEffect(() => {
-    if (user) {
-      navigate('/');
+    if (user && !loading) {
+      if (isSuperAdmin) {
+        navigate('/super-admin');
+      } else if (isAdmin && hotelId) {
+        navigate('/admin/dashboard');
+      } else if (isAdmin && !hotelId) {
+        navigate('/onboarding');
+      } else {
+        navigate('/');
+      }
     }
-  }, [user, navigate]);
+  }, [user, loading, isAdmin, isSuperAdmin, hotelId, navigate]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -66,9 +74,8 @@ export default function Auth() {
     const { error } = await signIn(data.email, data.password);
     if (error) {
       toast.error(error.message);
-    } else {
-      navigate('/');
     }
+    // Редирект произойдёт автоматически через useEffect
     setIsLoading(false);
   };
 
