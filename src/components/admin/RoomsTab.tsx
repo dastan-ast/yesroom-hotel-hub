@@ -91,15 +91,13 @@ export function RoomsTab({ hotelId }: { hotelId: string }) {
   };
 
   const handleSave = async (data: Partial<Room>) => {
+    let error;
     if (editingRoom) {
-      const { error } = await supabase
+      const result = await supabase
         .from('rooms')
         .update(data)
         .eq('id', editingRoom.id);
-      if (error) {
-        toast.error(t('common.error'));
-        return;
-      }
+      error = result.error;
     } else {
       const insertData = {
         room_number: data.room_number!,
@@ -109,12 +107,19 @@ export function RoomsTab({ hotelId }: { hotelId: string }) {
         notes: data.notes,
         hotel_id: hotelId,
       };
-      const { error } = await supabase.from('rooms').insert([insertData]);
-      if (error) {
-        toast.error(t('common.error'));
-        return;
-      }
+      const result = await supabase.from('rooms').insert([insertData]);
+      error = result.error;
     }
+    
+    if (error) {
+      if (error.code === '23505') {
+        toast.error('Номер комнаты уже существует в этом отеле');
+      } else {
+        toast.error(t('common.error'));
+      }
+      return;
+    }
+    
     toast.success(t('common.success'));
     setDialogOpen(false);
     fetchData();
