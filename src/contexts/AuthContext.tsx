@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  roleLoading: boolean;
   role: AppRole | null;
   hotelId: string | null;
   profile: UserProfile | null;
@@ -33,34 +34,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
   const [role, setRole] = useState<AppRole | null>(null);
   const [hotelId, setHotelId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   const fetchUserData = async (userId: string) => {
-    // Fetch role
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (roleData) {
-      setRole(roleData.role as AppRole);
-    } else {
-      setRole('guest');
-    }
+    setRoleLoading(true);
+    try {
+      // Fetch role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (roleData) {
+        setRole(roleData.role as AppRole);
+      } else {
+        setRole('guest');
+      }
 
-    // Fetch profile with hotel_id
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    if (profileData) {
-      setProfile(profileData as UserProfile);
-      setHotelId(profileData.hotel_id);
+      // Fetch profile with hotel_id
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (profileData) {
+        setProfile(profileData as UserProfile);
+        setHotelId(profileData.hotel_id);
+      }
+    } finally {
+      setRoleLoading(false);
     }
   };
 
@@ -85,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRole(null);
           setHotelId(null);
           setProfile(null);
+          setRoleLoading(false);
         }
       }
     );
@@ -135,7 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{ 
       user, 
       session, 
-      loading, 
+      loading,
+      roleLoading,
       role,
       hotelId,
       profile,

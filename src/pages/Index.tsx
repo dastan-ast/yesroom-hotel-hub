@@ -24,14 +24,14 @@ interface HotelWithPrice extends Hotel {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, isSuperAdmin, hotelId, loading: authLoading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, hotelId, loading: authLoading, roleLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Redirect admins to their dashboard
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && !roleLoading && user) {
       if (isSuperAdmin) {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
@@ -40,7 +40,7 @@ const Index = () => {
         navigate('/onboarding');
       }
     }
-  }, [user, authLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
+  }, [user, authLoading, roleLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
 
   // Parse URL params
   const checkInParam = searchParams.get('checkIn');

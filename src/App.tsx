@@ -2,13 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "@/i18n";
 import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Auth from "./pages/Auth";
-import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
 import Onboarding from "./pages/Onboarding";
@@ -34,7 +33,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<Onboarding />} />
             <Route path="/pending-approval" element={<PendingApproval />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="*" element={<NotFound />} />
