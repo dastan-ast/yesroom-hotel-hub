@@ -34,7 +34,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function Auth() {
   const { t } = useTranslation();
-  const { user, signIn, signUp, isAdmin, isSuperAdmin, hotelId, loading } = useAuth();
+  const { user, signIn, signUp, isAdmin, isSuperAdmin, hotelId, loading, roleLoading } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +46,7 @@ export default function Auth() {
   };
 
   useEffect(() => {
-    if (user && !loading) {
+    if (user && !loading && !roleLoading) {
       if (isSuperAdmin) {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
@@ -57,7 +57,7 @@ export default function Auth() {
         navigate('/');
       }
     }
-  }, [user, loading, isAdmin, isSuperAdmin, hotelId, navigate]);
+  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
