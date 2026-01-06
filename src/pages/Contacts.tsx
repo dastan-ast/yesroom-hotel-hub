@@ -166,7 +166,7 @@ export default function Contacts() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <a
-                    href="https://wa.me/77018883331/?text=Привет!%20Я%20пишу%20вам%20касательно%20YesRoom./"
+                    href="https://wa.me/77018883331"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors"
