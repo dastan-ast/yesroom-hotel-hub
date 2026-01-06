@@ -1,54 +1,50 @@
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Navbar } from '@/components/Navbar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { Mail, Phone, MapPin, Send, MessageCircle } from 'lucide-react';
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { Mail, Phone, MapPin, Send, MessageCircle } from "lucide-react";
 
 export default function Contacts() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    message: ''
+    name: "",
+    email: "",
+    phone: "",
+    message: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      toast.error('Пожалуйста, заполните все обязательные поля');
+      toast.error("Пожалуйста, заполните все обязательные поля");
       return;
     }
 
     setLoading(true);
     // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     setLoading(false);
-    
-    toast.success('Сообщение отправлено! Мы свяжемся с вами в ближайшее время.');
-    setFormData({ name: '', email: '', phone: '', message: '' });
+
+    toast.success("Сообщение отправлено! Мы свяжемся с вами в ближайшее время.");
+    setFormData({ name: "", email: "", phone: "", message: "" });
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">
-              Свяжитесь с нами
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Есть вопросы? Мы готовы помочь вам 24/7
-            </p>
+            <h1 className="text-3xl md:text-4xl font-display font-bold mb-4">Свяжитесь с нами</h1>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Есть вопросы? Мы готовы помочь вам 24/7</p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
@@ -56,9 +52,7 @@ export default function Contacts() {
             <Card>
               <CardHeader>
                 <CardTitle>Напишите нам</CardTitle>
-                <CardDescription>
-                  Заполните форму и мы ответим в течение 24 часов
-                </CardDescription>
+                <CardDescription>Заполните форму и мы ответим в течение 24 часов</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,7 +66,7 @@ export default function Contacts() {
                       required
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email *</Label>
                     <Input
@@ -84,7 +78,7 @@ export default function Contacts() {
                       required
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="phone">Телефон</Label>
                     <Input
@@ -95,7 +89,7 @@ export default function Contacts() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="message">Сообщение *</Label>
                     <Textarea
@@ -107,10 +101,10 @@ export default function Contacts() {
                       required
                     />
                   </div>
-                  
+
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? (
-                      'Отправка...'
+                      "Отправка..."
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
@@ -136,11 +130,11 @@ export default function Contacts() {
                     <div>
                       <p className="font-medium">Телефон</p>
                       <a href="tel:+77001234567" className="text-muted-foreground hover:text-primary">
-                        +7 (700) 123-45-67
+                        +7 (701) 888-33-31
                       </a>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-4">
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <Mail className="h-5 w-5 text-primary" />
@@ -148,20 +142,18 @@ export default function Contacts() {
                     <div>
                       <p className="font-medium">Email</p>
                       <a href="mailto:info@yesroom.kz" className="text-muted-foreground hover:text-primary">
-                        info@yesroom.kz
+                        info@detech.kz
                       </a>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-4">
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <MapPin className="h-5 w-5 text-primary" />
                     </div>
                     <div>
                       <p className="font-medium">Адрес</p>
-                      <p className="text-muted-foreground">
-                        Казахстан, г. Алматы
-                      </p>
+                      <p className="text-muted-foreground">Казахстан, г. Астана</p>
                     </div>
                   </div>
                 </CardContent>
@@ -170,13 +162,11 @@ export default function Contacts() {
               <Card>
                 <CardHeader>
                   <CardTitle>Мессенджеры</CardTitle>
-                  <CardDescription>
-                    Быстрая связь через мессенджеры
-                  </CardDescription>
+                  <CardDescription>Быстрая связь через мессенджеры</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <a
-                    href="https://wa.me/77001234567"
+                    href="https://wa.me/77018883331/?text=Привет!%20Я%20пишу%20вам%20касательно%20YesRoom./"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors"
@@ -185,7 +175,7 @@ export default function Contacts() {
                     <span>WhatsApp</span>
                   </a>
                   <a
-                    href="https://t.me/yesroom"
+                    href="https://t.me/ady"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted transition-colors"
