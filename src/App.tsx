@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "@/i18n";
 import Index from "./pages/Index";
-import Booking from "./pages/Booking";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
@@ -14,6 +13,9 @@ import Onboarding from "./pages/Onboarding";
 import PublicBooking from "./pages/PublicBooking";
 import PendingApproval from "./pages/PendingApproval";
 import HotelProfile from "./pages/HotelProfile";
+import Contacts from "./pages/Contacts";
+import Pricing from "./pages/Pricing";
+import Help from "./pages/Help";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,7 +29,6 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/booking" element={<Booking />} />
             <Route path="/book/:hotelSlug" element={<PublicBooking />} />
             <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
             <Route path="/auth" element={<Auth />} />
@@ -36,6 +37,9 @@ const App = () => (
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/contacts" element={<Contacts />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/help" element={<Help />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

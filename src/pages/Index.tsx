@@ -357,24 +357,24 @@ const Index = () => {
             <div>
               <h4 className="font-semibold mb-4">Гостям</h4>
               <ul className="space-y-2 text-sm opacity-70">
-                <li><a href="/" className="hover:opacity-100">Найти отель</a></li>
-                <li><a href="#" className="hover:opacity-100">Как забронировать</a></li>
-                <li><a href="#" className="hover:opacity-100">FAQ</a></li>
+                <li><Link to="/" className="hover:opacity-100">Найти отель</Link></li>
+                <li><Link to="/help" className="hover:opacity-100">Как забронировать</Link></li>
+                <li><Link to="/help" className="hover:opacity-100">FAQ</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Отелям</h4>
               <ul className="space-y-2 text-sm opacity-70">
                 <li><Link to="/auth" className="hover:opacity-100">Регистрация</Link></li>
-                <li><a href="#" className="hover:opacity-100">Преимущества</a></li>
-                <li><a href="#" className="hover:opacity-100">Тарифы</a></li>
+                <li><Link to="/pricing" className="hover:opacity-100">Преимущества</Link></li>
+                <li><Link to="/pricing" className="hover:opacity-100">Тарифы</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Поддержка</h4>
               <ul className="space-y-2 text-sm opacity-70">
-                <li><a href="#" className="hover:opacity-100">Контакты</a></li>
-                <li><a href="#" className="hover:opacity-100">Помощь</a></li>
+                <li><Link to="/contacts" className="hover:opacity-100">Контакты</Link></li>
+                <li><Link to="/help" className="hover:opacity-100">Помощь</Link></li>
               </ul>
             </div>
           </div>

@@ -33,8 +33,11 @@ export function Navbar() {
             <Link to="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               {t('nav.home')}
             </Link>
-            <Link to="/booking" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              {t('nav.booking')}
+            <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Тарифы
+            </Link>
+            <Link to="/contacts" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Контакты
             </Link>
             {isAdmin && (
               <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -97,11 +100,18 @@ export function Navbar() {
                 {t('nav.home')}
               </Link>
               <Link 
-                to="/booking" 
+                to="/pricing" 
                 className="text-sm font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                {t('nav.booking')}
+                Тарифы
+              </Link>
+              <Link 
+                to="/contacts" 
+                className="text-sm font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Контакты
               </Link>
               {isAdmin && (
                 <Link 
