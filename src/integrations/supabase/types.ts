@@ -21,6 +21,8 @@ export type Database = {
           check_out_date: string
           client_id: string | null
           created_at: string
+          external_id: string | null
+          external_source_data: Json | null
           guest_comment: string | null
           guest_count: number
           guest_name: string
@@ -41,6 +43,8 @@ export type Database = {
           check_out_date: string
           client_id?: string | null
           created_at?: string
+          external_id?: string | null
+          external_source_data?: Json | null
           guest_comment?: string | null
           guest_count?: number
           guest_name: string
@@ -61,6 +65,8 @@ export type Database = {
           check_out_date?: string
           client_id?: string | null
           created_at?: string
+          external_id?: string | null
+          external_source_data?: Json | null
           guest_comment?: string | null
           guest_count?: number
           guest_name?: string
@@ -143,6 +149,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "clients_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hotel_api_keys: {
+        Row: {
+          api_key_hash: string
+          api_key_prefix: string
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          name: string
+        }
+        Insert: {
+          api_key_hash: string
+          api_key_prefix: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+        }
+        Update: {
+          api_key_hash?: string
+          api_key_prefix?: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hotel_api_keys_hotel_id_fkey"
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
@@ -431,7 +481,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "guest" | "superadmin" | "owner"
-      booking_source: "manual" | "web" | "booking"
+      booking_source: "manual" | "web" | "booking" | "telegram" | "whatsapp"
       booking_status:
         | "pending"
         | "approved"
@@ -567,7 +617,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "guest", "superadmin", "owner"],
-      booking_source: ["manual", "web", "booking"],
+      booking_source: ["manual", "web", "booking", "telegram", "whatsapp"],
       booking_status: [
         "pending",
         "approved",
