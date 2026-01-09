@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { ImageUpload } from './ImageUpload';
+import { GalleryUpload } from './GalleryUpload';
 
 const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
@@ -33,6 +33,7 @@ interface RoomType {
   capacity: number;
   amenities: string[] | null;
   image_url: string | null;
+  images: string[] | null;
 }
 
 interface Props {
@@ -44,7 +45,7 @@ interface Props {
 
 export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
   const { t } = useTranslation();
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -67,7 +68,13 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           capacity: roomType.capacity,
           amenities: roomType.amenities?.join(', ') || '',
         });
-        setImageUrl(roomType.image_url);
+        // Use images array, fallback to image_url for backward compatibility
+        const existingImages = roomType.images?.length 
+          ? roomType.images 
+          : roomType.image_url 
+            ? [roomType.image_url] 
+            : [];
+        setImages(existingImages);
       } else {
         form.reset({
           name: '',
@@ -76,7 +83,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           capacity: 2,
           amenities: '',
         });
-        setImageUrl(null);
+        setImages([]);
       }
     }
   }, [open, roomType, form]);
@@ -88,7 +95,8 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
       price_per_night: data.price_per_night,
       capacity: data.capacity,
       amenities: data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : null,
-      image_url: imageUrl,
+      image_url: images[0] || null, // Keep first image as primary for backward compatibility
+      images: images,
     });
   };
 
@@ -97,22 +105,22 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {roomType ? t('admin.edit') : t('admin.addRoomType')}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <div>
             <p className="text-sm font-medium mb-2">Фото номера</p>
-            <ImageUpload
-              currentUrl={imageUrl}
-              onUpload={(url) => setImageUrl(url)}
-              onRemove={() => setImageUrl(null)}
+            <GalleryUpload
+              images={images}
+              onChange={setImages}
               folder="room-types"
               itemId={itemId}
+              maxImages={10}
             />
           </div>
           
