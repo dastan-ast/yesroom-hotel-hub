@@ -298,6 +298,7 @@ export type Database = {
           hotel_id: string | null
           id: string
           image_url: string | null
+          images: string[] | null
           name: string
           price_per_night: number
           updated_at: string
@@ -310,6 +311,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           image_url?: string | null
+          images?: string[] | null
           name: string
           price_per_night: number
           updated_at?: string
@@ -322,6 +324,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           image_url?: string | null
+          images?: string[] | null
           name?: string
           price_per_night?: number
           updated_at?: string

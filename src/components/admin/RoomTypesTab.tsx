@@ -15,6 +15,7 @@ interface RoomType {
   capacity: number;
   amenities: string[] | null;
   image_url: string | null;
+  images: string[] | null;
 }
 
 export function RoomTypesTab({ hotelId }: { hotelId: string }) {
@@ -70,7 +71,15 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
     if (editingType) {
       const { error } = await supabase
         .from('room_types')
-        .update(data)
+        .update({
+          name: data.name,
+          description: data.description,
+          price_per_night: data.price_per_night,
+          capacity: data.capacity,
+          amenities: data.amenities,
+          image_url: data.image_url,
+          images: data.images,
+        })
         .eq('id', editingType.id);
       if (error) {
         toast.error(t('common.error'));
@@ -84,6 +93,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         capacity: data.capacity,
         amenities: data.amenities,
         image_url: data.image_url,
+        images: data.images || [],
         hotel_id: hotelId,
       };
       const { error } = await supabase.from('room_types').insert([insertData]);
@@ -119,6 +129,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[60px]">Фото</TableHead>
               <TableHead>Название</TableHead>
               <TableHead>Цена/ночь</TableHead>
               <TableHead>Вместимость</TableHead>
@@ -127,9 +138,26 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {roomTypes.map((type) => (
-              <TableRow key={type.id}>
-                <TableCell className="font-medium">{type.name}</TableCell>
+            {roomTypes.map((type) => {
+              const photoCount = type.images?.length || (type.image_url ? 1 : 0);
+              const primaryImage = type.images?.[0] || type.image_url;
+              return (
+                <TableRow key={type.id}>
+                  <TableCell>
+                    {primaryImage ? (
+                      <div className="relative w-10 h-10">
+                        <img src={primaryImage} alt="" className="w-10 h-10 object-cover rounded" />
+                        {photoCount > 1 && (
+                          <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs w-4 h-4 rounded-full flex items-center justify-center">
+                            {photoCount}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 bg-muted rounded flex items-center justify-center text-muted-foreground text-xs">—</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{type.name}</TableCell>
                 <TableCell>{type.price_per_night?.toLocaleString()} ₸</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
                 <TableCell className="max-w-[200px] truncate">
@@ -145,8 +173,9 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                     </Button>
                   </div>
                 </TableCell>
-              </TableRow>
-            ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       )}
