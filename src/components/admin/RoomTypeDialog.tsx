@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { ImageUpload } from './ImageUpload';
 
 const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
@@ -43,6 +44,7 @@ interface Props {
 
 export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
   const { t } = useTranslation();
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -65,6 +67,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           capacity: roomType.capacity,
           amenities: roomType.amenities?.join(', ') || '',
         });
+        setImageUrl(roomType.image_url);
       } else {
         form.reset({
           name: '',
@@ -73,6 +76,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           capacity: 2,
           amenities: '',
         });
+        setImageUrl(null);
       }
     }
   }, [open, roomType, form]);
@@ -84,57 +88,44 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
       price_per_night: data.price_per_night,
       capacity: data.capacity,
       amenities: data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : null,
+      image_url: imageUrl,
     });
   };
 
+  // Generate a temporary ID for new room types
+  const itemId = roomType?.id || `new-${Date.now()}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {roomType ? t('admin.edit') : t('admin.addRoomType')}
           </DialogTitle>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Название</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Стандарт" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-sm font-medium mb-2">Фото номера</p>
+            <ImageUpload
+              currentUrl={imageUrl}
+              onUpload={(url) => setImageUrl(url)}
+              onRemove={() => setImageUrl(null)}
+              folder="room-types"
+              itemId={itemId}
             />
-            
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Описание</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Описание типа номера..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="grid grid-cols-2 gap-4">
+          </div>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="price_per_night"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('admin.price')} (₸)</FormLabel>
+                    <FormLabel>Название</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input placeholder="Стандарт" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -143,41 +134,71 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
               
               <FormField
                 control={form.control}
-                name="capacity"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Вместимость</FormLabel>
+                    <FormLabel>Описание</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} {...field} />
+                      <Textarea placeholder="Описание типа номера..." rows={2} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
-            
-            <FormField
-              control={form.control}
-              name="amenities"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Удобства (через запятую)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Wi-Fi, ТВ, Кондиционер" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="submit">{t('admin.save')}</Button>
-            </div>
-          </form>
-        </Form>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price_per_night"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('admin.price')} (₸)</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Вместимость</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="amenities"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Удобства (через запятую)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Wi-Fi, ТВ, Кондиционер" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button type="submit">{t('admin.save')}</Button>
+              </div>
+            </form>
+          </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

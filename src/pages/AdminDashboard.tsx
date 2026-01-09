@@ -15,6 +15,7 @@ import { ShahmatkaGrid } from '@/components/admin/ShahmatkaGrid';
 import { LiveFeedSidebar } from '@/components/admin/LiveFeedSidebar';
 import { ServiceLogTab } from '@/components/admin/ServiceLogTab';
 import { ApiKeysTab } from '@/components/admin/ApiKeysTab';
+import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -102,6 +103,7 @@ export default function AdminDashboard() {
     { id: 'clients', icon: Users, label: t('admin.clients') },
     { id: 'services', icon: Coffee, label: 'Журнал услуг' },
     { id: 'integrations', icon: Key, label: 'Интеграции' },
+    { id: 'settings', icon: Settings, label: 'Настройки отеля' },
   ];
 
   return (
@@ -143,12 +145,6 @@ export default function AdminDashboard() {
 
           <SidebarFooter className="p-2 border-t">
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Settings className="h-4 w-4" />
-                  <span>{t('admin.edit') || 'Настройки'}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={signOut}>
                   <LogOut className="h-4 w-4" />
@@ -301,6 +297,10 @@ export default function AdminDashboard() {
 
                 {activeTab === 'integrations' && (
                   <ApiKeysTab hotelId={hotelId} />
+                )}
+
+                {activeTab === 'settings' && (
+                  <HotelSettingsTab hotelId={hotelId} />
                 )}
               </div>
 
