@@ -32,6 +32,42 @@ interface SuccessResponse {
   message: string;
 }
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 3600000; // 1 hour
+const RATE_LIMIT_MAX_REQUESTS = 100; // max requests per window per API key
+
+// In-memory rate limit store (per isolate instance)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Rate limit check function
+function checkRateLimit(apiKeyId: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const existing = rateLimitStore.get(apiKeyId);
+  
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetAt < now) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+  
+  if (!existing || existing.resetAt < now) {
+    // New window
+    const resetAt = now + RATE_LIMIT_WINDOW_MS;
+    rateLimitStore.set(apiKeyId, { count: 1, resetAt });
+    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetAt };
+  }
+  
+  if (existing.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, remaining: 0, resetAt: existing.resetAt };
+  }
+  
+  existing.count++;
+  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - existing.count, resetAt: existing.resetAt };
+}
+
 // Simple hash function for API key verification
 async function hashApiKey(key: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -98,6 +134,30 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: "Invalid API key", code: "INVALID_API_KEY" } as ErrorResponse),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check rate limit after API key validation
+    const rateLimit = checkRateLimit(apiKeyRecord.id);
+    if (!rateLimit.allowed) {
+      console.warn(`Rate limit exceeded for API key: ${apiKeyRecord.id}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Rate limit exceeded. Try again later.", 
+          code: "RATE_LIMIT_EXCEEDED" 
+        } as ErrorResponse),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-RateLimit-Limit": RATE_LIMIT_MAX_REQUESTS.toString(),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": Math.ceil(rateLimit.resetAt / 1000).toString(),
+            "Retry-After": Math.ceil((rateLimit.resetAt - Date.now()) / 1000).toString()
+          } 
+        }
       );
     }
 
@@ -261,7 +321,13 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify(response), {
       status: 201,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json",
+        "X-RateLimit-Limit": RATE_LIMIT_MAX_REQUESTS.toString(),
+        "X-RateLimit-Remaining": rateLimit.remaining.toString(),
+        "X-RateLimit-Reset": Math.ceil(rateLimit.resetAt / 1000).toString()
+      },
     });
 
   } catch (error) {
