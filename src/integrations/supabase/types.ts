@@ -435,6 +435,42 @@ export type Database = {
           },
         ]
       }
+      subscription_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          hotel_id: string
+          id: string
+          new_status: string
+          new_trial_ends_at: string | null
+          previous_status: string | null
+          previous_trial_ends_at: string | null
+          reason: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          hotel_id: string
+          id?: string
+          new_status: string
+          new_trial_ends_at?: string | null
+          previous_status?: string | null
+          previous_trial_ends_at?: string | null
+          reason?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          new_status?: string
+          new_trial_ends_at?: string | null
+          previous_status?: string | null
+          previous_trial_ends_at?: string | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
