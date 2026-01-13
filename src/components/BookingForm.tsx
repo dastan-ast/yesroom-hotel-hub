@@ -5,8 +5,9 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
-import { CalendarIcon, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { BookingSuccess } from '@/components/BookingSuccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,6 +54,11 @@ interface RoomType {
   price_per_night: number;
 }
 
+interface HotelSettings {
+  kaspi_id?: string;
+  whatsapp_phone?: string;
+}
+
 interface BookingFormProps {
   hotelId?: string;
 }
@@ -61,6 +67,8 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [hotelSettings, setHotelSettings] = useState<HotelSettings | null>(null);
+  const [hotelName, setHotelName] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -76,15 +84,29 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   });
 
   useEffect(() => {
-    const fetchRoomTypes = async () => {
+    const fetchData = async () => {
+      // Fetch room types
       let query = supabase.from('room_types').select('id, name, price_per_night');
       if (hotelId) {
         query = query.eq('hotel_id', hotelId);
       }
       const { data } = await query;
       if (data) setRoomTypes(data);
+
+      // Fetch hotel settings if hotelId exists
+      if (hotelId) {
+        const { data: hotelData } = await supabase
+          .from('hotels')
+          .select('name, settings')
+          .eq('id', hotelId)
+          .single();
+        if (hotelData) {
+          setHotelName(hotelData.name);
+          setHotelSettings(hotelData.settings as HotelSettings | null);
+        }
+      }
     };
-    fetchRoomTypes();
+    fetchData();
   }, [hotelId]);
 
   const onSubmit = async (data: BookingFormData) => {
@@ -118,14 +140,11 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   if (isSuccess) {
     return (
       <Card className="max-w-md mx-auto animate-scale-in">
-        <CardContent className="pt-8 text-center">
-          <div className="mb-6 flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-display font-semibold mb-3">{t('booking.success')}</h2>
-          <p className="text-muted-foreground">{t('booking.successMessage')}</p>
+        <CardContent className="pt-8">
+          <BookingSuccess 
+            hotelSettings={hotelSettings}
+            hotelName={hotelName}
+          />
         </CardContent>
       </Card>
     );

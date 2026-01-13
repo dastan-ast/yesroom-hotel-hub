@@ -6,6 +6,7 @@ import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { RoomCard } from '@/components/RoomCard';
+import { BookingSuccess } from '@/components/BookingSuccess';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -419,15 +420,11 @@ export default function HotelProfile() {
               </CardHeader>
               <CardContent>
                 {isSuccess ? (
-                  <div className="text-center py-6">
-                    <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 className="h-8 w-8 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold mb-2">{t('booking.success')}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {t('booking.successMessage')}
-                    </p>
-                  </div>
+                  <BookingSuccess 
+                    hotelSettings={hotel.settings as { kaspi_id?: string; whatsapp_phone?: string } | null}
+                    hotelName={hotel.name}
+                    totalPrice={totalPrice}
+                  />
                 ) : (
                   <form onSubmit={handleBookingSubmit} className="space-y-4">
                     {/* Dates */}
