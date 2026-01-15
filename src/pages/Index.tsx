@@ -36,8 +36,8 @@ const Index = () => {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
         navigate('/admin/dashboard');
-      } else if ((isAdmin || role === 'guest' || role === 'owner') && !hotelId) {
-        // Все авторизованные пользователи без отеля идут на онбординг
+      } else if ((role === 'owner' || role === 'admin') && !hotelId) {
+        // Только owner/admin без отеля идут на онбординг
         navigate('/onboarding');
       }
     }
