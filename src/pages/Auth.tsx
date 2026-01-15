@@ -34,7 +34,7 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function Auth() {
   const { t } = useTranslation();
-  const { user, signIn, signUp, isAdmin, isSuperAdmin, hotelId, loading, roleLoading } = useAuth();
+  const { user, signIn, signUp, isAdmin, isSuperAdmin, hotelId, loading, roleLoading, role } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,13 +51,14 @@ export default function Auth() {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
         navigate('/admin/dashboard');
-      } else if (isAdmin && !hotelId) {
+      } else if ((isAdmin || role === 'guest' || role === 'owner') && !hotelId) {
+        // Новые пользователи (guest/owner) без отеля идут на онбординг
         navigate('/onboarding');
       } else {
         navigate('/');
       }
     }
-  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
+  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -90,7 +91,7 @@ export default function Auth() {
       }
     } else {
       toast.success('Регистрация успешна!');
-      navigate('/onboarding');
+      // Редирект произойдёт автоматически через useEffect после загрузки роли
     }
     setIsLoading(false);
   };

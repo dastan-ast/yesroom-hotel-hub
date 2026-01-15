@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,7 +15,7 @@ import { OnboardingStepper } from '@/components/OnboardingStepper';
 export default function Onboarding() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, hotelId, loading: authLoading, roleLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(2);
   const [formData, setFormData] = useState({
@@ -24,6 +24,17 @@ export default function Onboarding() {
     description: '',
     roomCount: ''
   });
+
+  // Защита страницы: редирект если не авторизован или уже есть отель
+  useEffect(() => {
+    if (!authLoading && !roleLoading) {
+      if (!user) {
+        navigate('/auth');
+      } else if (hotelId) {
+        navigate('/admin/dashboard');
+      }
+    }
+  }, [user, authLoading, roleLoading, hotelId, navigate]);
 
   const generateSlug = (name: string) => {
     return name

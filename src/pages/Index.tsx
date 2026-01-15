@@ -24,7 +24,7 @@ interface HotelWithPrice extends Hotel {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, isSuperAdmin, hotelId, loading: authLoading, roleLoading } = useAuth();
+  const { user, isAdmin, isSuperAdmin, hotelId, loading: authLoading, roleLoading, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,11 +36,12 @@ const Index = () => {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
         navigate('/admin/dashboard');
-      } else if (isAdmin && !hotelId) {
+      } else if ((isAdmin || role === 'guest' || role === 'owner') && !hotelId) {
+        // Все авторизованные пользователи без отеля идут на онбординг
         navigate('/onboarding');
       }
     }
-  }, [user, authLoading, roleLoading, isAdmin, isSuperAdmin, hotelId, navigate]);
+  }, [user, authLoading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
 
   // Parse URL params
   const checkInParam = searchParams.get('checkIn');
