@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +12,7 @@ interface RoomCardProps {
   capacity: number;
   amenities: string[] | null;
   imageUrl: string | null;
+  onBook?: (roomTypeId: string) => void;
 }
 
 const amenityIcons: Record<string, React.ElementType> = {
@@ -23,10 +23,16 @@ const amenityIcons: Record<string, React.ElementType> = {
   ac: Wind,
 };
 
-export function RoomCard({ id, name, description, price, capacity, amenities, imageUrl }: RoomCardProps) {
+export function RoomCard({ id, name, description, price, capacity, amenities, imageUrl, onBook }: RoomCardProps) {
   const { t } = useTranslation();
 
   const defaultImage = 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=60';
+
+  const handleBookClick = () => {
+    if (onBook) {
+      onBook(id);
+    }
+  };
 
   return (
     <Card className="overflow-hidden card-hover group">
@@ -63,8 +69,8 @@ export function RoomCard({ id, name, description, price, capacity, amenities, im
         </div>
       </CardContent>
       <CardFooter className="px-6 pb-6 pt-0">
-        <Button asChild className="w-full">
-          <Link to={`/booking?roomType=${id}`}>{t('rooms.book')}</Link>
+        <Button className="w-full" onClick={handleBookClick}>
+          {t('rooms.book')}
         </Button>
       </CardFooter>
     </Card>

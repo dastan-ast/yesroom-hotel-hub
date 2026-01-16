@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { usePhoneMask } from '@/hooks/usePhoneMask';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,6 @@ import { Button } from '@/components/ui/button';
 
 const schema = z.object({
   full_name: z.string().min(1, 'Обязательное поле'),
-  phone: z.string().min(1, 'Обязательное поле'),
   email: z.string().email('Неверный email').optional().or(z.literal('')),
   document_number: z.string().optional(),
   notes: z.string().optional(),
@@ -42,12 +42,12 @@ interface Props {
 
 export function ClientDialog({ open, onOpenChange, client, onSave }: Props) {
   const { t } = useTranslation();
+  const phoneMask = usePhoneMask();
   
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       full_name: '',
-      phone: '',
       email: '',
       document_number: '',
       notes: '',
@@ -59,19 +59,19 @@ export function ClientDialog({ open, onOpenChange, client, onSave }: Props) {
       if (client) {
         form.reset({
           full_name: client.full_name,
-          phone: client.phone,
           email: client.email || '',
           document_number: client.document_number || '',
           notes: client.notes || '',
         });
+        phoneMask.setValue(client.phone || '');
       } else {
         form.reset({
           full_name: '',
-          phone: '',
           email: '',
           document_number: '',
           notes: '',
         });
+        phoneMask.setValue('');
       }
     }
   }, [open, client, form]);
@@ -79,7 +79,7 @@ export function ClientDialog({ open, onOpenChange, client, onSave }: Props) {
   const handleSubmit = (data: FormData) => {
     onSave({
       full_name: data.full_name,
-      phone: data.phone,
+      phone: phoneMask.value,
       email: data.email || null,
       document_number: data.document_number || null,
       notes: data.notes || null,
@@ -104,7 +104,7 @@ export function ClientDialog({ open, onOpenChange, client, onSave }: Props) {
                 <FormItem>
                   <FormLabel>ФИО</FormLabel>
                   <FormControl>
-                    <Input placeholder="Иван Иванов" {...field} />
+                    <Input placeholder="Иванов Иван Иванович" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,19 +112,14 @@ export function ClientDialog({ open, onOpenChange, client, onSave }: Props) {
             />
             
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('booking.phone')}</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+7 777 123 45 67" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">{t('booking.phone')}</label>
+                <Input 
+                  placeholder="+7 (777) 123-45-67" 
+                  value={phoneMask.value}
+                  onChange={(e) => phoneMask.handleChange(e.target.value)}
+                />
+              </div>
               
               <FormField
                 control={form.control}

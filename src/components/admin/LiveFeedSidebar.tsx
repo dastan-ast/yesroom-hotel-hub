@@ -5,9 +5,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Bell, CheckCircle, XCircle, Phone, MessageCircle, DoorOpen } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Bell, XCircle, Phone, MessageCircle, DoorOpen } from 'lucide-react';
 import { RoomAssignDialog } from './RoomAssignDialog';
 
 interface PendingBooking {
@@ -32,6 +42,11 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
   const [loading, setLoading] = useState(true);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedBookingForAssign, setSelectedBookingForAssign] = useState<PendingBooking | null>(null);
+  
+  // Reject confirmation state
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [bookingToReject, setBookingToReject] = useState<PendingBooking | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
     if (hotelId) {
@@ -85,13 +100,35 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     onBookingUpdated?.();
   };
 
-  const handleReject = async (id: string) => {
-    const { error } = await supabase.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+  const handleRejectWithConfirm = (booking: PendingBooking) => {
+    setBookingToReject(booking);
+    setRejectReason('');
+    setRejectDialogOpen(true);
+  };
+
+  const confirmReject = async () => {
+    if (!bookingToReject) return;
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'cancelled',
+        additional_info: {
+          cancellation_reason: rejectReason || null,
+          cancelled_at: new Date().toISOString(),
+        }
+      })
+      .eq('id', bookingToReject.id);
+
     if (error) {
       toast.error(t('common.error'));
       return;
     }
-    toast.success('Бронирование отменено');
+
+    toast.success('Заявка отклонена');
+    setRejectDialogOpen(false);
+    setBookingToReject(null);
+    setRejectReason('');
     fetchPendingBookings();
     onBookingUpdated?.();
   };
@@ -168,7 +205,7 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
                     size="sm"
                     variant="destructive"
                     className="h-7 text-xs px-2"
-                    onClick={() => handleReject(booking.id)}
+                    onClick={() => handleRejectWithConfirm(booking)}
                   >
                     <XCircle className="h-3 w-3" />
                   </Button>
@@ -190,6 +227,34 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
           onSuccess={handleAssignSuccess}
         />
       )}
+
+      {/* Reject Confirmation Dialog */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Отклонить заявку?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Гость: <strong>{bookingToReject?.guest_name}</strong>
+              <br />
+              Заявка будет отменена.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="Причина отклонения (необязательно)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={2}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Назад</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Отклонить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

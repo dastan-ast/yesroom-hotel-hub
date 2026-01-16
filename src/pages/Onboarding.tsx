@@ -47,14 +47,21 @@ export default function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: 'Ошибка',
+        description: 'Необходима авторизация',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setLoading(true);
     setCurrentStep(3);
     try {
       const slug = generateSlug(formData.name) + '-' + Date.now().toString(36);
 
-      // Create hotel
+      // 1. Create hotel with owner_id
       const { data: hotel, error: hotelError } = await supabase
         .from('hotels')
         .insert([{
@@ -70,7 +77,7 @@ export default function Onboarding() {
 
       if (hotelError) throw hotelError;
 
-      // Update user profile with hotel_id
+      // 2. Update user profile with hotel_id
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ hotel_id: hotel.id })
@@ -78,7 +85,7 @@ export default function Onboarding() {
 
       if (profileError) throw profileError;
 
-      // Update user role to owner using SECURITY DEFINER function
+      // 3. Update user role to owner (hotel now exists, so the check will pass)
       const { error: roleError } = await supabase
         .rpc('update_user_role_to_owner', { _user_id: user.id });
 
@@ -98,6 +105,7 @@ export default function Onboarding() {
         description: error.message,
         variant: 'destructive'
       });
+      setCurrentStep(2);
     } finally {
       setLoading(false);
     }

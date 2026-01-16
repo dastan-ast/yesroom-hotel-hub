@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { usePhoneMask } from '@/hooks/usePhoneMask';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,6 @@ import { cn } from '@/lib/utils';
 
 const schema = z.object({
   guest_name: z.string().min(1, 'Обязательное поле'),
-  guest_phone: z.string().min(1, 'Обязательное поле'),
   room_type_id: z.string().min(1, 'Выберите тип'),
   check_in_date: z.date({ required_error: 'Укажите дату' }),
   check_out_date: z.date({ required_error: 'Укажите дату' }),
@@ -53,12 +53,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const { t } = useTranslation();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [loading, setLoading] = useState(false);
+  const phoneMask = usePhoneMask();
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       guest_name: '',
-      guest_phone: '',
       room_type_id: '',
       source: 'manual',
       prepayment_received: false,
@@ -71,12 +71,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       fetchRoomTypes();
       form.reset({
         guest_name: '',
-        guest_phone: '',
         room_type_id: '',
         source: 'manual',
         prepayment_received: false,
         guest_comment: '',
       });
+      phoneMask.setValue('');
     }
   }, [open, hotelId, form]);
 
@@ -89,11 +89,16 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   };
 
   const handleSubmit = async (data: FormData) => {
+    if (!phoneMask.value) {
+      toast.error('Укажите телефон');
+      return;
+    }
+
     setLoading(true);
     
     const { error } = await supabase.from('bookings').insert({
       guest_name: data.guest_name,
-      guest_phone: data.guest_phone,
+      guest_phone: phoneMask.value,
       room_type_id: data.room_type_id,
       check_in_date: format(data.check_in_date, 'yyyy-MM-dd'),
       check_out_date: format(data.check_out_date, 'yyyy-MM-dd'),
@@ -132,26 +137,21 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
                 <FormItem>
                   <FormLabel>{t('booking.guestName')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Иван Иванов" {...field} />
+                    <Input placeholder="Иванов Иван Иванович" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="guest_phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('booking.phone')}</FormLabel>
-                  <FormControl>
-                    <Input placeholder="+7 777 123 45 67" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">{t('booking.phone')}</label>
+              <Input 
+                placeholder="+7 (777) 123-45-67" 
+                value={phoneMask.value}
+                onChange={(e) => phoneMask.handleChange(e.target.value)}
+              />
+            </div>
 
             <FormField
               control={form.control}
