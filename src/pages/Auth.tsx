@@ -17,8 +17,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Hotel } from 'lucide-react';
+import { Hotel, User, Building2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -27,6 +29,7 @@ const loginSchema = z.object({
 
 const signupSchema = loginSchema.extend({
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  userType: z.enum(['guest', 'owner']),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -38,6 +41,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingRedirect, setPendingRedirect] = useState<'onboarding' | 'home' | null>(null);
 
   const handleToggleMode = () => {
     loginForm.reset();
@@ -47,18 +51,27 @@ export default function Auth() {
 
   useEffect(() => {
     if (user && !loading && !roleLoading) {
+      // Если есть pending redirect после регистрации, используем его
+      if (pendingRedirect === 'onboarding') {
+        navigate('/onboarding');
+        return;
+      } else if (pendingRedirect === 'home') {
+        navigate('/');
+        return;
+      }
+      
+      // Обычная логика для входа
       if (isSuperAdmin) {
         navigate('/super-admin');
       } else if (isAdmin && hotelId) {
         navigate('/admin/dashboard');
       } else if ((role === 'owner' || role === 'admin') && !hotelId) {
-        // Только owner/admin без отеля идут на онбординг
         navigate('/onboarding');
       } else {
         navigate('/');
       }
     }
-  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
+  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate, pendingRedirect]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -67,7 +80,7 @@ export default function Auth() {
 
   const signupForm = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '', fullName: '' },
+    defaultValues: { email: '', password: '', fullName: '', userType: 'guest' },
   });
 
   const handleLogin = async (data: LoginFormData) => {
@@ -76,14 +89,22 @@ export default function Auth() {
     if (error) {
       toast.error(error.message);
     }
-    // Редирект произойдёт автоматически через useEffect
     setIsLoading(false);
   };
 
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
+    
+    // Устанавливаем куда редиректить после регистрации
+    if (data.userType === 'owner') {
+      setPendingRedirect('onboarding');
+    } else {
+      setPendingRedirect('home');
+    }
+    
     const { error } = await signUp(data.email, data.password, data.fullName);
     if (error) {
+      setPendingRedirect(null);
       if (error.message.includes('already registered')) {
         toast.error('Этот email уже зарегистрирован');
       } else {
@@ -91,10 +112,11 @@ export default function Auth() {
       }
     } else {
       toast.success('Регистрация успешна!');
-      // Редирект произойдёт автоматически через useEffect после загрузки роли
     }
     setIsLoading(false);
   };
+
+  const selectedUserType = signupForm.watch('userType');
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -150,6 +172,72 @@ export default function Auth() {
             ) : (
               <Form {...signupForm} key="signup-form">
                 <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
+                  {/* Role Selection */}
+                  <FormField
+                    control={signupForm.control}
+                    name="userType"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Я хочу:</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="grid grid-cols-2 gap-3"
+                          >
+                            <div>
+                              <RadioGroupItem
+                                value="guest"
+                                id="guest"
+                                className="peer sr-only"
+                              />
+                              <Label
+                                htmlFor="guest"
+                                className={`flex flex-col items-center justify-between rounded-lg border-2 p-4 cursor-pointer transition-colors ${
+                                  selectedUserType === 'guest'
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-muted hover:border-primary/50'
+                                }`}
+                              >
+                                <User className={`h-6 w-6 mb-2 ${selectedUserType === 'guest' ? 'text-primary' : 'text-muted-foreground'}`} />
+                                <span className={`text-sm font-medium ${selectedUserType === 'guest' ? 'text-primary' : ''}`}>
+                                  Бронировать
+                                </span>
+                                <span className="text-xs text-muted-foreground text-center mt-1">
+                                  Искать и бронировать отели
+                                </span>
+                              </Label>
+                            </div>
+                            <div>
+                              <RadioGroupItem
+                                value="owner"
+                                id="owner"
+                                className="peer sr-only"
+                              />
+                              <Label
+                                htmlFor="owner"
+                                className={`flex flex-col items-center justify-between rounded-lg border-2 p-4 cursor-pointer transition-colors ${
+                                  selectedUserType === 'owner'
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-muted hover:border-primary/50'
+                                }`}
+                              >
+                                <Building2 className={`h-6 w-6 mb-2 ${selectedUserType === 'owner' ? 'text-primary' : 'text-muted-foreground'}`} />
+                                <span className={`text-sm font-medium ${selectedUserType === 'owner' ? 'text-primary' : ''}`}>
+                                  Мой отель
+                                </span>
+                                <span className="text-xs text-muted-foreground text-center mt-1">
+                                  Зарегистрировать отель
+                                </span>
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
                   <FormField
                     control={signupForm.control}
                     name="fullName"
@@ -157,7 +245,7 @@ export default function Auth() {
                       <FormItem>
                         <FormLabel>{t('auth.fullName')}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Иван Иванов" autoFocus {...field} />
+                          <Input placeholder="Иван Иванов" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

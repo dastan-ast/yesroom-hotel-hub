@@ -256,6 +256,31 @@ const Index = () => {
         </div>
       </section>
 
+      {/* CTA Banner for logged-in guests */}
+      {user && role === 'guest' && (
+        <section className="bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 border-b border-primary/20">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">У вас есть свой отель?</p>
+                  <p className="text-sm text-muted-foreground">Зарегистрируйте его и получайте прямые бронирования</p>
+                </div>
+              </div>
+              <Button asChild size="lg" className="shrink-0">
+                <Link to="/onboarding">
+                  Зарегистрировать отель
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Hotels Grid */}
       <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
