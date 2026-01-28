@@ -232,3 +232,79 @@
     transform: scale(1);
   }
 }
+
+/* Print styles for Help documentation */
+@media print {
+  /* Hide navigation and interactive elements */
+  .sidebar,
+  [data-sidebar],
+  header,
+  .print\\:hidden,
+  button:not(.print-keep),
+  [role="navigation"],
+  [data-radix-scroll-area-viewport] {
+    display: none !important;
+  }
+
+  /* Full width content */
+  .help-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page breaks */
+  .help-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .help-section:not(:first-child) {
+    page-break-before: always;
+    break-before: page;
+  }
+
+  /* Screenshot placeholders */
+  .help-screenshot {
+    max-width: 100%;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--muted)) !important;
+  }
+
+  /* Card styles for print */
+  .card {
+    box-shadow: none !important;
+    border: 1px solid hsl(var(--border)) !important;
+  }
+
+  /* Table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    border: 1px solid hsl(var(--border));
+    padding: 8px;
+  }
+
+  /* Show print-only elements */
+  .print\\:block {
+    display: block !important;
+  }
+
+  /* Body reset */
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Force colors in print */
+  .bg-green-500, .bg-blue-500, .bg-amber-500, .bg-red-500, 
+  .bg-yellow-400, .bg-gray-400, .bg-green-100 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

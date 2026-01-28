@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -16,6 +16,7 @@ import { LiveFeedSidebar } from '@/components/admin/LiveFeedSidebar';
 import { ServiceLogTab } from '@/components/admin/ServiceLogTab';
 import { ApiKeysTab } from '@/components/admin/ApiKeysTab';
 import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
+import { HelpTab } from '@/components/admin/HelpTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -104,6 +105,7 @@ export default function AdminDashboard() {
     { id: 'services', icon: Coffee, label: 'Журнал услуг' },
     { id: 'integrations', icon: Key, label: 'Интеграции' },
     { id: 'settings', icon: Settings, label: 'Настройки отеля' },
+    { id: 'help', icon: HelpCircle, label: 'Справка' },
   ];
 
   return (
@@ -301,6 +303,10 @@ export default function AdminDashboard() {
 
                 {activeTab === 'settings' && (
                   <HotelSettingsTab hotelId={hotelId} />
+                )}
+
+                {activeTab === 'help' && (
+                  <HelpTab />
                 )}
               </div>
 
