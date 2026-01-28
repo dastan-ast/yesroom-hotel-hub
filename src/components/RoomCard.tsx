@@ -1,8 +1,15 @@
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Wifi, Coffee, Tv, Bath, Wind } from 'lucide-react';
+import { Users, Wifi, Coffee, Tv, Bath, Wind, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from '@/components/ui/carousel';
 
 interface RoomCardProps {
   id: string;
@@ -11,7 +18,7 @@ interface RoomCardProps {
   price: number;
   capacity: number;
   amenities: string[] | null;
-  images: string[] | null
+  images: string[] | null;
   imageUrl: string | null;
   onBook?: (roomTypeId: string) => void;
 }
@@ -24,10 +31,35 @@ const amenityIcons: Record<string, React.ElementType> = {
   ac: Wind,
 };
 
-export function RoomCard({ id, name, description, price, capacity, amenities, imageUrl, onBook }: RoomCardProps) {
+export function RoomCard({ id, name, description, price, capacity, amenities, images, imageUrl, onBook }: RoomCardProps) {
   const { t } = useTranslation();
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
+  const [count, setCount] = useState(0);
 
   const defaultImage = 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&auto=format&fit=crop&q=60';
+
+  // Combine images array with fallback to imageUrl
+  const allImages = (() => {
+    const imgs: string[] = [];
+    if (images && images.length > 0) {
+      imgs.push(...images);
+    } else if (imageUrl) {
+      imgs.push(imageUrl);
+    }
+    return imgs.length > 0 ? imgs : [defaultImage];
+  })();
+
+  useEffect(() => {
+    if (!api) return;
+
+    setCount(api.scrollSnapList().length);
+    setCurrent(api.selectedScrollSnap() + 1);
+
+    api.on('select', () => {
+      setCurrent(api.selectedScrollSnap() + 1);
+    });
+  }, [api]);
 
   const handleBookClick = () => {
     if (onBook) {
@@ -35,15 +67,78 @@ export function RoomCard({ id, name, description, price, capacity, amenities, im
     }
   };
 
+  const scrollPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    api?.scrollPrev();
+  };
+
+  const scrollNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    api?.scrollNext();
+  };
+
+  const renderImage = () => {
+    // Single image - no carousel needed
+    if (allImages.length === 1) {
+      return (
+        <div className="relative h-56 overflow-hidden">
+          <img
+            src={allImages[0]}
+            alt={name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        </div>
+      );
+    }
+
+    // Multiple images - use carousel
+    return (
+      <Carousel setApi={setApi} className="w-full" opts={{ loop: true }}>
+        <CarouselContent className="ml-0">
+          {allImages.map((img, index) => (
+            <CarouselItem key={index} className="pl-0">
+              <div className="relative h-56 overflow-hidden">
+                <img
+                  src={img}
+                  alt={`${name} - ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        
+        {/* Navigation arrows */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 hover:bg-background shadow-md z-10"
+          onClick={scrollPrev}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 hover:bg-background shadow-md z-10"
+          onClick={scrollNext}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
+        {/* Slide indicator */}
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-background/80 px-2 py-1 rounded-full text-xs font-medium z-10">
+          {current} / {count}
+        </div>
+      </Carousel>
+    );
+  };
+
   return (
     <Card className="overflow-hidden card-hover group">
-      <div className="relative h-56 overflow-hidden">
-        <img
-          src={imageUrl || defaultImage}
-          alt={name}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
-        <div className="absolute top-4 right-4">
+      <div className="relative">
+        {renderImage()}
+        <div className="absolute top-4 right-4 z-10">
           <Badge className="bg-accent text-accent-foreground font-semibold shadow-gold">
             {price.toLocaleString()} ₸ / {t('rooms.perNight')}
           </Badge>

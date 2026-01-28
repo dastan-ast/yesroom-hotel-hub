@@ -24,6 +24,7 @@ interface RoomType {
   capacity: number;
   amenities: string[] | null;
   image_url: string | null;
+  images: string[] | null;
 }
 
 export default function PublicBooking() {
@@ -143,6 +144,7 @@ export default function PublicBooking() {
                     price={Number(room.price_per_night)}
                     capacity={room.capacity}
                     amenities={room.amenities}
+                    images={room.images}
                     imageUrl={room.image_url}
                   />
                 ))}
