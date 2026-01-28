@@ -97,6 +97,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bookings_room_id_fkey"
             columns: ["room_id"]
             isOneToOne: false
@@ -154,6 +161,13 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clients_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       hotel_api_keys: {
@@ -196,6 +210,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_api_keys_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
             referencedColumns: ["id"]
           },
         ]
@@ -287,6 +308,13 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       room_types: {
@@ -337,6 +365,13 @@ export type Database = {
             referencedRelation: "hotels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "room_types_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       rooms: {
@@ -379,6 +414,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
             referencedColumns: ["id"]
           },
           {
@@ -431,6 +473,13 @@ export type Database = {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_charges_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
             referencedColumns: ["id"]
           },
         ]
@@ -494,7 +543,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      hotels_public: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          location: string | null
+          logo_url: string | null
+          name: string | null
+          slug: string | null
+          status: string | null
+          subscription_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location?: string | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          status?: string | null
+          subscription_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          location?: string | null
+          logo_url?: string | null
+          name?: string | null
+          slug?: string | null
+          status?: string | null
+          subscription_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assign_user_role: {

@@ -60,13 +60,12 @@ export default function HotelProfile() {
         return;
       }
 
+      // Use public view to exclude sensitive fields like owner_id
       const { data: hotelData, error: hotelError } = await supabase
-        .from('hotels')
-        .select('*')
+        .from('hotels_public')
+        .select('id, name, slug, location, description, logo_url, status, subscription_status')
         .eq('slug', hotelSlug)
-        .eq('status', 'active')
-        .in('subscription_status', ['trial', 'active'])
-        .maybeSingle();
+        .maybeSingle() as any;
 
       if (hotelError || !hotelData) {
         setNotFound(true);

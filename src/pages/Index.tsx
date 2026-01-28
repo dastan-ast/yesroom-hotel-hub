@@ -69,12 +69,10 @@ const Index = () => {
   const fetchHotels = async () => {
     setLoading(true);
 
-    // Fetch active hotels
+    // Fetch active hotels from public view (excludes sensitive fields like owner_id)
     const { data: hotelsData, error: hotelsError } = await supabase
-      .from('hotels')
-      .select('id, name, slug, location, description, logo_url')
-      .eq('status', 'active')
-      .in('subscription_status', ['trial', 'active']);
+      .from('hotels_public')
+      .select('id, name, slug, location, description, logo_url') as any;
 
     if (hotelsError) {
       setLoading(false);
