@@ -11,6 +11,7 @@ interface RoomCardProps {
   price: number;
   capacity: number;
   amenities: string[] | null;
+  images: string[] | null
   imageUrl: string | null;
   onBook?: (roomTypeId: string) => void;
 }
