@@ -63,7 +63,7 @@ export default function HotelProfile() {
       // Use public view to exclude sensitive fields like owner_id
       const { data: hotelData, error: hotelError } = await supabase
         .from('hotels_public')
-        .select('id, name, slug, location, description, logo_url, status, subscription_status')
+        .select('id, name, slug, location, description, logo_url, settings')
         .eq('slug', hotelSlug)
         .maybeSingle() as any;
 
