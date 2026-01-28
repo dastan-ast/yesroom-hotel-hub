@@ -43,13 +43,12 @@ export default function PublicBooking() {
         return;
       }
 
-      // Fetch hotel by slug
+      // Fetch hotel by slug using public view (excludes sensitive fields like owner_id)
       const { data: hotelData, error: hotelError } = await supabase
-        .from('hotels')
-        .select('*')
+        .from('hotels_public')
+        .select('id, name, slug, location, description, logo_url')
         .eq('slug', hotelSlug)
-        .in('subscription_status', ['trial', 'active'])
-        .maybeSingle();
+        .maybeSingle() as any;
 
       if (hotelError || !hotelData) {
         setNotFound(true);
