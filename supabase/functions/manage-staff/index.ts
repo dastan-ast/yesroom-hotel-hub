@@ -111,45 +111,47 @@ serve(async (req) => {
 
       const newUserId = newUser.user.id;
 
-      // Create profile
+      // Create or update profile (upsert to handle existing users)
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert({
+        .upsert({
           user_id: newUserId,
           full_name: fullName,
           hotel_id: hotelId,
-        });
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
 
       if (profileError) {
         console.error("Profile error:", profileError);
         // Cleanup: delete the created user
         await supabaseAdmin.auth.admin.deleteUser(newUserId);
         return new Response(
-          JSON.stringify({ error: "Failed to create profile" }),
+          JSON.stringify({ error: "Failed to create profile: " + profileError.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Assign admin role
+      // Assign admin role (upsert to handle existing roles)
       const { error: roleError } = await supabaseAdmin
         .from('user_roles')
-        .insert({
+        .upsert({
           user_id: newUserId,
           role: 'admin',
-        });
+        }, { onConflict: 'user_id' });
 
       if (roleError) {
         console.error("Role error:", roleError);
       }
 
-      // Create permissions
+      // Create or update permissions
       const { error: permError } = await supabaseAdmin
         .from('staff_permissions')
-        .insert({
+        .upsert({
           user_id: newUserId,
           hotel_id: hotelId,
           permissions,
-        });
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,hotel_id' });
 
       if (permError) {
         console.error("Permissions error:", permError);
