@@ -76,7 +76,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
         .from('booking_services')
         .select('id, service_name, unit_price, quantity, total_price')
         .eq('booking_id', bookingId)
-        .order('created_at'),
+        .order('created_at', { ascending: true }),
     ]);
 
     if (bookingRes.data) setBooking(bookingRes.data as BookingDetails);

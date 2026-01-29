@@ -29,12 +29,14 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, Coffee, UtensilsCrossed, Wine, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Coffee } from 'lucide-react';
 
-interface ServiceCharge {
+interface BookingService {
   id: string;
-  description: string;
-  amount: number;
+  service_name: string;
+  unit_price: number;
+  quantity: number;
+  total_price: number | null;
   created_at: string;
   booking_id: string;
   bookings: {
@@ -51,25 +53,28 @@ interface ActiveBooking {
   rooms: { room_number: string } | null;
 }
 
+interface CatalogService {
+  id: string;
+  name: string;
+  default_price: number;
+}
+
 interface Props {
   hotelId: string;
 }
 
-const quickItems = [
-  { label: 'Завтрак', amount: 2000, icon: UtensilsCrossed },
-  { label: 'Мини-бар', amount: 3000, icon: Wine },
-  { label: 'Уборка номера', amount: 1500, icon: Sparkles },
-];
-
 export function ServiceLogTab({ hotelId }: Props) {
   const { t } = useTranslation();
-  const [charges, setCharges] = useState<ServiceCharge[]>([]);
+  const [services, setServices] = useState<BookingService[]>([]);
   const [activeBookings, setActiveBookings] = useState<ActiveBooking[]>([]);
+  const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState('');
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
+  const [selectedService, setSelectedService] = useState('');
+  const [customName, setCustomName] = useState('');
+  const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState('1');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -81,10 +86,10 @@ export function ServiceLogTab({ hotelId }: Props) {
   const fetchData = async () => {
     setLoading(true);
     
-    // Fetch service charges
-    const { data: chargesData } = await supabase
-      .from('service_charges')
-      .select('id, description, amount, created_at, booking_id, bookings(guest_name, room_id, rooms(room_number))')
+    // Fetch booking services (новая таблица)
+    const { data: servicesData } = await supabase
+      .from('booking_services')
+      .select('id, service_name, unit_price, quantity, total_price, created_at, booking_id, bookings(guest_name, room_id, rooms(room_number))')
       .eq('hotel_id', hotelId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -97,23 +102,52 @@ export function ServiceLogTab({ hotelId }: Props) {
       .eq('status', 'checked_in')
       .order('check_in_date', { ascending: false });
 
-    if (chargesData) setCharges(chargesData as unknown as ServiceCharge[]);
+    // Fetch catalog services
+    const { data: catalogData } = await supabase
+      .from('service_catalog')
+      .select('id, name, default_price')
+      .eq('hotel_id', hotelId)
+      .eq('is_active', true)
+      .order('name');
+
+    if (servicesData) setServices(servicesData as unknown as BookingService[]);
     if (bookingsData) setActiveBookings(bookingsData as unknown as ActiveBooking[]);
+    if (catalogData) setCatalogServices(catalogData);
     setLoading(false);
   };
 
-  const handleAddCharge = async () => {
-    if (!selectedBooking || !description.trim() || !amount) {
+  const handleServiceSelect = (serviceId: string) => {
+    setSelectedService(serviceId);
+    if (serviceId === 'custom') {
+      setCustomName('');
+      setPrice('');
+    } else {
+      const service = catalogServices.find(s => s.id === serviceId);
+      if (service) {
+        setCustomName(service.name);
+        setPrice(service.default_price.toString());
+      }
+    }
+  };
+
+  const handleAddService = async () => {
+    if (!selectedBooking || !customName.trim() || !price || !quantity) {
       toast.error('Заполните все поля');
       return;
     }
 
     setSubmitting(true);
-    const { error } = await supabase.from('service_charges').insert({
+    
+    const unitPrice = parseFloat(price);
+    const qty = parseInt(quantity);
+    
+    const { error } = await supabase.from('booking_services').insert({
       hotel_id: hotelId,
       booking_id: selectedBooking,
-      description: description.trim(),
-      amount: parseFloat(amount),
+      service_id: selectedService !== 'custom' ? selectedService : null,
+      service_name: customName.trim(),
+      unit_price: unitPrice,
+      quantity: qty,
     });
 
     if (error) {
@@ -121,21 +155,22 @@ export function ServiceLogTab({ hotelId }: Props) {
     } else {
       toast.success('Услуга добавлена');
       setDialogOpen(false);
-      setDescription('');
-      setAmount('');
-      setSelectedBooking('');
+      resetForm();
       fetchData();
     }
     setSubmitting(false);
   };
 
-  const handleQuickAdd = (item: { label: string; amount: number }) => {
-    setDescription(item.label);
-    setAmount(item.amount.toString());
+  const resetForm = () => {
+    setSelectedBooking('');
+    setSelectedService('');
+    setCustomName('');
+    setPrice('');
+    setQuantity('1');
   };
 
-  const handleDeleteCharge = async (id: string) => {
-    const { error } = await supabase.from('service_charges').delete().eq('id', id);
+  const handleDeleteService = async (id: string) => {
+    const { error } = await supabase.from('booking_services').delete().eq('id', id);
     if (error) {
       toast.error(t('common.error'));
     } else {
@@ -145,8 +180,9 @@ export function ServiceLogTab({ hotelId }: Props) {
   };
 
   // Calculate totals per booking
-  const bookingTotals = charges.reduce((acc, charge) => {
-    acc[charge.booking_id] = (acc[charge.booking_id] || 0) + charge.amount;
+  const bookingTotals = services.reduce((acc, service) => {
+    const total = service.total_price ?? (service.unit_price * service.quantity);
+    acc[service.booking_id] = (acc[service.booking_id] || 0) + total;
     return acc;
   }, {} as Record<string, number>);
 
@@ -196,8 +232,8 @@ export function ServiceLogTab({ hotelId }: Props) {
         </div>
       )}
 
-      {/* Charges table */}
-      {charges.length > 0 ? (
+      {/* Services table */}
+      {services.length > 0 ? (
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader>
@@ -205,40 +241,49 @@ export function ServiceLogTab({ hotelId }: Props) {
                 <TableHead>Дата</TableHead>
                 <TableHead>Гость / Номер</TableHead>
                 <TableHead>Услуга</TableHead>
+                <TableHead className="text-center">Кол-во</TableHead>
+                <TableHead className="text-right">Цена</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {charges.map(charge => (
-                <TableRow key={charge.id}>
-                  <TableCell className="text-muted-foreground">
-                    {format(new Date(charge.created_at), 'dd.MM HH:mm')}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{charge.bookings?.guest_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {charge.bookings?.rooms?.room_number || '—'}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>{charge.description}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {charge.amount.toLocaleString()} ₸
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDeleteCharge(charge.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {services.map(service => {
+                const total = service.total_price ?? (service.unit_price * service.quantity);
+                return (
+                  <TableRow key={service.id}>
+                    <TableCell className="text-muted-foreground">
+                      {format(new Date(service.created_at), 'dd.MM HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{service.bookings?.guest_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {service.bookings?.rooms?.room_number || '—'}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{service.service_name}</TableCell>
+                    <TableCell className="text-center">{service.quantity}</TableCell>
+                    <TableCell className="text-right">
+                      {service.unit_price.toLocaleString()} ₸
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {total.toLocaleString()} ₸
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteService(service.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -248,7 +293,7 @@ export function ServiceLogTab({ hotelId }: Props) {
         </div>
       )}
 
-      {/* Add charge dialog */}
+      {/* Add service dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -272,48 +317,71 @@ export function ServiceLogTab({ hotelId }: Props) {
               </Select>
             </div>
 
-            {/* Quick add buttons */}
-            <div className="flex flex-wrap gap-2">
-              {quickItems.map(item => (
-                <Button
-                  key={item.label}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickAdd(item)}
-                  className="gap-1.5"
-                >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
-                </Button>
-              ))}
+            <div className="space-y-2">
+              <Label>Услуга из справочника</Label>
+              <Select value={selectedService} onValueChange={handleServiceSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите услугу" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogServices.map(service => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.name} — {service.default_price.toLocaleString()} ₸
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">+ Своя услуга</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Описание</Label>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Например: Завтрак, Мини-бар..."
-              />
+            {selectedService === 'custom' && (
+              <div className="space-y-2">
+                <Label>Название услуги</Label>
+                <Input
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Например: Трансфер, Экскурсия..."
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Цена (₸)</Label>
+                <Input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Количество</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="1"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Сумма (₸)</Label>
-              <Input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-              />
-            </div>
+            {price && quantity && (
+              <div className="p-3 bg-muted/50 rounded-lg flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Итого:</span>
+                <span className="font-semibold">
+                  {(parseFloat(price || '0') * parseInt(quantity || '1')).toLocaleString()} ₸
+                </span>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
               Отмена
             </Button>
-            <Button onClick={handleAddCharge} disabled={submitting}>
+            <Button onClick={handleAddService} disabled={submitting}>
               {submitting ? t('common.loading') : 'Добавить'}
             </Button>
           </DialogFooter>
