@@ -30,8 +30,16 @@ const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-400/80',
   approved: 'bg-blue-400/80',
   checked_in: 'bg-green-500/80',
-  checked_out: 'bg-muted',
-  cancelled: 'bg-red-400/60',
+  checked_out: 'bg-muted-foreground/40',
+  cancelled: 'bg-destructive/40',
+};
+
+const statusOpacity: Record<BookingStatus, string> = {
+  pending: '',
+  approved: '',
+  checked_in: '',
+  checked_out: 'opacity-50',
+  cancelled: 'opacity-40',
 };
 
 interface Props {
@@ -74,7 +82,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         .not('room_id', 'is', null)
         .gte('check_out_date', format(startDate, 'yyyy-MM-dd'))
         .lte('check_in_date', format(endDate, 'yyyy-MM-dd'))
-        .in('status', ['pending', 'approved', 'checked_in'])
     ]);
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
@@ -130,6 +137,14 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           <div className="w-4 h-4 rounded bg-green-500/80" />
           <span>{t('admin.checkedIn')}</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" />
+          <span>{t('admin.checkedOut')}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded bg-destructive/40 opacity-40" />
+          <span>{t('admin.cancelled')}</span>
+        </div>
       </div>
 
       {/* Grid */}
@@ -182,7 +197,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                           <div
                             className={cn(
                               'h-8 rounded text-xs flex items-center justify-center text-white font-medium truncate px-1',
-                              statusColors[booking.status]
+                              statusColors[booking.status],
+                              statusOpacity[booking.status]
                             )}
                             title={`${booking.guest_name} (${booking.status})`}
                           >

@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -14,6 +14,7 @@ import { ClientsTab } from '@/components/admin/ClientsTab';
 import { ShahmatkaGrid } from '@/components/admin/ShahmatkaGrid';
 import { LiveFeedSidebar } from '@/components/admin/LiveFeedSidebar';
 import { ServiceLogTab } from '@/components/admin/ServiceLogTab';
+import { ServiceCatalogTab } from '@/components/admin/ServiceCatalogTab';
 import { ApiKeysTab } from '@/components/admin/ApiKeysTab';
 import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
 import { HelpTab } from '@/components/admin/HelpTab';
@@ -103,6 +104,7 @@ export default function AdminDashboard() {
     { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes') },
     { id: 'clients', icon: Users, label: t('admin.clients') },
     { id: 'services', icon: Coffee, label: 'Журнал услуг' },
+    { id: 'service-catalog', icon: BookOpen, label: 'Справочник услуг' },
     { id: 'integrations', icon: Key, label: 'Интеграции' },
     { id: 'settings', icon: Settings, label: 'Настройки отеля' },
     { id: 'help', icon: HelpCircle, label: 'Справка' },
@@ -293,6 +295,14 @@ export default function AdminDashboard() {
                   <Card>
                     <CardContent className="pt-6">
                       <ServiceLogTab hotelId={hotelId} />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {activeTab === 'service-catalog' && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <ServiceCatalogTab hotelId={hotelId} />
                     </CardContent>
                   </Card>
                 )}

@@ -16,10 +16,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
+import { CheckoutInvoiceModal } from './CheckoutInvoiceModal';
+import { BookingDetailModal } from './BookingDetailModal';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -63,6 +65,14 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   // Undo check-in dialog state
   const [undoCheckInDialogOpen, setUndoCheckInDialogOpen] = useState(false);
   const [bookingToUndoCheckIn, setBookingToUndoCheckIn] = useState<Booking | null>(null);
+
+  // Checkout invoice modal state
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [bookingToCheckout, setBookingToCheckout] = useState<Booking | null>(null);
+
+  // Booking detail modal state
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [bookingToView, setBookingToView] = useState<Booking | null>(null);
 
   useEffect(() => {
     if (hotelId) {
@@ -113,31 +123,16 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  const handleCheckOut = async (booking: Booking) => {
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .update({ status: 'checked_out' })
-      .eq('id', booking.id);
+  // Open checkout modal instead of direct checkout
+  const handleOpenCheckout = (booking: Booking) => {
+    setBookingToCheckout(booking);
+    setCheckoutModalOpen(true);
+  };
 
-    if (bookingError) {
-      toast.error(t('common.error'));
-      return;
-    }
-
-    if (booking.room_id) {
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({ status: 'available' })
-        .eq('id', booking.room_id);
-
-      if (roomError) {
-        toast.error(t('common.error'));
-        return;
-      }
-    }
-
-    toast.success(t('common.success'));
-    fetchBookings();
+  // Open detail modal
+  const handleOpenDetail = (booking: Booking) => {
+    setBookingToView(booking);
+    setDetailModalOpen(true);
   };
 
   const handleQuickApprove = async (bookingId: string) => {
@@ -324,60 +319,64 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   {format(new Date(booking.check_out_date), 'dd.MM.yyyy')}
                 </p>
               </div>
-              <div className="flex gap-2 flex-wrap">
-                {booking.status === 'pending' && (
-                  <>
-                    <Button size="sm" onClick={() => {
+                <div className="flex gap-2 flex-wrap">
+                  {/* View detail button for all statuses */}
+                  <Button size="sm" variant="ghost" onClick={() => handleOpenDetail(booking)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  {booking.status === 'pending' && (
+                    <>
+                      <Button size="sm" onClick={() => {
+                        setSelectedBooking(booking);
+                        setAssignDialogOpen(true);
+                      }}>
+                        <DoorOpen className="h-4 w-4 mr-1" />
+                        Назначить номер
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleQuickApprove(booking.id)}>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        {t('admin.approve')}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Отменить
+                      </Button>
+                    </>
+                  )}
+                  {booking.status === 'approved' && !booking.room_id && (
+                    <Button size="sm" variant="outline" onClick={() => {
                       setSelectedBooking(booking);
                       setAssignDialogOpen(true);
                     }}>
                       <DoorOpen className="h-4 w-4 mr-1" />
                       Назначить номер
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleQuickApprove(booking.id)}>
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      {t('admin.approve')}
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Отменить
-                    </Button>
-                  </>
-                )}
-                {booking.status === 'approved' && !booking.room_id && (
-                  <Button size="sm" variant="outline" onClick={() => {
-                    setSelectedBooking(booking);
-                    setAssignDialogOpen(true);
-                  }}>
-                    <DoorOpen className="h-4 w-4 mr-1" />
-                    Назначить номер
-                  </Button>
-                )}
-                {booking.status === 'approved' && (
-                  <>
-                    <Button size="sm" onClick={() => handleCheckIn(booking)}>
-                      <LogIn className="h-4 w-4 mr-1" />
-                      {t('admin.checkIn')}
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
-                      <XCircle className="h-4 w-4 mr-1" />
-                      Отменить
-                    </Button>
-                  </>
-                )}
-                {booking.status === 'checked_in' && (
-                  <>
-                    <Button size="sm" variant="secondary" onClick={() => handleCheckOut(booking)}>
-                      <LogOut className="h-4 w-4 mr-1" />
-                      {t('admin.checkOut')}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleUndoCheckInWithConfirm(booking)}>
-                      <RotateCcw className="h-4 w-4 mr-1" />
-                      Отменить заселение
-                    </Button>
-                  </>
-                )}
-              </div>
+                  )}
+                  {booking.status === 'approved' && (
+                    <>
+                      <Button size="sm" onClick={() => handleCheckIn(booking)}>
+                        <LogIn className="h-4 w-4 mr-1" />
+                        {t('admin.checkIn')}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Отменить
+                      </Button>
+                    </>
+                  )}
+                  {booking.status === 'checked_in' && (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckout(booking)}>
+                        <LogOut className="h-4 w-4 mr-1" />
+                        {t('admin.checkOut')}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleUndoCheckInWithConfirm(booking)}>
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Отменить заселение
+                      </Button>
+                    </>
+                  )}
+                </div>
             </div>
           ))}
         </div>
@@ -455,6 +454,28 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Checkout Invoice Modal */}
+      {bookingToCheckout && (
+        <CheckoutInvoiceModal
+          open={checkoutModalOpen}
+          onOpenChange={setCheckoutModalOpen}
+          bookingId={bookingToCheckout.id}
+          hotelId={hotelId}
+          onSuccess={fetchBookings}
+        />
+      )}
+
+      {/* Booking Detail Modal */}
+      {bookingToView && (
+        <BookingDetailModal
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          bookingId={bookingToView.id}
+          hotelId={hotelId}
+          onUpdate={fetchBookings}
+        />
+      )}
     </div>
   );
 }
