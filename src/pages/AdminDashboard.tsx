@@ -34,6 +34,11 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLiveFeed, setShowLiveFeed] = useState(true);
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
   // All menu items with permission mapping
   const allMenuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard'), permission: 'dashboard' },
@@ -174,7 +179,7 @@ export default function AdminDashboard() {
           <SidebarFooter className="p-2 border-t">
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={signOut}>
+                <SidebarMenuButton onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
                   <span>{t('nav.logout')}</span>
                 </SidebarMenuButton>
@@ -196,19 +201,39 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               </div>
-              <Button
-                variant={showLiveFeed ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setShowLiveFeed(!showLiveFeed)}
-                className="gap-2"
-              >
-                <Bell className="h-4 w-4" />
-                {stats.pending > 0 && (
-                  <span className="bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
-                    {stats.pending}
-                  </span>
-                )}
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant={showLiveFeed ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setShowLiveFeed(!showLiveFeed)}
+                  className="gap-2"
+                >
+                  <Bell className="h-4 w-4" />
+                  {stats.pending > 0 && (
+                    <span className="bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
+                      {stats.pending}
+                    </span>
+                  )}
+                </Button>
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
+                  <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-medium">
+                    {profile?.full_name?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-medium leading-none">{profile?.full_name || 'Пользователь'}</p>
+                    <p className="text-xs text-muted-foreground">{isOwner ? 'Владелец' : 'Администратор'}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  title="Выйти и сменить пользователя"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
             </header>
 
             <main className="flex-1 flex">
@@ -354,7 +379,7 @@ export default function AdminDashboard() {
                 {activeTab === 'staff' && (
                   <Card>
                     <CardContent className="pt-6">
-                      <StaffTab hotelId={hotelId} />
+                      <StaffTab hotelId={hotelId} hotelName={hotelName} />
                     </CardContent>
                   </Card>
                 )}

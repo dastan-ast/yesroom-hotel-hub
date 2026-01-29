@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.room-types]
 verify_jwt = false
+
+[functions.send-staff-invitation]
+verify_jwt = false
