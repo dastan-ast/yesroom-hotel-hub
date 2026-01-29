@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, UserPlus, Shield } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Shield, Mail, Clock, X, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { StaffPermissionsDialog } from './StaffPermissionsDialog';
-import { MODULE_LABELS, ModuleId, DEFAULT_ADMIN_PERMISSIONS } from '@/hooks/usePermissions';
+import { InviteStaffDialog } from './InviteStaffDialog';
+import { MODULE_LABELS, ModuleId } from '@/hooks/usePermissions';
 
 interface StaffMember {
   user_id: string;
@@ -20,28 +18,36 @@ interface StaffMember {
   permissions: string[];
 }
 
-interface Props {
-  hotelId: string;
+interface Invitation {
+  id: string;
+  email: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  permissions: string[];
 }
 
-export function StaffTab({ hotelId }: Props) {
+interface Props {
+  hotelId: string;
+  hotelName?: string;
+}
+
+export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [newStaffEmail, setNewStaffEmail] = useState('');
-  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     fetchStaff();
+    fetchInvitations();
   }, [hotelId]);
 
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      // Get all admins for this hotel
-      // First get profiles with this hotel_id
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name')
@@ -55,7 +61,6 @@ export function StaffTab({ hotelId }: Props) {
         return;
       }
 
-      // Get user roles to filter only admins
       const userIds = profiles.map(p => p.user_id);
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
@@ -73,7 +78,6 @@ export function StaffTab({ hotelId }: Props) {
         return;
       }
 
-      // Get permissions for these admins
       const { data: permissions, error: permError } = await supabase
         .from('staff_permissions')
         .select('user_id, permissions')
@@ -82,7 +86,6 @@ export function StaffTab({ hotelId }: Props) {
 
       if (permError) throw permError;
 
-      // Combine data
       const permissionsMap = new Map(permissions?.map(p => [p.user_id, p.permissions]) || []);
       
       const staffList: StaffMember[] = profiles
@@ -90,7 +93,7 @@ export function StaffTab({ hotelId }: Props) {
         .map(p => ({
           user_id: p.user_id,
           full_name: p.full_name,
-          email: '', // We can't access auth.users directly, will show name only
+          email: '',
           permissions: permissionsMap.get(p.user_id) || [],
         }));
 
@@ -103,36 +106,63 @@ export function StaffTab({ hotelId }: Props) {
     }
   };
 
-  const handleAddStaff = async () => {
-    if (!newStaffEmail.trim()) {
-      toast.error('Введите email сотрудника');
-      return;
-    }
-
-    setAdding(true);
+  const fetchInvitations = async () => {
     try {
-      // Check if user exists by email in profiles (we can't query auth.users directly)
-      // This is a limitation - we need to find user by some other means
-      // For now, we'll show a message that the user needs to register first
-      
-      toast.info(
-        'Для добавления сотрудника попросите его зарегистрироваться в системе, затем назначьте ему роль через панель SuperAdmin',
-        { duration: 5000 }
-      );
-      
-      setAddDialogOpen(false);
-      setNewStaffEmail('');
+      const { data, error } = await supabase
+        .from('staff_invitations')
+        .select('id, email, status, created_at, expires_at, permissions')
+        .eq('hotel_id', hotelId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setInvitations(data || []);
     } catch (error: any) {
-      console.error('Error adding staff:', error);
-      toast.error('Ошибка добавления: ' + error.message);
-    } finally {
-      setAdding(false);
+      console.error('Error fetching invitations:', error);
+    }
+  };
+
+  const handleCancelInvitation = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('staff_invitations')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Приглашение отменено');
+      fetchInvitations();
+    } catch (error: any) {
+      toast.error('Ошибка: ' + error.message);
+    }
+  };
+
+  const handleResendInvitation = async (invitation: Invitation) => {
+    try {
+      const inviteUrl = `${window.location.origin}/invite/${invitation.id}`;
+      
+      const { error } = await supabase.functions.invoke('send-staff-invitation', {
+        body: {
+          email: invitation.email,
+          hotelName,
+          inviteUrl,
+          invitedByName: 'Владелец отеля',
+        },
+      });
+
+      if (error) {
+        navigator.clipboard.writeText(inviteUrl);
+        toast.success('Ссылка скопирована в буфер обмена');
+      } else {
+        toast.success('Приглашение отправлено повторно');
+      }
+    } catch (error: any) {
+      toast.error('Ошибка: ' + error.message);
     }
   };
 
   const handleRemoveStaff = async (userId: string) => {
     try {
-      // Remove permissions
       const { error: permError } = await supabase
         .from('staff_permissions')
         .delete()
@@ -141,16 +171,12 @@ export function StaffTab({ hotelId }: Props) {
 
       if (permError) throw permError;
 
-      // Update profile to remove hotel_id
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ hotel_id: null })
         .eq('user_id', userId);
 
       if (profileError) throw profileError;
-
-      // Note: We can't change the role here as it requires superadmin
-      // The user will keep their admin role but without hotel access
 
       toast.success('Сотрудник удалён из отеля');
       fetchStaff();
@@ -213,23 +239,74 @@ export function StaffTab({ hotelId }: Props) {
             Настройте права доступа для администраторов вашего отеля
           </p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Добавить
+        <Button onClick={() => setInviteDialogOpen(true)}>
+          <Mail className="h-4 w-4 mr-2" />
+          Пригласить
         </Button>
       </div>
 
-      {staff.length === 0 ? (
+      {/* Pending Invitations */}
+      {invitations.length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Ожидают подтверждения
+            </h3>
+            <div className="space-y-2">
+              {invitations.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">{inv.email}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Истекает: {new Date(inv.expires_at).toLocaleDateString('ru')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleResendInvitation(inv)}
+                      title="Отправить повторно"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCancelInvitation(inv.id)}
+                      title="Отменить"
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {staff.length === 0 && invitations.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>Пока нет администраторов</p>
             <p className="text-sm mt-2">
-              Для добавления сотрудника обратитесь к SuperAdmin
+              Пригласите сотрудника по email
             </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => setInviteDialogOpen(true)}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Пригласить администратора
+            </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : staff.length > 0 && (
         <Card>
           <Table>
             <TableHeader>
@@ -299,38 +376,16 @@ export function StaffTab({ hotelId }: Props) {
         </Card>
       )}
 
-      {/* Add Staff Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Добавить сотрудника</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email сотрудника</Label>
-              <Input
-                id="email"
-                type="email"
-                value={newStaffEmail}
-                onChange={(e) => setNewStaffEmail(e.target.value)}
-                placeholder="admin@hotel.kz"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Сотрудник должен быть зарегистрирован в системе. 
-              Для назначения роли обратитесь к SuperAdmin.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-              Отмена
-            </Button>
-            <Button onClick={handleAddStaff} disabled={adding}>
-              {adding ? 'Добавление...' : 'Добавить'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Invite Dialog */}
+      <InviteStaffDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        hotelId={hotelId}
+        hotelName={hotelName}
+        onInviteSent={() => {
+          fetchInvitations();
+        }}
+      />
 
       {/* Permissions Dialog */}
       <StaffPermissionsDialog

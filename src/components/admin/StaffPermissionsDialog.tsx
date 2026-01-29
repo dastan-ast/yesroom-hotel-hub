@@ -45,8 +45,11 @@ export function StaffPermissionsDialog({ open, onOpenChange, staff, hotelId, onS
     );
   };
 
-  const applyPreset = (presetKey: keyof typeof PERMISSION_PRESETS) => {
-    setSelectedPermissions([...PERMISSION_PRESETS[presetKey].permissions]);
+  const applyPreset = (presetId: string) => {
+    const preset = PERMISSION_PRESETS.find(p => p.id === presetId);
+    if (preset) {
+      setSelectedPermissions([...preset.permissions]);
+    }
   };
 
   const handleSave = async () => {
@@ -95,12 +98,12 @@ export function StaffPermissionsDialog({ open, onOpenChange, staff, hotelId, onS
           <div className="space-y-2">
             <Label className="text-sm text-muted-foreground">Пресеты</Label>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(PERMISSION_PRESETS).map(([key, preset]) => (
+              {PERMISSION_PRESETS.map((preset) => (
                 <Badge
-                  key={key}
+                  key={preset.id}
                   variant="outline"
                   className="cursor-pointer hover:bg-accent"
-                  onClick={() => applyPreset(key as keyof typeof PERMISSION_PRESETS)}
+                  onClick={() => applyPreset(preset.id)}
                 >
                   {preset.label}
                 </Badge>

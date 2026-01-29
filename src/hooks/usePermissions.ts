@@ -43,20 +43,23 @@ export const DEFAULT_ADMIN_PERMISSIONS: ModuleId[] = [
 ];
 
 // Permissions presets
-export const PERMISSION_PRESETS = {
-  full: {
+export const PERMISSION_PRESETS = [
+  {
+    id: 'full',
     label: 'Полный доступ',
     permissions: ALL_MODULES.filter(m => m !== 'staff') as ModuleId[],
   },
-  basic: {
+  {
+    id: 'basic',
     label: 'Базовый',
     permissions: DEFAULT_ADMIN_PERMISSIONS,
   },
-  readonly: {
+  {
+    id: 'readonly',
     label: 'Только просмотр',
     permissions: ['dashboard', 'shahmatka'] as ModuleId[],
   },
-};
+];
 
 interface UsePermissionsReturn {
   permissions: string[];

@@ -606,6 +606,60 @@ export type Database = {
           },
         ]
       }
+      staff_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          hotel_id: string
+          id: string
+          invited_by: string | null
+          permissions: string[]
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          hotel_id: string
+          id?: string
+          invited_by?: string | null
+          permissions?: string[]
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          hotel_id?: string
+          id?: string
+          invited_by?: string | null
+          permissions?: string[]
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_invitations_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_invitations_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_permissions: {
         Row: {
           created_at: string
@@ -751,6 +805,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation: {
+        Args: { _token: string; _user_id: string }
+        Returns: undefined
+      }
       assign_user_role: {
         Args: {
           _hotel_id: string
