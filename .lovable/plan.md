@@ -1,224 +1,239 @@
 
-# План: Финансовая логика и управление услугами
+# План: Система управления правами доступа для администраторов
 
-## Обзор текущего состояния
+## Обзор решения
 
-### Существующие компоненты:
-- **service_charges** — таблица для записи дополнительных услуг (description, amount, booking_id)
-- **ServiceLogTab** — журнал услуг с быстрыми кнопками (Завтрак, Мини-бар, Уборка)
-- **BookingsTab** — управление бронированиями с действиями Check-in/Check-out
-- **ShahmatkaGrid** — 7-дневная сетка номеров (фильтрует только активные статусы)
-- **room_types.price_per_night** — базовая цена за ночь
+Реализуем гибкую систему прав доступа, позволяющую владельцам отелей контролировать, какие разделы и функции видят их администраторы.
 
-### Что требуется:
-1. Справочник услуг с настраиваемыми ценами
-2. Добавление услуг прямо в карточке бронирования
-3. Итоговый счёт при выселении
-4. История бронирований в Шахматке
+### Принцип работы:
+- **Владелец (owner)** — видит все разделы и может управлять правами администраторов
+- **Администратор (admin)** — видит только те разделы, которые разрешил владелец
+- **SuperAdmin** — полный доступ ко всему
+
+---
+
+## Архитектура прав доступа
+
+### Модули системы (permissions):
+
+| Код модуля | Название (RU) | Описание |
+|------------|---------------|----------|
+| `dashboard` | Дашборд | Главная страница со статистикой |
+| `bookings` | Бронирования | Очередь бронирований, заселение/выселение |
+| `shahmatka` | Шахматка | Календарная сетка занятости |
+| `rooms` | Номера | Управление номерным фондом |
+| `room_types` | Типы номеров | Категории и цены |
+| `clients` | Клиенты | База гостей |
+| `services` | Журнал услуг | Добавление услуг к бронированиям |
+| `service_catalog` | Справочник услуг | Настройка прейскуранта |
+| `integrations` | Интеграции | API ключи |
+| `settings` | Настройки | Настройки отеля |
+| `staff` | Персонал | Управление администраторами (только owner) |
 
 ---
 
 ## Изменения базы данных
 
-### 1. Новая таблица: service_catalog
+### 1. Новая таблица: staff_permissions
 
 ```sql
-CREATE TABLE public.service_catalog (
+CREATE TABLE public.staff_permissions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   hotel_id uuid NOT NULL REFERENCES hotels(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  default_price numeric NOT NULL DEFAULT 0,
-  is_active boolean NOT NULL DEFAULT true,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  permissions text[] NOT NULL DEFAULT '{}',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(hotel_id, user_id)
 );
 
--- RLS: Только персонал отеля
-ALTER TABLE public.service_catalog ENABLE ROW LEVEL SECURITY;
+-- RLS: Владелец может управлять, администратор может читать свои
+ALTER TABLE public.staff_permissions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Hotel staff can manage service_catalog"
-ON public.service_catalog FOR ALL
+CREATE POLICY "Owners can manage staff permissions"
+ON public.staff_permissions FOR ALL
 USING (
   hotel_id = get_user_hotel_id(auth.uid()) AND
-  (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'owner'))
+  has_role(auth.uid(), 'owner')
 );
+
+CREATE POLICY "Staff can read own permissions"
+ON public.staff_permissions FOR SELECT
+USING (user_id = auth.uid());
 ```
 
-### 2. Новая таблица: booking_services
+### 2. RPC функция для проверки прав
 
 ```sql
-CREATE TABLE public.booking_services (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  hotel_id uuid NOT NULL REFERENCES hotels(id) ON DELETE CASCADE,
-  booking_id uuid NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-  service_id uuid REFERENCES service_catalog(id) ON DELETE SET NULL,
-  service_name text NOT NULL,
-  unit_price numeric NOT NULL DEFAULT 0,
-  quantity integer NOT NULL DEFAULT 1,
-  total_price numeric GENERATED ALWAYS AS (unit_price * quantity) STORED,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id)
-);
-
--- RLS: Только персонал отеля
-ALTER TABLE public.booking_services ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Hotel staff can manage booking_services"
-ON public.booking_services FOR ALL
-USING (
-  hotel_id = get_user_hotel_id(auth.uid()) AND
-  (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'owner'))
-);
-```
-
-### 3. Расширение таблицы bookings
-
-```sql
--- Добавить колонки для финального расчёта
-ALTER TABLE public.bookings 
-ADD COLUMN IF NOT EXISTS prepayment_amount numeric DEFAULT 0,
-ADD COLUMN IF NOT EXISTS daily_rate numeric,
-ADD COLUMN IF NOT EXISTS final_total numeric;
+CREATE OR REPLACE FUNCTION public.check_permission(
+  _user_id uuid,
+  _permission text
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE
+    -- SuperAdmin и Owner имеют все права
+    WHEN has_role(_user_id, 'superadmin') THEN true
+    WHEN has_role(_user_id, 'owner') THEN true
+    -- Администратор проверяется по таблице permissions
+    WHEN has_role(_user_id, 'admin') THEN EXISTS (
+      SELECT 1 FROM staff_permissions
+      WHERE user_id = _user_id
+        AND _permission = ANY(permissions)
+    )
+    ELSE false
+  END
+$$;
 ```
 
 ---
 
 ## Новые компоненты UI
 
-### 1. ServiceCatalogTab.tsx
-**Расположение:** `src/components/admin/ServiceCatalogTab.tsx`
+### 1. StaffTab.tsx — Управление персоналом
+**Расположение:** `src/components/admin/StaffTab.tsx`
+
+**Доступ:** Только для owner
 
 **Функционал:**
-- Таблица услуг: название, цена по умолчанию, статус
-- Кнопка "Добавить услугу"
-- Диалог создания/редактирования услуги
-- Удаление услуги (soft delete через is_active)
+- Список сотрудников отеля (role = admin)
+- Добавление нового администратора (по email)
+- Управление правами каждого сотрудника
+- Удаление сотрудника из отеля
 
 **UI:**
 ```text
-+------------------------------------------+
-| Справочник услуг          [+ Добавить]   |
-+------------------------------------------+
-| Название        | Цена      | Действия   |
-| Завтрак         | 2 000 ₸   | ✏️ 🗑️      |
-| Мини-бар        | 3 000 ₸   | ✏️ 🗑️      |
-| Уборка номера   | 1 500 ₸   | ✏️ 🗑️      |
-+------------------------------------------+
++--------------------------------------------------+
+| Персонал                      [+ Добавить]       |
++--------------------------------------------------+
+| Имя              | Права доступа       | Действия|
++--------------------------------------------------+
+| Асем Жумабаева   | Бронирования,       | [✏️] [🗑]|
+|                  | Номера, Клиенты     |         |
++--------------------------------------------------+
+| Серик Ермеков    | Только просмотр     | [✏️] [🗑]|
++--------------------------------------------------+
 ```
 
-### 2. BookingServicesTab.tsx
-**Расположение:** `src/components/admin/BookingServicesTab.tsx`
+### 2. StaffPermissionsDialog.tsx — Редактирование прав
+**Расположение:** `src/components/admin/StaffPermissionsDialog.tsx`
 
 **Функционал:**
-- Выбор услуги из каталога
-- Автозаполнение цены (с возможностью изменить)
-- Указание количества
-- Живой подсчёт итога
-- Список добавленных услуг
+- Чекбоксы для каждого модуля
+- Пресеты: "Полный доступ", "Только просмотр", "Бронирования"
+- Сохранение в staff_permissions
 
 **UI:**
 ```text
-+------------------------------------------+
-| Услуги                                   |
-+------------------------------------------+
-| [Выберите услугу ▼] | Цена: [2000] | x[1]|
-|                      [+ Добавить]        |
-+------------------------------------------+
-| • Завтрак x2           4 000 ₸      [🗑️] |
-| • Мини-бар x1          3 000 ₸      [🗑️] |
-+------------------------------------------+
-| ИТОГО услуг:           7 000 ₸           |
-+------------------------------------------+
++--------------------------------------------------+
+| Права доступа: Асем Жумабаева              [X]   |
++--------------------------------------------------+
+| Пресеты: [Полный доступ] [Только просмотр]       |
++--------------------------------------------------+
+| [✓] Дашборд           [✓] Бронирования           |
+| [✓] Шахматка          [✓] Номера                 |
+| [ ] Типы номеров      [✓] Клиенты                |
+| [✓] Журнал услуг      [ ] Справочник услуг       |
+| [ ] Интеграции        [ ] Настройки              |
++--------------------------------------------------+
+|                    [Сохранить]                   |
++--------------------------------------------------+
 ```
 
-### 3. CheckoutInvoiceModal.tsx
-**Расположение:** `src/components/admin/CheckoutInvoiceModal.tsx`
+### 3. usePermissions.ts — Хук для проверки прав
+**Расположение:** `src/hooks/usePermissions.ts`
 
-**Триггер:** Клик на кнопку "Выселить" в BookingsTab
+**Функционал:**
+```typescript
+interface UsePermissionsReturn {
+  permissions: string[];
+  loading: boolean;
+  hasPermission: (key: string) => boolean;
+  canAccessModule: (moduleId: string) => boolean;
+}
 
-**Содержимое:**
-```text
-+------------------------------------------+
-| ИТОГОВЫЙ СЧЁТ                      [X]   |
-+------------------------------------------+
-| Гость: Иванов Иван Иванович              |
-| Номер: 101 (Стандарт)                    |
-| Период: 15.01 — 18.01.2026 (3 ночи)      |
-+------------------------------------------+
-| ПРОЖИВАНИЕ                               |
-| 3 ночи × 15 000 ₸           = 45 000 ₸   |
-+------------------------------------------+
-| УСЛУГИ                                   |
-| Завтрак × 2                 =  4 000 ₸   |
-| Мини-бар × 1                =  3 000 ₸   |
-| Итого услуг:                   7 000 ₸   |
-+------------------------------------------+
-| ОБЩИЙ ИТОГ:                   52 000 ₸   |
-| Предоплата:                  -20 000 ₸   |
-| ═══════════════════════════════════════  |
-| БАЛАНС К ОПЛАТЕ:              32 000 ₸   |
-+------------------------------------------+
-|              [Подтвердить и закрыть]     |
-+------------------------------------------+
+export function usePermissions() {
+  const { user, role, isOwner, isSuperAdmin, hotelId } = useAuth();
+  
+  // Owner и SuperAdmin имеют все права
+  if (isOwner || isSuperAdmin) {
+    return { 
+      permissions: ALL_MODULES, 
+      hasPermission: () => true,
+      canAccessModule: () => true 
+    };
+  }
+  
+  // Для admin — загружаем из БД
+  // ...fetch from staff_permissions
+}
 ```
-
-**Логика:**
-1. Рассчитать количество ночей: `differenceInDays(check_out, check_in)`
-2. Получить daily_rate из room_types или bookings.daily_rate
-3. Сумма проживания = ночи × тариф
-4. Сумма услуг = SUM(booking_services.total_price)
-5. Общий итог = проживание + услуги
-6. Баланс = итог - предоплата
-
-**Действие "Подтвердить":**
-- Обновить booking.status = 'checked_out'
-- Сохранить booking.final_total
-- Освободить room.status = 'available'
-
-### 4. BookingDetailModal.tsx
-**Расположение:** `src/components/admin/BookingDetailModal.tsx`
-
-**Назначение:** Детальный просмотр бронирования с вкладками
-
-**Вкладки:**
-- **Информация** — данные гостя, даты, номер
-- **Услуги** — BookingServicesTab (добавление услуг)
-- **Счёт** — предпросмотр итогового счёта
 
 ---
 
 ## Изменения существующих компонентов
 
 ### 1. AdminDashboard.tsx
-- Добавить пункт меню "Справочник услуг" с иконкой `BookOpen`
-- Рендерить `ServiceCatalogTab` для этой вкладки
 
-### 2. BookingsTab.tsx
-- Изменить кнопку "Выселить": вместо прямого действия открывать `CheckoutInvoiceModal`
-- Добавить кнопку "Подробнее" для открытия `BookingDetailModal`
+**Изменения:**
+- Импортировать `usePermissions`
+- Фильтровать `menuItems` по правам доступа
+- Добавить пункт "Персонал" для owner
+- Скрывать недоступные разделы
 
-### 3. ShahmatkaGrid.tsx
-- Убрать фильтр `.in('status', ['pending', 'approved', 'checked_in'])`
-- Включить все статусы для отображения истории
-- Добавить стили для завершённых бронирований:
-  - `checked_out`: `opacity-50` + серый фон
-  - `cancelled`: `opacity-40` + красная штриховка
+```typescript
+const { canAccessModule, isOwner } = usePermissions();
 
-### 4. ServiceLogTab.tsx
-- Интегрировать с service_catalog для выбора услуг
-- Заменить hardcoded quickItems на данные из каталога
+const menuItems = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд', permission: 'dashboard' },
+  { id: 'bookings', icon: CalendarDays, label: 'Бронирования', permission: 'bookings' },
+  // ...
+  { id: 'staff', icon: Users, label: 'Персонал', permission: 'staff', ownerOnly: true },
+].filter(item => {
+  if (item.ownerOnly && !isOwner) return false;
+  return canAccessModule(item.permission);
+});
+```
+
+### 2. AuthContext.tsx
+
+**Добавить:**
+- Загрузку permissions при авторизации
+- Метод `refreshPermissions()`
+- Экспорт прав в контекст
 
 ---
 
-## Миграция данных
+## Логика прав по умолчанию
 
-### Перенос из service_charges в booking_services
+При назначении роли "admin" через `assign_user_role`:
+
 ```sql
--- Миграция существующих записей (опционально)
-INSERT INTO booking_services (hotel_id, booking_id, service_name, unit_price, quantity)
-SELECT hotel_id, booking_id, description, amount, 1
-FROM service_charges;
+-- Создать запись с базовыми правами
+INSERT INTO staff_permissions (hotel_id, user_id, permissions)
+VALUES (_hotel_id, _target_user_id, 
+  ARRAY['dashboard', 'bookings', 'shahmatka', 'rooms', 'clients', 'services']
+)
+ON CONFLICT (hotel_id, user_id) DO NOTHING;
 ```
+
+**Базовый набор прав для нового администратора:**
+- Дашборд
+- Бронирования
+- Шахматка
+- Номера
+- Клиенты
+- Журнал услуг
+
+**НЕ включены по умолчанию:**
+- Типы номеров (цены)
+- Справочник услуг (цены)
+- Интеграции (API ключи)
+- Настройки отеля
 
 ---
 
@@ -226,75 +241,38 @@ FROM service_charges;
 
 | Этап | Задача | Файлы |
 |------|--------|-------|
-| 1 | Миграция БД: service_catalog, booking_services | SQL миграция |
-| 2 | ServiceCatalogTab | Новый компонент |
-| 3 | Интеграция в AdminDashboard | AdminDashboard.tsx |
-| 4 | BookingServicesTab | Новый компонент |
-| 5 | CheckoutInvoiceModal | Новый компонент |
-| 6 | BookingDetailModal с вкладками | Новый компонент |
-| 7 | Обновить BookingsTab | Существующий компонент |
-| 8 | Обновить ShahmatkaGrid (история) | Существующий компонент |
-| 9 | Обновить ServiceLogTab | Существующий компонент |
+| 1 | Миграция БД: staff_permissions + RPC | SQL миграция |
+| 2 | usePermissions hook | Новый файл |
+| 3 | StaffTab компонент | Новый компонент |
+| 4 | StaffPermissionsDialog | Новый компонент |
+| 5 | Интеграция в AdminDashboard | Существующий компонент |
+| 6 | Обновить assign_user_role RPC | SQL миграция |
 
 ---
 
-## Технические детали
+## Безопасность
 
-### Расчёт количества ночей
-```typescript
-import { differenceInDays, parseISO } from 'date-fns';
+### RLS на уровне БД:
+- `staff_permissions` защищена RLS
+- Owner может управлять записями своего hotel_id
+- Admin может только читать свою запись
 
-const nights = differenceInDays(
-  parseISO(booking.check_out_date), 
-  parseISO(booking.check_in_date)
-);
-```
+### Проверка на клиенте:
+- `usePermissions` hook скрывает UI элементы
+- Двойная проверка: UI + RLS на сервере
 
-### Типы данных
-```typescript
-interface ServiceCatalogItem {
-  id: string;
-  hotel_id: string;
-  name: string;
-  default_price: number;
-  is_active: boolean;
-}
-
-interface BookingService {
-  id: string;
-  booking_id: string;
-  service_id: string | null;
-  service_name: string;
-  unit_price: number;
-  quantity: number;
-  total_price: number;
-  created_at: string;
-}
-
-interface CheckoutData {
-  nights: number;
-  dailyRate: number;
-  stayTotal: number;
-  servicesTotal: number;
-  grandTotal: number;
-  prepayment: number;
-  balanceDue: number;
-}
-```
-
-### RLS для новых таблиц
-- Все новые таблицы защищены RLS
-- Доступ только для owner/admin текущего hotel_id
-- Используются существующие функции `get_user_hotel_id` и `has_role`
+### Защита от эскалации:
+- Только owner может редактировать права
+- SuperAdmin обходит все проверки
+- Функция `check_permission` — SECURITY DEFINER
 
 ---
 
 ## Результат
 
 После реализации:
-1. Администраторы смогут настраивать каталог услуг отеля
-2. При заселённом госте можно добавлять услуги прямо в бронирование
-3. При выселении автоматически формируется итоговый счёт
-4. Шахматка показывает полную историю бронирований
-5. Все расчёты используют NUMERIC для точности
-6. Интерфейс полностью на русском языке
+1. Владелец видит новый раздел "Персонал" в меню
+2. Владелец может добавлять администраторов и настраивать их права
+3. Администраторы видят только разрешённые разделы
+4. Права проверяются и на UI, и на уровне БД
+5. Новые администраторы получают базовый набор прав автоматически
