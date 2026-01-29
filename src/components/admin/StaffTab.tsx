@@ -4,11 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, UserPlus, Shield, Mail, Clock, X, RefreshCw, Send } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Pencil, Trash2, UserPlus, Shield, Mail, Clock, X, Send, MoreVertical, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { StaffPermissionsDialog } from './StaffPermissionsDialog';
 import { InviteStaffDialog } from './InviteStaffDialog';
+import { CreateStaffDialog } from './CreateStaffDialog';
 import { MODULE_LABELS, ModuleId } from '@/hooks/usePermissions';
 
 interface StaffMember {
@@ -37,8 +39,10 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
 
   useEffect(() => {
     fetchStaff();
@@ -163,20 +167,19 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
 
   const handleRemoveStaff = async (userId: string) => {
     try {
-      const { error: permError } = await supabase
-        .from('staff_permissions')
-        .delete()
-        .eq('hotel_id', hotelId)
-        .eq('user_id', userId);
+      const { data, error } = await supabase.functions.invoke('manage-staff', {
+        body: {
+          action: 'delete',
+          hotelId,
+          userId,
+          email: '',
+          fullName: '',
+          permissions: [],
+        },
+      });
 
-      if (permError) throw permError;
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ hotel_id: null })
-        .eq('user_id', userId);
-
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast.success('Сотрудник удалён из отеля');
       fetchStaff();
@@ -184,6 +187,11 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
       console.error('Error removing staff:', error);
       toast.error('Ошибка удаления: ' + error.message);
     }
+  };
+
+  const handleEditStaff = (member: StaffMember) => {
+    setEditingStaff(member);
+    setCreateDialogOpen(true);
   };
 
   const openPermissionsDialog = (member: StaffMember) => {
@@ -239,10 +247,24 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
             Настройте права доступа для администраторов вашего отеля
           </p>
         </div>
-        <Button onClick={() => setInviteDialogOpen(true)}>
-          <Mail className="h-4 w-4 mr-2" />
-          Пригласить
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Добавить
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => { setEditingStaff(null); setCreateDialogOpen(true); }}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Создать учётную запись
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setInviteDialogOpen(true)}>
+              <Mail className="h-4 w-4 mr-2" />
+              Пригласить по email
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Pending Invitations */}
@@ -329,14 +351,23 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openPermissionsDialog(member)}
-                        title="Редактировать права"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditStaff(member)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Редактировать
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPermissionsDialog(member)}>
+                            <Shield className="h-4 w-4 mr-2" />
+                            Права доступа
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
@@ -385,6 +416,18 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
         onInviteSent={() => {
           fetchInvitations();
         }}
+      />
+
+      {/* Create/Edit Staff Dialog */}
+      <CreateStaffDialog
+        open={createDialogOpen}
+        onOpenChange={(open) => {
+          setCreateDialogOpen(open);
+          if (!open) setEditingStaff(null);
+        }}
+        hotelId={hotelId}
+        onCreated={fetchStaff}
+        editStaff={editingStaff}
       />
 
       {/* Permissions Dialog */}
