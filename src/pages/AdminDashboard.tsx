@@ -18,6 +18,7 @@ import { ServiceCatalogTab } from '@/components/admin/ServiceCatalogTab';
 import { ApiKeysTab } from '@/components/admin/ApiKeysTab';
 import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
 import { HelpTab } from '@/components/admin/HelpTab';
+import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -247,6 +248,8 @@ export default function AdminDashboard() {
                           </div>
                         </CardContent>
                       </Card>
+                      
+                      <ServiceStatsWidget hotelId={hotelId} onNavigate={setActiveTab} />
                     </div>
                   </div>
                 )}
