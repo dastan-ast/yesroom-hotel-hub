@@ -1,92 +1,129 @@
 
-# План: Система управления правами доступа для администраторов
 
-## Обзор решения
+# План: Улучшение авторизации и система приглашений
 
-Реализуем гибкую систему прав доступа, позволяющую владельцам отелей контролировать, какие разделы и функции видят их администраторы.
+## Проблемы и решения
 
-### Принцип работы:
-- **Владелец (owner)** — видит все разделы и может управлять правами администраторов
-- **Администратор (admin)** — видит только те разделы, которые разрешил владелец
-- **SuperAdmin** — полный доступ ко всему
+### 1. Проблема с выходом из системы
+**Текущая ситуация:** В AdminDashboard кнопка "Выйти" вызывает `signOut` напрямую без навигации. После выхода пользователь остаётся на странице `/admin/dashboard`, и система может перенаправить его обратно на `/auth` с ошибками.
+
+**Решение:** Добавить явную навигацию на страницу входа после выхода.
+
+### 2. Быстрое переключение аккаунтов
+**Сценарий:** На одном компьютере работают 3-4 администратора. Им нужно быстро переключаться между учётными записями.
+
+**Решение:** 
+- Добавить кнопку "Сменить пользователя" в шапку дашборда
+- Показывать текущего пользователя в шапке
+- После выхода сразу показывать форму входа
+
+### 3. Приглашение администраторов по email
+**Текущая ситуация:** Владелец не может самостоятельно добавить администратора. Приходится обращаться к SuperAdmin.
+
+**Решение:** Создать систему приглашений с отправкой email через Resend.
 
 ---
 
-## Архитектура прав доступа
+## Архитектура системы приглашений
 
-### Модули системы (permissions):
-
-| Код модуля | Название (RU) | Описание |
-|------------|---------------|----------|
-| `dashboard` | Дашборд | Главная страница со статистикой |
-| `bookings` | Бронирования | Очередь бронирований, заселение/выселение |
-| `shahmatka` | Шахматка | Календарная сетка занятости |
-| `rooms` | Номера | Управление номерным фондом |
-| `room_types` | Типы номеров | Категории и цены |
-| `clients` | Клиенты | База гостей |
-| `services` | Журнал услуг | Добавление услуг к бронированиям |
-| `service_catalog` | Справочник услуг | Настройка прейскуранта |
-| `integrations` | Интеграции | API ключи |
-| `settings` | Настройки | Настройки отеля |
-| `staff` | Персонал | Управление администраторами (только owner) |
+```text
++------------------------+
+| staff_invitations      |
++------------------------+
+| id (uuid)              |
+| hotel_id (uuid FK)     |
+| email (text)           |
+| token (uuid)           |  <- Уникальный токен для ссылки
+| permissions (text[])   |  <- Предустановленные права
+| invited_by (uuid FK)   |
+| expires_at (timestamptz)|
+| accepted_at (timestamptz)|
+| status (pending/accepted/expired)
++------------------------+
+```
 
 ---
 
 ## Изменения базы данных
 
-### 1. Новая таблица: staff_permissions
+### 1. Новая таблица: staff_invitations
 
 ```sql
-CREATE TABLE public.staff_permissions (
+CREATE TABLE public.staff_invitations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   hotel_id uuid NOT NULL REFERENCES hotels(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  token uuid NOT NULL DEFAULT gen_random_uuid(),
   permissions text[] NOT NULL DEFAULT '{}',
+  invited_by uuid REFERENCES auth.users(id),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
+  accepted_at timestamptz,
+  status text NOT NULL DEFAULT 'pending',
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(hotel_id, user_id)
+  UNIQUE(hotel_id, email, status)
 );
 
--- RLS: Владелец может управлять, администратор может читать свои
-ALTER TABLE public.staff_permissions ENABLE ROW LEVEL SECURITY;
+-- RLS: Владелец может управлять приглашениями
+ALTER TABLE public.staff_invitations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Owners can manage staff permissions"
-ON public.staff_permissions FOR ALL
+CREATE POLICY "Owners can manage invitations"
+ON public.staff_invitations FOR ALL
 USING (
   hotel_id = get_user_hotel_id(auth.uid()) AND
   has_role(auth.uid(), 'owner')
 );
 
-CREATE POLICY "Staff can read own permissions"
-ON public.staff_permissions FOR SELECT
-USING (user_id = auth.uid());
+-- Публичный доступ для проверки токена (для регистрации)
+CREATE POLICY "Anyone can verify valid invitation token"
+ON public.staff_invitations FOR SELECT
+USING (
+  status = 'pending' AND
+  expires_at > now()
+);
 ```
 
-### 2. RPC функция для проверки прав
+### 2. Функция принятия приглашения
 
 ```sql
-CREATE OR REPLACE FUNCTION public.check_permission(
-  _user_id uuid,
-  _permission text
+CREATE OR REPLACE FUNCTION public.accept_invitation(
+  _token uuid,
+  _user_id uuid
 )
-RETURNS boolean
-LANGUAGE sql
-STABLE
+RETURNS void
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT CASE
-    -- SuperAdmin и Owner имеют все права
-    WHEN has_role(_user_id, 'superadmin') THEN true
-    WHEN has_role(_user_id, 'owner') THEN true
-    -- Администратор проверяется по таблице permissions
-    WHEN has_role(_user_id, 'admin') THEN EXISTS (
-      SELECT 1 FROM staff_permissions
-      WHERE user_id = _user_id
-        AND _permission = ANY(permissions)
-    )
-    ELSE false
-  END
+DECLARE
+  v_invitation RECORD;
+BEGIN
+  -- Найти приглашение
+  SELECT * INTO v_invitation
+  FROM staff_invitations
+  WHERE token = _token
+    AND status = 'pending'
+    AND expires_at > now();
+  
+  IF v_invitation IS NULL THEN
+    RAISE EXCEPTION 'Invalid or expired invitation';
+  END IF;
+  
+  -- Назначить роль admin
+  UPDATE user_roles SET role = 'admin' WHERE user_id = _user_id;
+  
+  -- Привязать к отелю
+  UPDATE profiles SET hotel_id = v_invitation.hotel_id WHERE user_id = _user_id;
+  
+  -- Создать права
+  INSERT INTO staff_permissions (hotel_id, user_id, permissions)
+  VALUES (v_invitation.hotel_id, _user_id, v_invitation.permissions)
+  ON CONFLICT (hotel_id, user_id) DO UPDATE SET permissions = EXCLUDED.permissions;
+  
+  -- Отметить приглашение как принятое
+  UPDATE staff_invitations
+  SET status = 'accepted', accepted_at = now()
+  WHERE id = v_invitation.id;
+END;
 $$;
 ```
 
@@ -94,83 +131,97 @@ $$;
 
 ## Новые компоненты UI
 
-### 1. StaffTab.tsx — Управление персоналом
-**Расположение:** `src/components/admin/StaffTab.tsx`
+### 1. Улучшенный хедер AdminDashboard
 
-**Доступ:** Только для owner
+**Изменения в шапке:**
+- Показывать имя текущего пользователя
+- Добавить кнопку "Выйти" с иконкой
+- Добавить кнопку "Сменить пользователя"
+
+```text
++----------------------------------------------------------+
+| [☰] Название отеля > Текущий раздел      👤 Иван Иванов  |
+|                                          [🔄 Сменить] [🚪]|
++----------------------------------------------------------+
+```
+
+### 2. InviteStaffDialog.tsx
+**Расположение:** `src/components/admin/InviteStaffDialog.tsx`
 
 **Функционал:**
-- Список сотрудников отеля (role = admin)
-- Добавление нового администратора (по email)
-- Управление правами каждого сотрудника
-- Удаление сотрудника из отеля
+- Ввод email приглашаемого
+- Выбор прав доступа (чекбоксы модулей)
+- Отправка приглашения
 
 **UI:**
 ```text
 +--------------------------------------------------+
-| Персонал                      [+ Добавить]       |
+| Пригласить администратора               [X]      |
 +--------------------------------------------------+
-| Имя              | Права доступа       | Действия|
+| Email:                                           |
+| [admin@hotel.kz                        ]         |
+|                                                  |
+| Права доступа:                                   |
+| [✓] Бронирования  [✓] Шахматка                  |
+| [✓] Номера        [✓] Клиенты                   |
+| [ ] Справочник услуг  [ ] Настройки             |
+|                                                  |
+| [Пресет: Базовый доступ ▼]                      |
 +--------------------------------------------------+
-| Асем Жумабаева   | Бронирования,       | [✏️] [🗑]|
-|                  | Номера, Клиенты     |         |
-+--------------------------------------------------+
-| Серик Ермеков    | Только просмотр     | [✏️] [🗑]|
+|              [Отменить] [Отправить приглашение] |
 +--------------------------------------------------+
 ```
 
-### 2. StaffPermissionsDialog.tsx — Редактирование прав
-**Расположение:** `src/components/admin/StaffPermissionsDialog.tsx`
+### 3. Страница AcceptInvite.tsx
+**Расположение:** `src/pages/AcceptInvite.tsx`
+**Маршрут:** `/invite/:token`
 
-**Функционал:**
-- Чекбоксы для каждого модуля
-- Пресеты: "Полный доступ", "Только просмотр", "Бронирования"
-- Сохранение в staff_permissions
+**Сценарии:**
+1. **Новый пользователь** — показать форму регистрации
+2. **Существующий пользователь** — показать кнопку "Принять приглашение"
+3. **Истёкший токен** — показать сообщение об ошибке
 
-**UI:**
+**UI для нового пользователя:**
 ```text
 +--------------------------------------------------+
-| Права доступа: Асем Жумабаева              [X]   |
+|        🏨 Приглашение в отель "Астана"           |
 +--------------------------------------------------+
-| Пресеты: [Полный доступ] [Только просмотр]       |
-+--------------------------------------------------+
-| [✓] Дашборд           [✓] Бронирования           |
-| [✓] Шахматка          [✓] Номера                 |
-| [ ] Типы номеров      [✓] Клиенты                |
-| [✓] Журнал услуг      [ ] Справочник услуг       |
-| [ ] Интеграции        [ ] Настройки              |
-+--------------------------------------------------+
-|                    [Сохранить]                   |
+| Вас пригласили стать администратором отеля.      |
+| Создайте аккаунт для продолжения:                |
+|                                                  |
+| Имя:       [                           ]         |
+| Email:     [admin@hotel.kz            ] (locked) |
+| Пароль:    [                           ]         |
+|                                                  |
+|              [Создать аккаунт и принять]         |
 +--------------------------------------------------+
 ```
 
-### 3. usePermissions.ts — Хук для проверки прав
-**Расположение:** `src/hooks/usePermissions.ts`
+### 4. Edge Function: send-staff-invitation
+**Расположение:** `supabase/functions/send-staff-invitation/index.ts`
 
 **Функционал:**
-```typescript
-interface UsePermissionsReturn {
-  permissions: string[];
-  loading: boolean;
-  hasPermission: (key: string) => boolean;
-  canAccessModule: (moduleId: string) => boolean;
-}
+- Принимает: email, hotelName, inviteUrl, invitedByName
+- Отправляет красивое email через Resend
+- Возвращает статус отправки
 
-export function usePermissions() {
-  const { user, role, isOwner, isSuperAdmin, hotelId } = useAuth();
-  
-  // Owner и SuperAdmin имеют все права
-  if (isOwner || isSuperAdmin) {
-    return { 
-      permissions: ALL_MODULES, 
-      hasPermission: () => true,
-      canAccessModule: () => true 
-    };
-  }
-  
-  // Для admin — загружаем из БД
-  // ...fetch from staff_permissions
-}
+**Шаблон письма:**
+```
+Тема: Приглашение в отель "{hotelName}" — YesRoom
+
+Здравствуйте!
+
+{invitedByName} приглашает вас стать администратором отеля "{hotelName}" 
+в системе управления YesRoom.
+
+Чтобы принять приглашение, нажмите на кнопку ниже:
+
+[Принять приглашение]
+
+Ссылка действительна 7 дней.
+
+С уважением,
+Команда YesRoom
 ```
 
 ---
@@ -178,62 +229,43 @@ export function usePermissions() {
 ## Изменения существующих компонентов
 
 ### 1. AdminDashboard.tsx
-
-**Изменения:**
-- Импортировать `usePermissions`
-- Фильтровать `menuItems` по правам доступа
-- Добавить пункт "Персонал" для owner
-- Скрывать недоступные разделы
-
+**Изменения в хедере:**
 ```typescript
-const { canAccessModule, isOwner } = usePermissions();
+const handleSignOut = async () => {
+  await signOut();
+  navigate('/auth');
+};
 
-const menuItems = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Дашборд', permission: 'dashboard' },
-  { id: 'bookings', icon: CalendarDays, label: 'Бронирования', permission: 'bookings' },
-  // ...
-  { id: 'staff', icon: Users, label: 'Персонал', permission: 'staff', ownerOnly: true },
-].filter(item => {
-  if (item.ownerOnly && !isOwner) return false;
-  return canAccessModule(item.permission);
-});
+// В шапке:
+<div className="flex items-center gap-3">
+  <Avatar>
+    <AvatarFallback>{profile?.full_name?.[0] || 'U'}</AvatarFallback>
+  </Avatar>
+  <div className="hidden sm:block">
+    <p className="text-sm font-medium">{profile?.full_name}</p>
+    <p className="text-xs text-muted-foreground">{isOwner ? 'Владелец' : 'Администратор'}</p>
+  </div>
+  <Button variant="ghost" size="icon" onClick={handleSignOut} title="Выйти">
+    <LogOut className="h-4 w-4" />
+  </Button>
+</div>
 ```
 
-### 2. AuthContext.tsx
+### 2. StaffTab.tsx
+**Изменения:**
+- Заменить текущий диалог добавления на `InviteStaffDialog`
+- Добавить список ожидающих приглашений
+- Добавить возможность отменить/переотправить приглашение
 
-**Добавить:**
-- Загрузку permissions при авторизации
-- Метод `refreshPermissions()`
-- Экспорт прав в контекст
+### 3. Auth.tsx
+**Изменения:**
+- Проверять URL параметр `invite` при загрузке
+- Если есть токен приглашения — показывать специальную форму
+- После регистрации — автоматически принимать приглашение
 
----
-
-## Логика прав по умолчанию
-
-При назначении роли "admin" через `assign_user_role`:
-
-```sql
--- Создать запись с базовыми правами
-INSERT INTO staff_permissions (hotel_id, user_id, permissions)
-VALUES (_hotel_id, _target_user_id, 
-  ARRAY['dashboard', 'bookings', 'shahmatka', 'rooms', 'clients', 'services']
-)
-ON CONFLICT (hotel_id, user_id) DO NOTHING;
-```
-
-**Базовый набор прав для нового администратора:**
-- Дашборд
-- Бронирования
-- Шахматка
-- Номера
-- Клиенты
-- Журнал услуг
-
-**НЕ включены по умолчанию:**
-- Типы номеров (цены)
-- Справочник услуг (цены)
-- Интеграции (API ключи)
-- Настройки отеля
+### 4. App.tsx
+**Изменения:**
+- Добавить маршрут `/invite/:token` -> `AcceptInvite`
 
 ---
 
@@ -241,38 +273,46 @@ ON CONFLICT (hotel_id, user_id) DO NOTHING;
 
 | Этап | Задача | Файлы |
 |------|--------|-------|
-| 1 | Миграция БД: staff_permissions + RPC | SQL миграция |
-| 2 | usePermissions hook | Новый файл |
-| 3 | StaffTab компонент | Новый компонент |
-| 4 | StaffPermissionsDialog | Новый компонент |
-| 5 | Интеграция в AdminDashboard | Существующий компонент |
-| 6 | Обновить assign_user_role RPC | SQL миграция |
+| 1 | Исправить logout в AdminDashboard | AdminDashboard.tsx |
+| 2 | Миграция БД: staff_invitations | SQL миграция |
+| 3 | Edge function для email | send-staff-invitation/index.ts |
+| 4 | InviteStaffDialog | Новый компонент |
+| 5 | Обновить StaffTab | Существующий компонент |
+| 6 | AcceptInvite страница | Новая страница |
+| 7 | Обновить маршруты | App.tsx |
+
+---
+
+## Требования для email отправки
+
+Для отправки email через Resend потребуется:
+1. Аккаунт на resend.com
+2. Подтверждённый домен отправки
+3. API ключ `RESEND_API_KEY`
 
 ---
 
 ## Безопасность
 
-### RLS на уровне БД:
-- `staff_permissions` защищена RLS
-- Owner может управлять записями своего hotel_id
-- Admin может только читать свою запись
+### Защита токенов:
+- Токен — случайный UUID
+- Срок действия — 7 дней
+- Одноразовое использование
+- RLS ограничивает доступ
 
-### Проверка на клиенте:
-- `usePermissions` hook скрывает UI элементы
-- Двойная проверка: UI + RLS на сервере
-
-### Защита от эскалации:
-- Только owner может редактировать права
-- SuperAdmin обходит все проверки
-- Функция `check_permission` — SECURITY DEFINER
+### Валидация:
+- Проверка email формата
+- Проверка что email не зарегистрирован с ролью в этом отеле
+- Серверная проверка в RPC функции
 
 ---
 
 ## Результат
 
 После реализации:
-1. Владелец видит новый раздел "Персонал" в меню
-2. Владелец может добавлять администраторов и настраивать их права
-3. Администраторы видят только разрешённые разделы
-4. Права проверяются и на UI, и на уровне БД
-5. Новые администраторы получают базовый набор прав автоматически
+1. Кнопка "Выйти" работает корректно и перенаправляет на страницу входа
+2. В шапке отображается текущий пользователь для быстрой идентификации
+3. Владелец может приглашать администраторов прямо из панели управления
+4. Приглашённый получает email со ссылкой для регистрации
+5. После регистрации по приглашению — автоматическое назначение прав
+
