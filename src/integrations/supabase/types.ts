@@ -606,6 +606,48 @@ export type Database = {
           },
         ]
       }
+      staff_permissions: {
+        Row: {
+          created_at: string
+          hotel_id: string
+          id: string
+          permissions: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hotel_id: string
+          id?: string
+          permissions?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          permissions?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_permissions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_permissions_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_history: {
         Row: {
           changed_by: string | null
@@ -716,6 +758,10 @@ export type Database = {
           _target_user_id: string
         }
         Returns: undefined
+      }
+      check_permission: {
+        Args: { _permission: string; _user_id: string }
+        Returns: boolean
       }
       get_user_hotel_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
