@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_services: {
+        Row: {
+          booking_id: string
+          created_at: string
+          created_by: string | null
+          hotel_id: string
+          id: string
+          quantity: number
+          service_id: string | null
+          service_name: string
+          total_price: number | null
+          unit_price: number
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id: string
+          id?: string
+          quantity?: number
+          service_id?: string | null
+          service_name: string
+          total_price?: number | null
+          unit_price?: number
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          created_by?: string | null
+          hotel_id?: string
+          id?: string
+          quantity?: number
+          service_id?: string | null
+          service_name?: string
+          total_price?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_services_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_services_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_services_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_services_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "service_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           additional_info: Json | null
@@ -21,14 +89,17 @@ export type Database = {
           check_out_date: string
           client_id: string | null
           created_at: string
+          daily_rate: number | null
           external_id: string | null
           external_source_data: Json | null
+          final_total: number | null
           guest_comment: string | null
           guest_count: number
           guest_name: string
           guest_phone: string
           hotel_id: string | null
           id: string
+          prepayment_amount: number | null
           prepayment_received: boolean
           room_id: string | null
           room_type_id: string | null
@@ -43,14 +114,17 @@ export type Database = {
           check_out_date: string
           client_id?: string | null
           created_at?: string
+          daily_rate?: number | null
           external_id?: string | null
           external_source_data?: Json | null
+          final_total?: number | null
           guest_comment?: string | null
           guest_count?: number
           guest_name: string
           guest_phone: string
           hotel_id?: string | null
           id?: string
+          prepayment_amount?: number | null
           prepayment_received?: boolean
           room_id?: string | null
           room_type_id?: string | null
@@ -65,14 +139,17 @@ export type Database = {
           check_out_date?: string
           client_id?: string | null
           created_at?: string
+          daily_rate?: number | null
           external_id?: string | null
           external_source_data?: Json | null
+          final_total?: number | null
           guest_comment?: string | null
           guest_count?: number
           guest_name?: string
           guest_phone?: string
           hotel_id?: string | null
           id?: string
+          prepayment_amount?: number | null
           prepayment_received?: boolean
           room_id?: string | null
           room_type_id?: string | null
@@ -428,6 +505,51 @@ export type Database = {
             columns: ["room_type_id"]
             isOneToOne: false
             referencedRelation: "room_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_catalog: {
+        Row: {
+          created_at: string
+          default_price: number
+          hotel_id: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_price?: number
+          hotel_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_price?: number
+          hotel_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_catalog_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_catalog_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
             referencedColumns: ["id"]
           },
         ]
