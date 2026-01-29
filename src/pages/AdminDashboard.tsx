@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -18,12 +19,14 @@ import { ServiceCatalogTab } from '@/components/admin/ServiceCatalogTab';
 import { ApiKeysTab } from '@/components/admin/ApiKeysTab';
 import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
 import { HelpTab } from '@/components/admin/HelpTab';
+import { StaffTab } from '@/components/admin/StaffTab';
 import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, isAdmin, loading, hotelId, signOut, profile } = useAuth();
+  const { user, isAdmin, isOwner, loading, hotelId, signOut, profile } = useAuth();
+  const { canAccessModule, loading: permissionsLoading } = usePermissions();
   const location = useLocation();
   const [stats, setStats] = useState({ total: 0, pending: 0, occupied: 0 });
   const [hotelName, setHotelName] = useState('');
@@ -31,12 +34,47 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLiveFeed, setShowLiveFeed] = useState(true);
 
+  // All menu items with permission mapping
+  const allMenuItems = [
+    { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard'), permission: 'dashboard' },
+    { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
+    { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
+    { id: 'rooms', icon: DoorOpen, label: t('admin.rooms'), permission: 'rooms' },
+    { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes'), permission: 'room_types' },
+    { id: 'clients', icon: Users, label: t('admin.clients'), permission: 'clients' },
+    { id: 'services', icon: Coffee, label: 'Журнал услуг', permission: 'services' },
+    { id: 'service-catalog', icon: BookOpen, label: 'Справочник услуг', permission: 'service_catalog' },
+    { id: 'integrations', icon: Key, label: 'Интеграции', permission: 'integrations' },
+    { id: 'settings', icon: Settings, label: 'Настройки отеля', permission: 'settings' },
+    { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
+    { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
+  ];
+
+  // Filter menu items based on permissions
+  const menuItems = allMenuItems.filter(item => {
+    if (item.permission === null) return true;
+    if (item.ownerOnly && !isOwner) return false;
+    return canAccessModule(item.permission);
+  });
+
   useEffect(() => {
     if (isAdmin && hotelId) {
       fetchStats();
       fetchHotelInfo();
     }
   }, [isAdmin, hotelId]);
+
+  // If current tab is not accessible, switch to first available
+  useEffect(() => {
+    if (loading || permissionsLoading) return;
+    const currentItem = allMenuItems.find(m => m.id === activeTab);
+    if (currentItem && currentItem.permission && !canAccessModule(currentItem.permission)) {
+      const firstAvailable = menuItems[0];
+      if (firstAvailable) {
+        setActiveTab(firstAvailable.id);
+      }
+    }
+  }, [activeTab, canAccessModule, loading, permissionsLoading]);
 
   const fetchStats = async () => {
     if (!hotelId) return;
@@ -72,7 +110,6 @@ export default function AdminDashboard() {
       setHotelName(data.name);
       setHotelStatus(data.status);
       
-      // Redirect if hotel is pending or rejected
       if (data.status === 'pending') {
         navigate('/pending-approval');
       } else if (data.status === 'rejected') {
@@ -81,7 +118,7 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) {
+  if (loading || permissionsLoading) {
     return <div className="min-h-screen flex items-center justify-center">{t('common.loading')}</div>;
   }
 
@@ -96,20 +133,6 @@ export default function AdminDashboard() {
   if (!hotelId) {
     return <Navigate to="/onboarding" replace />;
   }
-
-  const menuItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard') },
-    { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue') },
-    { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka') },
-    { id: 'rooms', icon: DoorOpen, label: t('admin.rooms') },
-    { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes') },
-    { id: 'clients', icon: Users, label: t('admin.clients') },
-    { id: 'services', icon: Coffee, label: 'Журнал услуг' },
-    { id: 'service-catalog', icon: BookOpen, label: 'Справочник услуг' },
-    { id: 'integrations', icon: Key, label: 'Интеграции' },
-    { id: 'settings', icon: Settings, label: 'Настройки отеля' },
-    { id: 'help', icon: HelpCircle, label: 'Справка' },
-  ];
 
   return (
     <SidebarProvider>
@@ -195,7 +218,7 @@ export default function AdminDashboard() {
                     <h1 className="text-2xl font-display font-bold">{t('admin.dashboard')}</h1>
                     
                     <div className="grid sm:grid-cols-3 gap-4">
-                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('bookings')}>
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => canAccessModule('bookings') && setActiveTab('bookings')}>
                         <CardContent className="pt-6 flex items-center gap-4">
                           <CalendarDays className="h-8 w-8 text-primary" />
                           <div>
@@ -204,18 +227,18 @@ export default function AdminDashboard() {
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('bookings')}>
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => canAccessModule('bookings') && setActiveTab('bookings')}>
                         <CardContent className="pt-6 flex items-center gap-4">
-                          <Clock className="h-8 w-8 text-yellow-500" />
+                          <Clock className="h-8 w-8 text-warning" />
                           <div>
                             <p className="text-sm text-muted-foreground">{t('admin.pendingBookings')}</p>
                             <p className="text-2xl font-bold">{stats.pending}</p>
                           </div>
                         </CardContent>
                       </Card>
-                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('rooms')}>
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => canAccessModule('rooms') && setActiveTab('rooms')}>
                         <CardContent className="pt-6 flex items-center gap-4">
-                          <DoorOpen className="h-8 w-8 text-green-500" />
+                          <DoorOpen className="h-8 w-8 text-success" />
                           <div>
                             <p className="text-sm text-muted-foreground">{t('admin.occupiedRooms')}</p>
                             <p className="text-2xl font-bold">{stats.occupied}</p>
@@ -229,27 +252,37 @@ export default function AdminDashboard() {
                         <CardContent className="pt-6">
                           <h3 className="font-semibold mb-4">{t('admin.bookingQueue')}</h3>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => setActiveTab('bookings')}>
-                              <CalendarDays className="h-4 w-4 mr-2" />
-                              {t('admin.bookingQueue')}
-                            </Button>
-                            <Button variant="outline" onClick={() => setActiveTab('shahmatka')}>
-                              <Grid3X3 className="h-4 w-4 mr-2" />
-                              {t('admin.shahmatka')}
-                            </Button>
-                            <Button variant="outline" onClick={() => setActiveTab('rooms')}>
-                              <DoorOpen className="h-4 w-4 mr-2" />
-                              {t('admin.rooms')}
-                            </Button>
-                            <Button variant="outline" onClick={() => setActiveTab('clients')}>
-                              <Users className="h-4 w-4 mr-2" />
-                              {t('admin.clients')}
-                            </Button>
+                            {canAccessModule('bookings') && (
+                              <Button variant="outline" onClick={() => setActiveTab('bookings')}>
+                                <CalendarDays className="h-4 w-4 mr-2" />
+                                {t('admin.bookingQueue')}
+                              </Button>
+                            )}
+                            {canAccessModule('shahmatka') && (
+                              <Button variant="outline" onClick={() => setActiveTab('shahmatka')}>
+                                <Grid3X3 className="h-4 w-4 mr-2" />
+                                {t('admin.shahmatka')}
+                              </Button>
+                            )}
+                            {canAccessModule('rooms') && (
+                              <Button variant="outline" onClick={() => setActiveTab('rooms')}>
+                                <DoorOpen className="h-4 w-4 mr-2" />
+                                {t('admin.rooms')}
+                              </Button>
+                            )}
+                            {canAccessModule('clients') && (
+                              <Button variant="outline" onClick={() => setActiveTab('clients')}>
+                                <Users className="h-4 w-4 mr-2" />
+                                {t('admin.clients')}
+                              </Button>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
                       
-                      <ServiceStatsWidget hotelId={hotelId} onNavigate={setActiveTab} />
+                      {canAccessModule('services') && (
+                        <ServiceStatsWidget hotelId={hotelId} onNavigate={setActiveTab} />
+                      )}
                     </div>
                   </div>
                 )}
@@ -318,12 +351,19 @@ export default function AdminDashboard() {
                   <HotelSettingsTab hotelId={hotelId} />
                 )}
 
+                {activeTab === 'staff' && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <StaffTab hotelId={hotelId} />
+                    </CardContent>
+                  </Card>
+                )}
+
                 {activeTab === 'help' && (
                   <HelpTab />
                 )}
               </div>
 
-              {/* Live Feed Sidebar */}
               {showLiveFeed && (
                 <div className="w-80 border-l p-4 hidden lg:block">
                   <LiveFeedSidebar hotelId={hotelId} onBookingUpdated={fetchStats} />
