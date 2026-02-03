@@ -104,31 +104,32 @@ Deno.serve(async (req) => {
         external_id: item.id, // Map local id to external_id
       };
 
+      // Columns to skip entirely (internal or not in external schema)
+      const skipColumns = ['id', 'owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'];
+      
+      // Columns that need FK transformation (original_name -> external_name)
+      const fkMappings: Record<string, string> = {
+        'hotel_id': 'hotel_external_id',
+        'room_type_id': 'room_type_external_id',
+        'room_id': 'room_external_id',
+        'client_id': 'client_external_id',
+        'service_id': 'service_external_id',
+        'booking_id': 'booking_external_id',
+      };
+
       // Map fields based on table type
       for (const [key, value] of Object.entries(item)) {
-        if (key === 'id') continue; // Already mapped to external_id
+        // Skip internal columns
+        if (skipColumns.includes(key)) continue;
         
-        // Skip internal columns that don't exist in external schema
-        if (['owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'].includes(key)) {
+        // Handle FK transformations (always transform, even if null)
+        if (key in fkMappings) {
+          transformed[fkMappings[key]] = value;
           continue;
         }
         
-        // Transform foreign key references to external_id pattern
-        if (key === 'hotel_id' && value) {
-          transformed['hotel_external_id'] = value;
-        } else if (key === 'room_type_id' && value) {
-          transformed['room_type_external_id'] = value;
-        } else if (key === 'room_id' && value) {
-          transformed['room_external_id'] = value;
-        } else if (key === 'client_id' && value) {
-          transformed['client_external_id'] = value;
-        } else if (key === 'service_id' && value) {
-          transformed['service_external_id'] = value;
-        } else if (key === 'booking_id' && value) {
-          transformed['booking_external_id'] = value;
-        } else {
-          transformed[key] = value;
-        }
+        // Copy other columns as-is
+        transformed[key] = value;
       }
 
       return transformed;
