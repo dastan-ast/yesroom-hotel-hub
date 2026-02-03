@@ -16,6 +16,7 @@ import { ru } from 'date-fns/locale';
 import { UsersTab } from '@/components/superadmin/UsersTab';
 import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
 import { SubscriptionsTab } from '@/components/superadmin/SubscriptionsTab';
+import { SettingsTab } from '@/components/superadmin/SettingsTab';
 
 interface Hotel {
   id: string;
@@ -35,7 +36,7 @@ export default function SuperAdmin() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0, pending: 0 });
-  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings'>('requests');
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -154,7 +155,10 @@ export default function SuperAdmin() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton
+                  isActive={activeTab === 'settings'}
+                  onClick={() => setActiveTab('settings')}
+                >
                   <Settings className="h-4 w-4" />
                   <span>Настройки</span>
                 </SidebarMenuButton>
@@ -298,6 +302,8 @@ export default function SuperAdmin() {
             {activeTab === 'users' && <UsersTab />}
 
             {activeTab === 'subscriptions' && <SubscriptionsTab />}
+
+            {activeTab === 'settings' && <SettingsTab />}
           </main>
         </SidebarInset>
       </div>
