@@ -90,6 +90,55 @@ function validatePhone(phone: string): boolean {
   return /^\+?\d{10,15}$/.test(cleaned);
 }
 
+// Sync booking to external Supabase
+// deno-lint-ignore no-explicit-any
+async function syncBookingToExternal(supabaseAdmin: any, booking: Record<string, unknown>) {
+  try {
+    // Get sync settings
+    const { data: settingsData } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "external_supabase")
+      .single();
+
+    // deno-lint-ignore no-explicit-any
+    const settings = (settingsData as any)?.value as Record<string, unknown> | null;
+
+    if (!settings?.sync_enabled || !settings?.url || !settings?.anon_key) {
+      console.log("External sync is disabled or not configured");
+      return;
+    }
+
+    const syncTables = (settings.sync_tables as string[]) || [];
+    if (!syncTables.includes("bookings")) {
+      console.log("Bookings table is not configured for sync");
+      return;
+    }
+
+    // Create external Supabase client
+    const externalClient = createClient(settings.url as string, settings.anon_key as string);
+
+    // Prepare booking data with external_id
+    const syncData = {
+      ...booking,
+      external_id: booking.id,
+    };
+
+    // Upsert to external Supabase
+    const { error } = await externalClient
+      .from("bookings")
+      .upsert(syncData, { onConflict: "external_id" });
+
+    if (error) {
+      console.error("Failed to sync booking to external:", error);
+    } else {
+      console.log("Booking synced to external Supabase:", booking.id);
+    }
+  } catch (error) {
+    console.error("Error syncing booking to external:", error);
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -293,7 +342,7 @@ Deno.serve(async (req) => {
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")
       .insert(bookingData)
-      .select("id, status")
+      .select("*")
       .single();
 
     if (bookingError) {
@@ -311,6 +360,11 @@ Deno.serve(async (req) => {
       .eq("id", apiKeyRecord.id);
 
     console.log("Booking created successfully:", booking.id);
+
+    // Sync to external Supabase (async, don't wait)
+    syncBookingToExternal(supabase, booking).catch(err => {
+      console.error("Background sync failed:", err);
+    });
 
     const response: SuccessResponse = {
       success: true,

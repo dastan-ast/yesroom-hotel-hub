@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
+import { syncBookingToExternal } from '@/lib/syncBooking';
 import {
   Dialog,
   DialogContent,
@@ -96,7 +97,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
     setLoading(true);
     
-    const { error } = await supabase.from('bookings').insert({
+    const { data: booking, error } = await supabase.from('bookings').insert({
       guest_name: data.guest_name,
       guest_phone: phoneMask.value,
       room_type_id: data.room_type_id,
@@ -107,14 +108,17 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       guest_comment: data.guest_comment || null,
       status: 'pending',
       hotel_id: hotelId,
-    });
+    }).select('id').single();
 
     setLoading(false);
 
-    if (error) {
+    if (error || !booking) {
       toast.error(t('common.error'));
       return;
     }
+
+    // Синхронизация с внешним Supabase (асинхронно)
+    syncBookingToExternal(booking.id).catch(console.error);
 
     toast.success(t('common.success'));
     onOpenChange(false);
