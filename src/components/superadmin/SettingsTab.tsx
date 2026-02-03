@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Upload, Clock, AlertCircle } from 'lucide-react';
 import type { Json } from '@/integrations/supabase/types';
 
 interface ExternalSupabaseSettings {
@@ -16,6 +16,15 @@ interface ExternalSupabaseSettings {
   sync_enabled: boolean;
   sync_tables: string[];
   last_sync_at?: string;
+  last_sync_results?: SyncResults;
+}
+
+interface SyncResults {
+  [table: string]: {
+    count: number;
+    success: boolean;
+    error?: string;
+  };
 }
 
 const AVAILABLE_TABLES = [
@@ -37,6 +46,8 @@ export function SettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
   const [showKey, setShowKey] = useState(false);
 
@@ -62,6 +73,7 @@ export function SettingsTab() {
           sync_enabled: value.sync_enabled || false,
           sync_tables: value.sync_tables || ['hotels', 'bookings', 'clients', 'room_types'],
           last_sync_at: value.last_sync_at,
+          last_sync_results: value.last_sync_results,
         });
       }
     } catch (error) {
@@ -82,8 +94,6 @@ export function SettingsTab() {
     setConnectionStatus('unknown');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('test-external-connection', {
         body: { url: settings.url, anon_key: settings.anon_key },
       });
@@ -103,6 +113,98 @@ export function SettingsTab() {
       toast.error(error.message || 'Ошибка подключения');
     } finally {
       setTesting(false);
+    }
+  };
+
+  const syncAllData = async () => {
+    if (!settings.sync_enabled) {
+      toast.error('Включите синхронизацию перед отправкой данных');
+      return;
+    }
+
+    if (!settings.url || !settings.anon_key) {
+      toast.error('Настройте подключение к внешнему Supabase');
+      return;
+    }
+
+    setSyncing(true);
+    const results: SyncResults = {};
+
+    try {
+      for (const table of settings.sync_tables) {
+        setSyncProgress(`Синхронизация: ${AVAILABLE_TABLES.find(t => t.id === table)?.label || table}...`);
+
+        // Fetch data from local table - use type assertion for dynamic table name
+        const { data, error: fetchError } = await supabase
+          .from(table as 'hotels')
+          .select('*');
+
+        if (fetchError) {
+          console.error(`Error fetching ${table}:`, fetchError);
+          results[table] = { count: 0, success: false, error: fetchError.message };
+          continue;
+        }
+
+        if (!data || data.length === 0) {
+          results[table] = { count: 0, success: true };
+          continue;
+        }
+
+        // Send to external Supabase via Edge Function
+        const response = await supabase.functions.invoke('sync-to-external', {
+          body: { 
+            table, 
+            data,
+            operation: 'upsert'
+          }
+        });
+
+        if (response.error) {
+          console.error(`Sync error for ${table}:`, response.error);
+          results[table] = { count: 0, success: false, error: response.error.message };
+        } else if (response.data?.success === false) {
+          results[table] = { count: 0, success: false, error: response.data.error || response.data.message };
+        } else {
+          results[table] = { count: response.data?.synced || data.length, success: true };
+        }
+      }
+
+      // Update settings with sync results
+      const updatedSettings = {
+        ...settings,
+        last_sync_at: new Date().toISOString(),
+        last_sync_results: results,
+      };
+
+      await supabase
+        .from('platform_settings')
+        .update({
+          value: JSON.parse(JSON.stringify(updatedSettings)) as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('key', 'external_supabase');
+
+      setSettings(updatedSettings);
+
+      // Check if all syncs were successful
+      const allSuccess = Object.values(results).every(r => r.success);
+      const totalSynced = Object.values(results).reduce((sum, r) => sum + r.count, 0);
+
+      if (allSuccess) {
+        toast.success(`Синхронизация завершена! Отправлено ${totalSynced} записей`);
+      } else {
+        const failedTables = Object.entries(results)
+          .filter(([_, r]) => !r.success)
+          .map(([t]) => AVAILABLE_TABLES.find(at => at.id === t)?.label || t);
+        toast.error(`Ошибки синхронизации: ${failedTables.join(', ')}`);
+      }
+
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast.error(error.message || 'Ошибка синхронизации');
+    } finally {
+      setSyncing(false);
+      setSyncProgress(null);
     }
   };
 
@@ -256,12 +358,6 @@ export function SettingsTab() {
                 ))}
               </div>
             </div>
-
-            {settings.last_sync_at && (
-              <p className="text-sm text-muted-foreground mt-4">
-                Последняя синхронизация: {new Date(settings.last_sync_at).toLocaleString('ru-RU')}
-              </p>
-            )}
           </div>
 
           <div className="border-t pt-6">
@@ -272,6 +368,80 @@ export function SettingsTab() {
               Сохранить настройки
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Manual Sync Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Ручная синхронизация
+          </CardTitle>
+          <CardDescription>
+            Отправьте все данные из выбранных таблиц во внешний Supabase
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button 
+            onClick={syncAllData} 
+            disabled={syncing || !settings.sync_enabled || !settings.url || !settings.anon_key}
+            className="w-full"
+            size="lg"
+          >
+            {syncing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {syncProgress || 'Синхронизация...'}
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Синхронизировать все данные
+              </>
+            )}
+          </Button>
+
+          {!settings.sync_enabled && (
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Включите синхронизацию выше для отправки данных
+            </p>
+          )}
+
+          {/* Last Sync Results */}
+          {settings.last_sync_at && (
+            <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Последняя синхронизация: {new Date(settings.last_sync_at).toLocaleString('ru-RU')}
+              </div>
+
+              {settings.last_sync_results && (
+                <div className="space-y-2">
+                  {Object.entries(settings.last_sync_results).map(([table, result]) => {
+                    const tableLabel = AVAILABLE_TABLES.find(t => t.id === table)?.label || table;
+                    return (
+                      <div key={table} className="flex items-center justify-between text-sm">
+                        <span>{tableLabel}</span>
+                        {result.success ? (
+                          <span className="text-emerald-600 dark:text-emerald-500 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {result.count} записей
+                          </span>
+                        ) : (
+                          <span className="text-destructive flex items-center gap-1">
+                            <XCircle className="h-3 w-3" />
+                            {result.error || 'Ошибка'}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
