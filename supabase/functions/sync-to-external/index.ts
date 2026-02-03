@@ -95,12 +95,44 @@ Deno.serve(async (req) => {
       settings.value.anon_key
     );
 
-    // Prepare data with external_id
+    // Transform data for external schema
+    // External tables use hotel_external_id instead of hotel_id, 
+    // room_type_external_id instead of room_type_id, etc.
     const dataArray = Array.isArray(data) ? data : [data];
-    const preparedData = dataArray.map(item => ({
-      ...item,
-      external_id: item.id, // Map local id to external_id
-    }));
+    const preparedData = dataArray.map(item => {
+      const transformed: Record<string, unknown> = {
+        external_id: item.id, // Map local id to external_id
+      };
+
+      // Map fields based on table type
+      for (const [key, value] of Object.entries(item)) {
+        if (key === 'id') continue; // Already mapped to external_id
+        
+        // Skip internal columns that don't exist in external schema
+        if (['owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'].includes(key)) {
+          continue;
+        }
+        
+        // Transform foreign key references to external_id pattern
+        if (key === 'hotel_id' && value) {
+          transformed['hotel_external_id'] = value;
+        } else if (key === 'room_type_id' && value) {
+          transformed['room_type_external_id'] = value;
+        } else if (key === 'room_id' && value) {
+          transformed['room_external_id'] = value;
+        } else if (key === 'client_id' && value) {
+          transformed['client_external_id'] = value;
+        } else if (key === 'service_id' && value) {
+          transformed['service_external_id'] = value;
+        } else if (key === 'booking_id' && value) {
+          transformed['booking_external_id'] = value;
+        } else {
+          transformed[key] = value;
+        }
+      }
+
+      return transformed;
+    });
 
     let error;
 
