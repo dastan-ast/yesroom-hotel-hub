@@ -50,26 +50,28 @@ export default function Auth() {
   };
 
   useEffect(() => {
-    if (user && !loading && !roleLoading) {
+    // Ждём полной загрузки и наличия роли
+    if (user && !loading && !roleLoading && role !== null) {
       // Если есть pending redirect после регистрации, используем его
       if (pendingRedirect === 'onboarding') {
-        navigate('/onboarding');
+        navigate('/onboarding', { replace: true });
         return;
       } else if (pendingRedirect === 'home') {
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
       
-      // Обычная логика для входа
+      // Обычная логика для входа - редирект только при известной роли
       if (isSuperAdmin) {
-        navigate('/super-admin');
+        navigate('/super-admin', { replace: true });
       } else if (isAdmin && hotelId) {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else if ((role === 'owner' || role === 'admin') && !hotelId) {
-        navigate('/onboarding');
-      } else {
-        navigate('/');
+        navigate('/onboarding', { replace: true });
+      } else if (role === 'guest') {
+        navigate('/', { replace: true });
       }
+      // Не редиректим если роль не определена
     }
   }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate, pendingRedirect]);
 

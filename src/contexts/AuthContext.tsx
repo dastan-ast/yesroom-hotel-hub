@@ -129,10 +129,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Сначала очищаем локальное состояние
+    setUser(null);
+    setSession(null);
     setRole(null);
     setHotelId(null);
     setProfile(null);
+    
+    // Затем пытаемся выйти на сервере (игнорируем ошибки)
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      console.warn('Logout error (ignoring):', error);
+    }
   };
 
   const isSuperAdmin = role === 'superadmin';
