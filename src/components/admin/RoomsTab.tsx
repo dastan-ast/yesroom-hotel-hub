@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { format, startOfDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -17,6 +18,8 @@ interface Room {
   room_type_id: string;
   notes: string | null;
   room_types?: { name: string; price_per_night: number } | null;
+  // Computed field based on today's bookings
+  displayStatus?: RoomStatus;
 }
 
 interface RoomType {
@@ -48,7 +51,10 @@ export function RoomsTab({ hotelId }: { hotelId: string }) {
 
   const fetchData = async () => {
     setLoading(true);
-    const [roomsRes, typesRes] = await Promise.all([
+    const today = startOfDay(new Date());
+    const todayStr = format(today, 'yyyy-MM-dd');
+
+    const [roomsRes, typesRes, bookingsRes] = await Promise.all([
       supabase
         .from('rooms')
         .select('*, room_types(name, price_per_night)')
@@ -59,9 +65,46 @@ export function RoomsTab({ hotelId }: { hotelId: string }) {
         .from('room_types')
         .select('id, name, price_per_night')
         .eq('hotel_id', hotelId),
+      // Get today's active bookings to determine real-time availability
+      supabase
+        .from('bookings')
+        .select('room_id, status, check_in_date, check_out_date')
+        .eq('hotel_id', hotelId)
+        .not('room_id', 'is', null)
+        .in('status', ['approved', 'checked_in'])
+        .lte('check_in_date', todayStr)
+        .gt('check_out_date', todayStr),
     ]);
 
-    if (roomsRes.data) setRooms(roomsRes.data as Room[]);
+    if (roomsRes.data) {
+      // Create a map of room_id -> booking status for today
+      const todayBookings = new Map<string, string>();
+      if (bookingsRes.data) {
+        for (const booking of bookingsRes.data) {
+          if (booking.room_id) {
+            todayBookings.set(booking.room_id, booking.status);
+          }
+        }
+      }
+
+      // Calculate displayStatus based on actual bookings for today
+      const roomsWithDisplayStatus = roomsRes.data.map(room => {
+        let displayStatus: RoomStatus = room.status;
+        
+        if (room.status === 'maintenance') {
+          displayStatus = 'maintenance';
+        } else if (todayBookings.has(room.id)) {
+          const bookingStatus = todayBookings.get(room.id);
+          displayStatus = bookingStatus === 'checked_in' ? 'occupied' : 'booked';
+        } else {
+          displayStatus = 'available';
+        }
+
+        return { ...room, displayStatus } as Room;
+      });
+
+      setRooms(roomsWithDisplayStatus);
+    }
     if (typesRes.data) setRoomTypes(typesRes.data);
     setLoading(false);
   };
@@ -194,7 +237,7 @@ export function RoomsTab({ hotelId }: { hotelId: string }) {
                     onClick={() => handleEdit(room)}
                     className={cn(
                       'p-3 rounded-lg border-2 cursor-pointer transition-all hover:scale-105',
-                      statusColors[room.status]
+                      statusColors[room.displayStatus || room.status]
                     )}
                   >
                     <div className="text-lg font-bold">{room.room_number}</div>
