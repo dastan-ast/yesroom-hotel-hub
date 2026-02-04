@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,6 +91,18 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const watchCheckOut = form.watch('check_out_date');
   const watchRoomType = form.watch('room_type_id');
 
+  const availabilityKey = useMemo(() => {
+    if (!open || !hotelId || !watchCheckIn || !watchCheckOut) return null;
+    return [
+      hotelId,
+      watchRoomType || 'all',
+      format(watchCheckIn, 'yyyy-MM-dd'),
+      format(watchCheckOut, 'yyyy-MM-dd'),
+    ].join('|');
+  }, [open, hotelId, watchRoomType, watchCheckIn, watchCheckOut]);
+
+  const lastAvailabilityKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (open && hotelId) {
       fetchRoomTypes();
@@ -113,11 +125,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
   // Fetch available rooms when dates and room type change
   useEffect(() => {
-    if (watchCheckIn && watchCheckOut && hotelId && open) {
-      fetchAvailableRooms();
-    }
+    if (!availabilityKey) return;
+    if (lastAvailabilityKeyRef.current === availabilityKey) return;
+    lastAvailabilityKeyRef.current = availabilityKey;
+    fetchAvailableRooms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchCheckIn?.getTime(), watchCheckOut?.getTime(), watchRoomType, hotelId, open]);
+  }, [availabilityKey]);
 
   const fetchRoomTypes = async () => {
     const { data } = await supabase
@@ -187,10 +200,19 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
     ]);
 
     const available = allRooms.filter(room => !conflictingRoomIds.has(room.id));
-    setAvailableRooms(available as AvailableRoom[]);
+
+    // Avoid pointless state updates (can trigger render loops in some Radix/ref scenarios)
+    setAvailableRooms(prev => {
+      const prevIds = prev.map(r => r.id).join(',');
+      const nextIds = (available as any[]).map(r => r.id).join(',');
+      return prevIds === nextIds ? prev : (available as AvailableRoom[]);
+    });
     
     // Clear selected rooms that are no longer available
-    setSelectedRooms(prev => prev.filter(id => available.some(r => r.id === id)));
+    setSelectedRooms(prev => {
+      const next = prev.filter(id => available.some(r => r.id === id));
+      return next.length === prev.length && next.every((v, i) => v === prev[i]) ? prev : next;
+    });
     
     setLoadingRooms(false);
   };
