@@ -18,6 +18,7 @@ import Pricing from "./pages/Pricing";
 import Help from "./pages/Help";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -27,24 +28,26 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/book/:hotelSlug" element={<PublicBooking />} />
-            <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/pending-approval" element={<PendingApproval />} />
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/super-admin" element={<SuperAdmin />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/help" element={<Help />} />
-            <Route path="/invite/:token" element={<AcceptInvite />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <ErrorBoundary>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/book/:hotelSlug" element={<PublicBooking />} />
+              <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/pending-approval" element={<PendingApproval />} />
+              <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/super-admin" element={<SuperAdmin />} />
+              <Route path="/contacts" element={<Contacts />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/invite/:token" element={<AcceptInvite />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </ErrorBoundary>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
