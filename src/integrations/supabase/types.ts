@@ -909,6 +909,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_hotel_active_for_public: {
+        Args: { _hotel_id: string }
+        Returns: boolean
+      }
       update_user_role_to_owner: {
         Args: { _user_id: string }
         Returns: undefined
