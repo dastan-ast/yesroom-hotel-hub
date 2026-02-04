@@ -69,8 +69,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Optional: Verify caller (can be called internally or by superadmin)
+    // Verify caller - allow superadmin, owner, or admin
     const authHeader = req.headers.get("Authorization");
+    let callerUserId: string | null = null;
+    let callerRole: string | null = null;
+    let callerHotelId: string | null = null;
+
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
       const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
@@ -82,19 +86,40 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Check superadmin role
+      callerUserId = user.id;
+
+      // Get user role
       const { data: roleData } = await supabaseAdmin
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .single();
 
-      if (roleData?.role !== "superadmin") {
+      callerRole = roleData?.role || null;
+
+      // Get user's hotel_id for owners/admins
+      if (callerRole === "owner" || callerRole === "admin") {
+        const { data: profileData } = await supabaseAdmin
+          .from("profiles")
+          .select("hotel_id")
+          .eq("user_id", user.id)
+          .single();
+        callerHotelId = profileData?.hotel_id || null;
+      }
+
+      // Allow superadmin, owner, or admin
+      if (!callerRole || !["superadmin", "owner", "admin"].includes(callerRole)) {
         return new Response(
           JSON.stringify({ success: false, error: "Access denied" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+    } else {
+      // No auth header - deny access
+      return new Response(
+        JSON.stringify({ success: false, error: "Authorization required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Get sync settings
