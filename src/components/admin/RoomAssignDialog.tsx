@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 interface Room {
   id: string;
@@ -33,7 +34,7 @@ interface Props {
   checkInDate?: string;
   checkOutDate?: string;
   onSuccess?: () => void;
-  multiRoom?: boolean; // Enable multi-room selection
+  multiRoom?: boolean;
 }
 
 export function RoomAssignDialog({ 
@@ -45,7 +46,7 @@ export function RoomAssignDialog({
   checkInDate,
   checkOutDate,
   onSuccess,
-  multiRoom = false 
+  multiRoom: initialMultiRoom = false 
 }: Props) {
   const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -53,21 +54,21 @@ export function RoomAssignDialog({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingDates, setBookingDates] = useState({ checkIn: '', checkOut: '' });
+  const [multiRoomMode, setMultiRoomMode] = useState(initialMultiRoom);
 
   useEffect(() => {
     if (open && hotelId) {
       fetchAvailableRooms();
     }
-    // Reset selection when dialog opens
     if (open) {
       setSelectedRooms([]);
+      setMultiRoomMode(initialMultiRoom);
     }
   }, [open, hotelId, roomTypeId, checkInDate, checkOutDate]);
 
   const fetchAvailableRooms = async () => {
     setLoading(true);
     
-    // First, get booking dates if not provided
     let bookingCheckIn = checkInDate;
     let bookingCheckOut = checkOutDate;
     
@@ -86,7 +87,7 @@ export function RoomAssignDialog({
     
     setBookingDates({ checkIn: bookingCheckIn || '', checkOut: bookingCheckOut || '' });
     
-    // Get all rooms (not just 'available' status, we'll check conflicts)
+    // Get all rooms (filter by room type if specified)
     let query = supabase
       .from('rooms')
       .select('id, room_number, floor, room_types(name), status')
@@ -107,29 +108,44 @@ export function RoomAssignDialog({
       return;
     }
 
-    // Get all bookings that might conflict with our dates
-    // Using date overlap formula: (RequestStart < ExistingEnd) AND (RequestEnd > ExistingStart)
+    // Get conflicting bookings using date overlap formula
     const { data: conflictingBookings } = await supabase
       .from('bookings')
       .select('room_id')
       .eq('hotel_id', hotelId)
-      .neq('id', bookingId) // Exclude current booking
+      .neq('id', bookingId)
       .not('room_id', 'is', null)
-      .in('status', ['approved', 'checked_in']) // Only active bookings cause conflicts
-      .lt('check_in_date', bookingCheckOut)  // Existing start < requested end
-      .gt('check_out_date', bookingCheckIn); // Existing end > requested start
+      .in('status', ['approved', 'checked_in'])
+      .lt('check_in_date', bookingCheckOut)
+      .gt('check_out_date', bookingCheckIn);
 
-    const conflictingRoomIds = new Set(
-      (conflictingBookings || []).map(b => b.room_id)
-    );
+    // Also check booking_rooms table for multi-room assignments
+    const { data: conflictingBookingRooms } = await supabase
+      .from('booking_rooms')
+      .select('room_id, bookings!inner(id, check_in_date, check_out_date, status)')
+      .eq('hotel_id', hotelId)
+      .neq('booking_id', bookingId);
 
-    // Mark rooms with conflicts
+    // Filter booking_rooms by date and status
+    const conflictingRoomIdsFromBookingRooms = (conflictingBookingRooms || [])
+      .filter((br: any) => {
+        const booking = br.bookings;
+        if (!booking) return false;
+        if (!['approved', 'checked_in'].includes(booking.status)) return false;
+        return booking.check_in_date < bookingCheckOut && booking.check_out_date > bookingCheckIn;
+      })
+      .map((br: any) => br.room_id);
+
+    const conflictingRoomIds = new Set([
+      ...(conflictingBookings || []).map(b => b.room_id),
+      ...conflictingRoomIdsFromBookingRooms
+    ]);
+
     const roomsWithStatus: Room[] = allRooms.map(room => ({
       ...room,
       hasConflict: conflictingRoomIds.has(room.id),
     }));
 
-    // Sort: available first, then with conflicts
     roomsWithStatus.sort((a, b) => {
       if (a.hasConflict && !b.hasConflict) return 1;
       if (!a.hasConflict && b.hasConflict) return -1;
@@ -141,7 +157,7 @@ export function RoomAssignDialog({
   };
 
   const toggleRoomSelection = (roomId: string) => {
-    if (multiRoom) {
+    if (multiRoomMode) {
       setSelectedRooms(prev => 
         prev.includes(roomId) 
           ? prev.filter(id => id !== roomId)
@@ -152,6 +168,10 @@ export function RoomAssignDialog({
     }
   };
 
+  const removeRoom = (roomId: string) => {
+    setSelectedRooms(prev => prev.filter(id => id !== roomId));
+  };
+
   const handleAssign = async () => {
     if (selectedRooms.length === 0) {
       toast.error('Выберите номер');
@@ -160,45 +180,38 @@ export function RoomAssignDialog({
 
     setSubmitting(true);
     
-    // For single room assignment (default behavior)
-    if (!multiRoom) {
-      const roomId = selectedRooms[0];
-      
-      // Update booking with room_id and status
-      const { error: bookingError } = await supabase
-        .from('bookings')
-        .update({ room_id: roomId, status: 'approved' })
-        .eq('id', bookingId);
+    try {
+      // First, clear existing booking_rooms for this booking
+      await supabase
+        .from('booking_rooms')
+        .delete()
+        .eq('booking_id', bookingId);
 
-      if (bookingError) {
+      // Insert all selected rooms into booking_rooms table
+      const roomEntries = selectedRooms.map(roomId => ({
+        booking_id: bookingId,
+        room_id: roomId,
+        hotel_id: hotelId,
+      }));
+
+      const { error: bookingRoomsError } = await supabase
+        .from('booking_rooms')
+        .insert(roomEntries);
+
+      if (bookingRoomsError) {
+        console.error('Error inserting booking_rooms:', bookingRoomsError);
         toast.error(t('common.error'));
         setSubmitting(false);
         return;
       }
 
-      // Update room status to booked
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({ status: 'booked' })
-        .eq('id', roomId);
-
-      if (roomError) {
-        toast.error(t('common.error'));
-        setSubmitting(false);
-        return;
-      }
-    } else {
-      // Multi-room: update all selected rooms to booked and mark booking as approved
-      // The main booking gets the first room, additional rooms tracked in additional_info
-      const [mainRoom, ...additionalRooms] = selectedRooms;
-      
+      // Update booking with first room_id for backward compatibility
       const { error: bookingError } = await supabase
         .from('bookings')
         .update({ 
-          room_id: mainRoom, 
+          room_id: selectedRooms[0], 
           status: 'approved',
           additional_info: {
-            additional_rooms: additionalRooms,
             total_rooms: selectedRooms.length,
           }
         })
@@ -210,7 +223,7 @@ export function RoomAssignDialog({
         return;
       }
 
-      // Update all rooms to booked
+      // Update all rooms to booked status
       const { error: roomError } = await supabase
         .from('rooms')
         .update({ status: 'booked' })
@@ -221,28 +234,50 @@ export function RoomAssignDialog({
         setSubmitting(false);
         return;
       }
-    }
 
-    toast.success(multiRoom && selectedRooms.length > 1 
-      ? `${selectedRooms.length} номеров назначено` 
-      : 'Номер назначен, бронирование подтверждено'
-    );
-    setSelectedRooms([]);
-    onOpenChange(false);
-    onSuccess?.();
+      toast.success(selectedRooms.length > 1 
+        ? `${selectedRooms.length} номеров назначено` 
+        : 'Номер назначен, бронирование подтверждено'
+      );
+      setSelectedRooms([]);
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      console.error('Error assigning rooms:', error);
+      toast.error(t('common.error'));
+    }
+    
     setSubmitting(false);
   };
 
   const availableRooms = rooms.filter(r => !r.hasConflict);
   const conflictRooms = rooms.filter(r => r.hasConflict);
 
+  // Get selected room details for display
+  const selectedRoomDetails = rooms.filter(r => selectedRooms.includes(r.id));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {multiRoom ? 'Назначить номера' : 'Назначить номер'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Назначить номера</DialogTitle>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="multi-room-switch" className="text-sm text-muted-foreground">
+                Несколько номеров
+              </Label>
+              <Switch
+                id="multi-room-switch"
+                checked={multiRoomMode}
+                onCheckedChange={(checked) => {
+                  setMultiRoomMode(checked);
+                  if (!checked && selectedRooms.length > 1) {
+                    setSelectedRooms([selectedRooms[0]]);
+                  }
+                }}
+              />
+            </div>
+          </div>
           {bookingDates.checkIn && bookingDates.checkOut && (
             <p className="text-sm text-muted-foreground">
               Период: {format(parseISO(bookingDates.checkIn), 'dd.MM')} — {format(parseISO(bookingDates.checkOut), 'dd.MM.yyyy')}
@@ -273,7 +308,7 @@ export function RoomAssignDialog({
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          {multiRoom && (
+                          {multiRoomMode && (
                             <Checkbox 
                               checked={selectedRooms.includes(room.id)} 
                               className="pointer-events-none"
@@ -292,7 +327,7 @@ export function RoomAssignDialog({
                 </div>
               )}
               
-              {/* Conflicting rooms (show but disabled) */}
+              {/* Conflicting rooms */}
               {conflictRooms.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-muted-foreground flex items-center gap-2">
@@ -317,9 +352,30 @@ export function RoomAssignDialog({
             </>
           )}
           
-          {selectedRooms.length > 0 && (
-            <div className="p-2 bg-muted rounded-lg text-sm">
-              Выбрано: {selectedRooms.length} {selectedRooms.length === 1 ? 'номер' : 'номера'}
+          {/* Selected rooms summary with remove buttons */}
+          {selectedRoomDetails.length > 0 && (
+            <div className="p-3 bg-muted rounded-lg space-y-2">
+              <div className="text-sm font-medium">
+                Выбрано: {selectedRoomDetails.length} {selectedRoomDetails.length === 1 ? 'номер' : 'номера'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedRoomDetails.map(room => (
+                  <Badge key={room.id} variant="secondary" className="flex items-center gap-1">
+                    {room.room_number} ({room.room_types?.name})
+                    {multiRoomMode && selectedRoomDetails.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeRoom(room.id);
+                        }}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
         </div>

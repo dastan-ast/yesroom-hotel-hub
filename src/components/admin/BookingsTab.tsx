@@ -406,6 +406,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
           checkInDate={selectedBooking.check_in_date}
           checkOutDate={selectedBooking.check_out_date}
           onSuccess={fetchBookings}
+          multiRoom={true}
         />
       )}
 

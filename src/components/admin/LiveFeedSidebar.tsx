@@ -227,6 +227,7 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
           checkInDate={selectedBookingForAssign.check_in_date}
           checkOutDate={selectedBookingForAssign.check_out_date}
           onSuccess={handleAssignSuccess}
+          multiRoom={true}
         />
       )}
 
