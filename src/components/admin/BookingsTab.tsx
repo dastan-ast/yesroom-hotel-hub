@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
@@ -48,14 +57,28 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-red-500/20 text-red-700 border-red-500',
 };
 
+// Status priority for sorting (lower = higher priority)
+const statusPriority: Record<BookingStatus, number> = {
+  pending: 0,
+  approved: 1,
+  checked_in: 2,
+  checked_out: 3,
+  cancelled: 4,
+};
+
 export function BookingsTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
+  const { isOwner } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [historyPhone, setHistoryPhone] = useState<string | null>(null);
+  
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Cancel dialog state
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -73,6 +96,10 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   // Booking detail modal state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [bookingToView, setBookingToView] = useState<Booking | null>(null);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
 
   useEffect(() => {
     if (hotelId) {
@@ -236,6 +263,80 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
+  // Delete booking with confirmation (owner only)
+  const handleDeleteWithConfirm = (booking: Booking) => {
+    if (booking.status === 'checked_in') {
+      toast.error('Сначала выселите гостя');
+      return;
+    }
+    setBookingToDelete(booking);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!bookingToDelete) return;
+
+    // Delete related booking_rooms entries
+    await supabase
+      .from('booking_rooms')
+      .delete()
+      .eq('booking_id', bookingToDelete.id);
+
+    // Delete related booking_services entries
+    await supabase
+      .from('booking_services')
+      .delete()
+      .eq('booking_id', bookingToDelete.id);
+
+    // Release room if assigned
+    if (bookingToDelete.room_id) {
+      await supabase
+        .from('rooms')
+        .update({ status: 'available' })
+        .eq('id', bookingToDelete.room_id);
+    }
+
+    // Delete the booking
+    const { error } = await supabase
+      .from('bookings')
+      .delete()
+      .eq('id', bookingToDelete.id);
+
+    if (error) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    toast.success('Бронирование удалено');
+    setDeleteDialogOpen(false);
+    setBookingToDelete(null);
+    fetchBookings();
+  };
+
+  // Filtered and sorted bookings
+  const filteredBookings = useMemo(() => {
+    let result = [...bookings];
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(b => b.status === statusFilter);
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(b => 
+        b.guest_name.toLowerCase().includes(query) ||
+        b.guest_phone.includes(query)
+      );
+    }
+
+    // Sort by status priority
+    result.sort((a, b) => statusPriority[a.status] - statusPriority[b.status]);
+
+    return result;
+  }, [bookings, statusFilter, searchQuery]);
+
   const getStatusLabel = (status: BookingStatus) => {
     const labels: Record<BookingStatus, string> = {
       pending: t('admin.pending'),
@@ -264,7 +365,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-semibold">{t('admin.bookingQueue')}</h2>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -272,11 +373,39 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </Button>
       </div>
 
-      {bookings.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">{t('admin.noBookings')}</div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Поиск по имени или телефону..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as BookingStatus | 'all')}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Все статусы" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все статусы</SelectItem>
+            <SelectItem value="pending">Ожидают подтверждения</SelectItem>
+            <SelectItem value="approved">Подтверждено</SelectItem>
+            <SelectItem value="checked_in">Заселён</SelectItem>
+            <SelectItem value="checked_out">Выселен</SelectItem>
+            <SelectItem value="cancelled">Отменено</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filteredBookings.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          {bookings.length === 0 ? t('admin.noBookings') : 'Нет бронирований по заданным фильтрам'}
+        </div>
       ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => (
+          {filteredBookings.map((booking) => (
             <div
               key={booking.id}
               className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border bg-card gap-4"
@@ -375,6 +504,17 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                         Отменить заселение
                       </Button>
                     </>
+                  )}
+                  {/* Delete button for owners (not for checked_in) */}
+                  {isOwner && booking.status !== 'checked_in' && (
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteWithConfirm(booking)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   )}
                 </div>
             </div>
@@ -479,6 +619,29 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
           onUpdate={fetchBookings}
         />
       )}
+
+      {/* Delete Confirmation Dialog (Owner only) */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить бронирование?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Гость: <strong>{bookingToDelete?.guest_name}</strong>
+              <br />
+              Это действие нельзя отменить. Запись будет полностью удалена из системы.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

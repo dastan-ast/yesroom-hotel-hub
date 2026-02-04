@@ -4,6 +4,8 @@ import { format, addDays, startOfDay, isSameDay, isWithinInterval, parseISO } fr
 import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +61,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [bookingRoomMap, setBookingRoomMap] = useState<Map<string, Set<string>>>(new Map());
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
+  const [showOnlyActive, setShowOnlyActive] = useState(true);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -149,18 +152,23 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     const bookingIds = bookingRoomMap.get(roomId);
     if (!bookingIds || bookingIds.size === 0) {
       // Fallback to direct room_id check for backward compatibility
-      return bookings.find(b => {
+      const booking = bookings.find(b => {
         if (b.room_id !== roomId) return false;
+        // Apply active filter
+        if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(b.status)) return false;
         const checkIn = parseISO(b.check_in_date);
         const checkOut = parseISO(b.check_out_date);
         return isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) });
-      }) || null;
+      });
+      return booking || null;
     }
     
     // Find booking that covers this date
     for (const bookingId of bookingIds) {
       const booking = bookings.find(b => b.id === bookingId);
       if (booking) {
+        // Apply active filter
+        if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(booking.status)) continue;
         const checkIn = parseISO(booking.check_in_date);
         const checkOut = parseISO(booking.check_out_date);
         if (isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) })) {
@@ -182,18 +190,30 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl font-semibold">Шахматка</h2>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrev}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleToday}>
-            Сегодня
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleNext}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-active-only"
+              checked={showOnlyActive}
+              onCheckedChange={setShowOnlyActive}
+            />
+            <Label htmlFor="show-active-only" className="text-sm text-muted-foreground cursor-pointer">
+              Только активные
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrev}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleToday}>
+              Сегодня
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleNext}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
