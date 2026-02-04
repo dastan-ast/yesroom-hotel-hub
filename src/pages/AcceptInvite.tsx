@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Building2, Loader2, CheckCircle, XCircle, UserPlus } from 'lucide-react';
 
 const signupSchema = z.object({
+  email: z.string().email('Некорректный email'),
   fullName: z.string().min(2, 'Минимум 2 символа').max(100),
   password: z.string().min(6, 'Минимум 6 символов'),
 });
@@ -22,7 +23,6 @@ type SignupFormData = z.infer<typeof signupSchema>;
 
 interface InvitationData {
   id: string;
-  email: string;
   hotel_name: string;
   hotel_id: string;
   permissions: string[];
@@ -42,7 +42,7 @@ export default function AcceptInvite() {
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { fullName: '', password: '' },
+    defaultValues: { email: '', fullName: '', password: '' },
   });
 
   useEffect(() => {
@@ -53,43 +53,42 @@ export default function AcceptInvite() {
 
   const fetchInvitation = async () => {
     try {
+      // Use the secure function to validate the invitation token
+      // This function only returns non-sensitive data (no email exposed)
       const { data, error } = await supabase
-        .from('staff_invitations')
-        .select(`
-          id,
-          email,
-          permissions,
-          status,
-          expires_at,
-          hotel_id,
-          hotels!inner(name)
-        `)
-        .eq('token', token)
-        .single();
+        .rpc('validate_invitation_token', { _token: token });
 
-      if (error || !data) {
-        setError('Приглашение не найдено');
+      if (error || !data || data.length === 0) {
+        setError('Приглашение не найдено или недействительно');
         return;
       }
 
-      if (data.status !== 'pending') {
+      const invitationData = data[0];
+
+      if (invitationData.status !== 'pending') {
         setError('Это приглашение уже использовано');
         return;
       }
 
-      if (new Date(data.expires_at) < new Date()) {
+      if (new Date(invitationData.expires_at) < new Date()) {
         setError('Срок действия приглашения истёк');
         return;
       }
 
+      // Fetch hotel name separately (hotels table has public view)
+      const { data: hotelData } = await supabase
+        .from('hotels_public')
+        .select('name')
+        .eq('id', invitationData.hotel_id)
+        .single();
+
       setInvitation({
-        id: data.id,
-        email: data.email,
-        hotel_name: (data.hotels as any)?.name || 'Отель',
-        hotel_id: data.hotel_id,
-        permissions: data.permissions,
-        status: data.status,
-        expires_at: data.expires_at,
+        id: invitationData.id,
+        hotel_name: hotelData?.name || 'Отель',
+        hotel_id: invitationData.hotel_id,
+        permissions: invitationData.permissions,
+        status: invitationData.status,
+        expires_at: invitationData.expires_at,
       });
     } catch (err) {
       console.error('Error fetching invitation:', err);
@@ -127,9 +126,10 @@ export default function AcceptInvite() {
 
     setAccepting(true);
     try {
-      // Register new user
+      // Register new user with the email they provided
+      // The accept_invitation RPC validates that this email matches the invitation
       const { data: authData, error: signupError } = await supabase.auth.signUp({
-        email: invitation.email,
+        email: data.email,
         password: data.password,
         options: {
           emailRedirectTo: `${window.location.origin}/invite/${token}`,
@@ -251,10 +251,19 @@ export default function AcceptInvite() {
               // New user signup flow
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSignupAndAccept)} className="space-y-4">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Email:</p>
-                    <p className="font-medium">{invitation?.email}</p>
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="your@email.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
