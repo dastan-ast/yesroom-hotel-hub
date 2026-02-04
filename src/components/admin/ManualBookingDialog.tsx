@@ -32,7 +32,9 @@ const schema = z.object({
   check_out_date: z.date({ required_error: 'Укажите дату' }),
   source: z.enum(['manual', 'web', 'booking']),
   prepayment_received: z.boolean(),
+  prepayment_amount: z.number().min(0).optional(),
   guest_comment: z.string().optional(),
+  guest_count: z.number().min(1).max(10).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -63,9 +65,13 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       room_type_id: '',
       source: 'manual',
       prepayment_received: false,
+      prepayment_amount: 0,
       guest_comment: '',
+      guest_count: 1,
     },
   });
+
+  const watchPrepayment = form.watch('prepayment_received');
 
   useEffect(() => {
     if (open && hotelId) {
@@ -75,7 +81,9 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
         room_type_id: '',
         source: 'manual',
         prepayment_received: false,
+        prepayment_amount: 0,
         guest_comment: '',
+        guest_count: 1,
       });
       phoneMask.setValue('');
     }
@@ -105,7 +113,9 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       check_out_date: format(data.check_out_date, 'yyyy-MM-dd'),
       source: data.source,
       prepayment_received: data.prepayment_received,
+      prepayment_amount: data.prepayment_received ? (data.prepayment_amount || 0) : 0,
       guest_comment: data.guest_comment || null,
+      guest_count: data.guest_count || 1,
       status: 'pending',
       hotel_id: hotelId,
     }).select('id').single();
@@ -269,6 +279,27 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
             <FormField
               control={form.control}
+              name="guest_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Количество гостей</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      max={10} 
+                      {...field} 
+                      value={field.value || 1}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="prepayment_received"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
@@ -281,6 +312,29 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
                 </FormItem>
               )}
             />
+
+            {watchPrepayment && (
+              <FormField
+                control={form.control}
+                name="prepayment_amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Сумма предоплаты (₸)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={0} 
+                        placeholder="0"
+                        {...field} 
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3 } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -21,6 +21,7 @@ import { HotelSettingsTab } from '@/components/admin/HotelSettingsTab';
 import { HelpTab } from '@/components/admin/HelpTab';
 import { StaffTab } from '@/components/admin/StaffTab';
 import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
+import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
   // All menu items with permission mapping
   const allMenuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard'), permission: 'dashboard' },
+    { id: 'analytics', icon: BarChart3, label: 'Аналитика', permission: 'dashboard' },
     { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
     { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
     { id: 'rooms', icon: DoorOpen, label: t('admin.rooms'), permission: 'rooms' },
@@ -310,6 +312,10 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
+                )}
+
+                {activeTab === 'analytics' && (
+                  <ExecutiveDashboard hotelId={hotelId} />
                 )}
 
                 {activeTab === 'bookings' && (

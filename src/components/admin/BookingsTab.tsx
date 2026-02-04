@@ -403,6 +403,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
           bookingId={selectedBooking.id}
           hotelId={hotelId}
           roomTypeId={selectedBooking.room_type_id}
+          checkInDate={selectedBooking.check_in_date}
+          checkOutDate={selectedBooking.check_out_date}
           onSuccess={fetchBookings}
         />
       )}
