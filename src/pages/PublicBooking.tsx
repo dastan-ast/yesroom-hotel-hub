@@ -58,12 +58,12 @@ export default function PublicBooking() {
 
       setHotel(hotelData);
 
-      // Fetch room types for this hotel using secure public view
+      // Fetch room types for this hotel (RLS allows public view for active hotels only)
       const { data: roomData } = await supabase
-        .from('room_types_public')
+        .from('room_types')
         .select('*')
         .eq('hotel_id', hotelData.id)
-        .order('price_per_night', { ascending: true }) as any;
+        .order('price_per_night', { ascending: true });
 
       if (roomData) {
         setRoomTypes(roomData);

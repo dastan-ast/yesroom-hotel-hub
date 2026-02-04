@@ -247,13 +247,6 @@ export type Database = {
             referencedRelation: "room_types"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "bookings_room_type_id_fkey"
-            columns: ["room_type_id"]
-            isOneToOne: false
-            referencedRelation: "room_types_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       clients: {
@@ -594,13 +587,6 @@ export type Database = {
             referencedRelation: "room_types"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "rooms_room_type_id_fkey"
-            columns: ["room_type_id"]
-            isOneToOne: false
-            referencedRelation: "room_types_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       service_catalog: {
@@ -896,35 +882,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      room_types_public: {
-        Row: {
-          amenities: string[] | null
-          capacity: number | null
-          description: string | null
-          hotel_id: string | null
-          id: string | null
-          image_url: string | null
-          images: string[] | null
-          name: string | null
-          price_per_night: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "room_types_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "room_types_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_public"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Functions: {
