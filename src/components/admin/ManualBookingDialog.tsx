@@ -108,14 +108,16 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       setAvailableRooms([]);
       setRoomsOpen(false);
     }
-  }, [open, hotelId, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hotelId]);
 
   // Fetch available rooms when dates and room type change
   useEffect(() => {
-    if (watchCheckIn && watchCheckOut && hotelId) {
+    if (watchCheckIn && watchCheckOut && hotelId && open) {
       fetchAvailableRooms();
     }
-  }, [watchCheckIn, watchCheckOut, watchRoomType, hotelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchCheckIn?.getTime(), watchCheckOut?.getTime(), watchRoomType, hotelId, open]);
 
   const fetchRoomTypes = async () => {
     const { data } = await supabase
