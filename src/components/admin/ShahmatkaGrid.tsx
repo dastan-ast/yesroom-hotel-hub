@@ -26,6 +26,12 @@ interface Booking {
   guest_name: string;
 }
 
+interface BookingRoomEntry {
+  booking_id: string;
+  room_id: string;
+  bookings: Booking | null;
+}
+
 const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-400/80',
   approved: 'bg-blue-400/80',
@@ -50,6 +56,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingRoomMap, setBookingRoomMap] = useState<Map<string, Set<string>>>(new Map());
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
 
@@ -68,7 +75,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     
     const endDate = addDays(startDate, 7);
     
-    const [roomsRes, bookingsRes] = await Promise.all([
+    const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
         .from('rooms')
         .select('id, room_number, floor, room_type_id, room_types(name)')
@@ -79,23 +86,90 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         .from('bookings')
         .select('id, room_id, check_in_date, check_out_date, status, guest_name')
         .eq('hotel_id', hotelId)
-        .not('room_id', 'is', null)
         .gte('check_out_date', format(startDate, 'yyyy-MM-dd'))
-        .lte('check_in_date', format(endDate, 'yyyy-MM-dd'))
+        .lte('check_in_date', format(endDate, 'yyyy-MM-dd')),
+      supabase
+        .from('booking_rooms')
+        .select('booking_id, room_id, bookings(id, room_id, check_in_date, check_out_date, status, guest_name)')
+        .eq('hotel_id', hotelId),
     ]);
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
-    if (bookingsRes.data) setBookings(bookingsRes.data as Booking[]);
+    
+    // Process bookings
+    const allBookings: Booking[] = [];
+    const roomToBookingsMap = new Map<string, Set<string>>();
+    
+    // Add bookings with direct room_id
+    if (bookingsRes.data) {
+      bookingsRes.data.forEach((b: any) => {
+        allBookings.push(b);
+        if (b.room_id) {
+          if (!roomToBookingsMap.has(b.room_id)) {
+            roomToBookingsMap.set(b.room_id, new Set());
+          }
+          roomToBookingsMap.get(b.room_id)!.add(b.id);
+        }
+      });
+    }
+    
+    // Add rooms from booking_rooms table
+    if (bookingRoomsRes.data) {
+      (bookingRoomsRes.data as BookingRoomEntry[]).forEach((br) => {
+        if (br.bookings) {
+          // Check if booking is within date range
+          const bookingCheckIn = parseISO(br.bookings.check_in_date);
+          const bookingCheckOut = parseISO(br.bookings.check_out_date);
+          const rangeStart = startDate;
+          const rangeEnd = endDate;
+          
+          if (bookingCheckIn < rangeEnd && bookingCheckOut > rangeStart) {
+            // Add booking if not already present
+            if (!allBookings.find(b => b.id === br.bookings!.id)) {
+              allBookings.push(br.bookings);
+            }
+            
+            // Map room to booking
+            if (!roomToBookingsMap.has(br.room_id)) {
+              roomToBookingsMap.set(br.room_id, new Set());
+            }
+            roomToBookingsMap.get(br.room_id)!.add(br.booking_id);
+          }
+        }
+      });
+    }
+    
+    setBookings(allBookings);
+    setBookingRoomMap(roomToBookingsMap);
     setLoading(false);
   };
 
   const getBookingForCell = (roomId: string, date: Date): Booking | null => {
-    return bookings.find(b => {
-      if (b.room_id !== roomId) return false;
-      const checkIn = parseISO(b.check_in_date);
-      const checkOut = parseISO(b.check_out_date);
-      return isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) });
-    }) || null;
+    // Check if room has any bookings
+    const bookingIds = bookingRoomMap.get(roomId);
+    if (!bookingIds || bookingIds.size === 0) {
+      // Fallback to direct room_id check for backward compatibility
+      return bookings.find(b => {
+        if (b.room_id !== roomId) return false;
+        const checkIn = parseISO(b.check_in_date);
+        const checkOut = parseISO(b.check_out_date);
+        return isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) });
+      }) || null;
+    }
+    
+    // Find booking that covers this date
+    for (const bookingId of bookingIds) {
+      const booking = bookings.find(b => b.id === bookingId);
+      if (booking) {
+        const checkIn = parseISO(booking.check_in_date);
+        const checkOut = parseISO(booking.check_out_date);
+        if (isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) })) {
+          return booking;
+        }
+      }
+    }
+    
+    return null;
   };
 
   const handlePrev = () => setStartDate(prev => addDays(prev, -7));

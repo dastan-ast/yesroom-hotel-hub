@@ -5,6 +5,7 @@ import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,14 @@ interface BookingService {
   unit_price: number;
   quantity: number;
   total_price: number;
+}
+
+interface BookingRoom {
+  room_id: string;
+  rooms: {
+    room_number: string;
+    room_types: { name: string } | null;
+  } | null;
 }
 
 interface BookingDetails {
@@ -49,6 +58,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
   const { t } = useTranslation();
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [services, setServices] = useState<BookingService[]>([]);
+  const [bookingRooms, setBookingRooms] = useState<BookingRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
@@ -61,7 +71,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
   const fetchData = async () => {
     setLoading(true);
 
-    const [bookingRes, servicesRes] = await Promise.all([
+    const [bookingRes, servicesRes, bookingRoomsRes] = await Promise.all([
       supabase
         .from('bookings')
         .select(`
@@ -77,11 +87,58 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
         .select('id, service_name, unit_price, quantity, total_price')
         .eq('booking_id', bookingId)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('booking_rooms')
+        .select('room_id, rooms(room_number, room_types(name))')
+        .eq('booking_id', bookingId),
     ]);
 
     if (bookingRes.data) setBooking(bookingRes.data as BookingDetails);
     if (servicesRes.data) setServices(servicesRes.data);
+    if (bookingRoomsRes.data) setBookingRooms(bookingRoomsRes.data as BookingRoom[]);
     setLoading(false);
+  };
+
+  // Get all room IDs (from booking_rooms + main room_id for backward compatibility)
+  const getAllRoomIds = (): string[] => {
+    const roomIds = new Set<string>();
+    
+    // Add rooms from booking_rooms table
+    bookingRooms.forEach(br => {
+      if (br.room_id) roomIds.add(br.room_id);
+    });
+    
+    // Add main room_id for backward compatibility
+    if (booking?.room_id && !roomIds.has(booking.room_id)) {
+      roomIds.add(booking.room_id);
+    }
+    
+    return Array.from(roomIds);
+  };
+
+  // Get display info for all rooms
+  const getAllRoomsDisplay = () => {
+    const displayRooms: { room_number: string; room_type: string }[] = [];
+    
+    // Rooms from booking_rooms
+    bookingRooms.forEach(br => {
+      if (br.rooms) {
+        displayRooms.push({
+          room_number: br.rooms.room_number,
+          room_type: br.rooms.room_types?.name || '',
+        });
+      }
+    });
+    
+    // If no booking_rooms but has main room_id (backward compatibility)
+    if (displayRooms.length === 0 && booking?.rooms) {
+      displayRooms.push({
+        room_number: booking.rooms.room_number,
+        room_type: booking.room_types?.name || '',
+      });
+    }
+    
+    return displayRooms;
   };
 
   // Calculate totals
@@ -90,8 +147,10 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
     : 0;
 
   const dailyRate = booking?.daily_rate ?? booking?.room_types?.price_per_night ?? 0;
-  const stayTotal = nights * dailyRate;
-  const servicesTotal = services.reduce((sum, s) => sum + s.total_price, 0);
+  const allRooms = getAllRoomsDisplay();
+  const roomCount = Math.max(allRooms.length, 1);
+  const stayTotal = nights * dailyRate * roomCount;
+  const servicesTotal = services.reduce((sum, s) => sum + (s.total_price || 0), 0);
   const grandTotal = stayTotal + servicesTotal;
   const prepayment = booking?.prepayment_amount ?? 0;
   const balanceDue = grandTotal - prepayment;
@@ -117,15 +176,16 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
       return;
     }
 
-    // Release room
-    if (booking.room_id) {
+    // Release all rooms
+    const allRoomIds = getAllRoomIds();
+    if (allRoomIds.length > 0) {
       const { error: roomError } = await supabase
         .from('rooms')
         .update({ status: 'available' })
-        .eq('id', booking.room_id);
+        .in('id', allRoomIds);
 
       if (roomError) {
-        toast.error('Ошибка при освобождении номера');
+        toast.error('Ошибка при освобождении номеров');
       }
     }
 
@@ -164,10 +224,17 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
             </div>
             <div className="flex items-center gap-2 text-sm">
               <BedDouble className="h-4 w-4 text-muted-foreground" />
-              <span>
-                {booking.rooms?.room_number ? `Номер ${booking.rooms.room_number}` : '—'}
-                {booking.room_types?.name && ` (${booking.room_types.name})`}
-              </span>
+              <div className="flex flex-wrap gap-1">
+                {allRooms.length > 0 ? (
+                  allRooms.map((room, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      №{room.room_number} {room.room_type && `(${room.room_type})`}
+                    </Badge>
+                  ))
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -187,6 +254,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
             <div className="flex justify-between">
               <span>
                 {nights} {nights === 1 ? 'ночь' : nights < 5 ? 'ночи' : 'ночей'} × {dailyRate.toLocaleString()} ₸
+                {roomCount > 1 && ` × ${roomCount} номера`}
               </span>
               <span className="font-medium">{stayTotal.toLocaleString()} ₸</span>
             </div>
@@ -204,7 +272,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
                       {service.service_name}
                       {service.quantity > 1 && ` × ${service.quantity}`}
                     </span>
-                    <span>{service.total_price.toLocaleString()} ₸</span>
+                    <span>{(service.total_price || 0).toLocaleString()} ₸</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-medium pt-1 border-t border-dashed">

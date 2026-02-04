@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_rooms: {
+        Row: {
+          booking_id: string
+          created_at: string | null
+          hotel_id: string
+          id: string
+          room_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string | null
+          hotel_id: string
+          id?: string
+          room_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string | null
+          hotel_id?: string
+          id?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_rooms_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_rooms_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_services: {
         Row: {
           booking_id: string
