@@ -68,12 +68,38 @@ function checkRateLimit(apiKeyId: string): { allowed: boolean; remaining: number
   return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - existing.count, resetAt: existing.resetAt };
 }
 
-// Simple hash function for API key verification
+// Secure hash function for API key verification using PBKDF2
+// PBKDF2 with high iterations is computationally expensive, making brute-force attacks infeasible
 async function hashApiKey(key: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(key);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const keyData = encoder.encode(key);
+  
+  // Use a fixed salt for deterministic hashing (key lookup)
+  // The salt is not secret - it just prevents rainbow table attacks
+  const salt = encoder.encode("hotel-api-key-v1");
+  
+  // Import the key for PBKDF2
+  const baseKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  
+  // Derive bits using PBKDF2 with 100,000 iterations (OWASP recommended minimum)
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    baseKey,
+    256 // 32 bytes = 256 bits
+  );
+  
+  const hashArray = Array.from(new Uint8Array(derivedBits));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 

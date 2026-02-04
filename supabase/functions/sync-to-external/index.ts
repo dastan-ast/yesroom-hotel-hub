@@ -11,6 +11,46 @@ interface SyncRequest {
   operation?: "upsert" | "insert" | "update" | "delete";
 }
 
+// Maximum allowed payload size (100KB)
+const MAX_PAYLOAD_SIZE = 100000;
+
+// Allowed tables for synchronization (whitelist)
+const ALLOWED_TABLES = ["hotels", "bookings", "clients", "room_types", "rooms", "service_catalog"];
+
+// Validate sync request data
+function validateSyncRequest(table: string, data: unknown): { valid: boolean; error?: string } {
+  // Check table is in whitelist
+  if (!ALLOWED_TABLES.includes(table)) {
+    return { valid: false, error: `Table '${table}' is not allowed for synchronization` };
+  }
+  
+  // Check data size
+  const dataStr = JSON.stringify(data);
+  if (dataStr.length > MAX_PAYLOAD_SIZE) {
+    return { valid: false, error: `Payload too large: ${dataStr.length} bytes (max ${MAX_PAYLOAD_SIZE})` };
+  }
+  
+  // Validate data structure
+  if (!data || (typeof data !== 'object')) {
+    return { valid: false, error: "Data must be an object or array of objects" };
+  }
+  
+  const dataArray = Array.isArray(data) ? data : [data];
+  
+  for (const item of dataArray) {
+    if (!item || typeof item !== 'object') {
+      return { valid: false, error: "Each data item must be an object" };
+    }
+    
+    // Check for required id field
+    if (!('id' in item)) {
+      return { valid: false, error: "Each data item must have an 'id' field" };
+    }
+  }
+  
+  return { valid: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,6 +116,15 @@ Deno.serve(async (req) => {
     if (!table || !data) {
       return new Response(
         JSON.stringify({ success: false, error: "Table and data are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate the sync request (size limits, table whitelist, data structure)
+    const validation = validateSyncRequest(table, data);
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ success: false, error: validation.error }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
