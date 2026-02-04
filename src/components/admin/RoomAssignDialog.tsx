@@ -16,12 +16,19 @@ import {
 import { toast } from 'sonner';
 import { AlertTriangle, X } from 'lucide-react';
 
+interface ConflictInfo {
+  guestName: string;
+  checkIn: string;
+  checkOut: string;
+}
+
 interface Room {
   id: string;
   room_number: string;
   floor: number;
   room_types: { name: string } | null;
   hasConflict?: boolean;
+  conflictInfo?: ConflictInfo;
 }
 
 interface Props {
@@ -107,10 +114,10 @@ export function RoomAssignDialog({
       return;
     }
 
-    // Get conflicting bookings using date overlap formula
+    // Get conflicting bookings using date overlap formula - include guest_name
     const { data: conflictingBookings } = await supabase
       .from('bookings')
-      .select('room_id')
+      .select('room_id, guest_name, check_in_date, check_out_date')
       .eq('hotel_id', hotelId)
       .neq('id', bookingId)
       .not('room_id', 'is', null)
@@ -121,28 +128,44 @@ export function RoomAssignDialog({
     // Also check booking_rooms table for multi-room assignments
     const { data: conflictingBookingRooms } = await supabase
       .from('booking_rooms')
-      .select('room_id, bookings!inner(id, check_in_date, check_out_date, status)')
+      .select('room_id, bookings!inner(id, guest_name, check_in_date, check_out_date, status)')
       .eq('hotel_id', hotelId)
       .neq('booking_id', bookingId);
 
-    // Filter booking_rooms by date and status
-    const conflictingRoomIdsFromBookingRooms = (conflictingBookingRooms || [])
-      .filter((br: any) => {
-        const booking = br.bookings;
-        if (!booking) return false;
-        if (!['approved', 'checked_in'].includes(booking.status)) return false;
-        return booking.check_in_date < bookingCheckOut && booking.check_out_date > bookingCheckIn;
-      })
-      .map((br: any) => br.room_id);
+    // Build map of room_id -> conflict info
+    const roomConflictMap = new Map<string, ConflictInfo>();
 
-    const conflictingRoomIds = new Set([
-      ...(conflictingBookings || []).map(b => b.room_id),
-      ...conflictingRoomIdsFromBookingRooms
-    ]);
+    // Add conflicts from direct room_id bookings
+    (conflictingBookings || []).forEach((b: any) => {
+      if (b.room_id && !roomConflictMap.has(b.room_id)) {
+        roomConflictMap.set(b.room_id, {
+          guestName: b.guest_name,
+          checkIn: b.check_in_date,
+          checkOut: b.check_out_date,
+        });
+      }
+    });
+
+    // Add conflicts from booking_rooms table
+    (conflictingBookingRooms || []).forEach((br: any) => {
+      const booking = br.bookings;
+      if (!booking) return;
+      if (!['approved', 'checked_in'].includes(booking.status)) return;
+      if (!(booking.check_in_date < bookingCheckOut && booking.check_out_date > bookingCheckIn)) return;
+      
+      if (!roomConflictMap.has(br.room_id)) {
+        roomConflictMap.set(br.room_id, {
+          guestName: booking.guest_name,
+          checkIn: booking.check_in_date,
+          checkOut: booking.check_out_date,
+        });
+      }
+    });
 
     const roomsWithStatus: Room[] = allRooms.map(room => ({
       ...room,
-      hasConflict: conflictingRoomIds.has(room.id),
+      hasConflict: roomConflictMap.has(room.id),
+      conflictInfo: roomConflictMap.get(room.id),
     }));
 
     roomsWithStatus.sort((a, b) => {
@@ -339,12 +362,27 @@ export function RoomAssignDialog({
                     {conflictRooms.map(room => (
                       <div
                         key={room.id}
-                        className="p-3 rounded-lg border-2 border-muted bg-muted/30 opacity-50 cursor-not-allowed"
+                        onClick={() => {
+                          if (room.conflictInfo) {
+                            toast.error(
+                              `Номер ${room.room_number} занят: ${room.conflictInfo.guestName} (${format(parseISO(room.conflictInfo.checkIn), 'dd.MM')} — ${format(parseISO(room.conflictInfo.checkOut), 'dd.MM')})`
+                            );
+                          }
+                        }}
+                        className="p-3 rounded-lg border-2 border-muted bg-muted/30 opacity-60 cursor-pointer hover:opacity-80 transition-opacity"
+                        title={room.conflictInfo 
+                          ? `Занят: ${room.conflictInfo.guestName} (${format(parseISO(room.conflictInfo.checkIn), 'dd.MM')} — ${format(parseISO(room.conflictInfo.checkOut), 'dd.MM')})`
+                          : 'Занят'}
                       >
                         <div className="font-medium">{room.room_number}</div>
                         <div className="text-xs text-muted-foreground">
                           {room.room_types?.name} • этаж {room.floor}
                         </div>
+                        {room.conflictInfo && (
+                          <div className="text-xs text-yellow-600 mt-1 truncate">
+                            {room.conflictInfo.guestName}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

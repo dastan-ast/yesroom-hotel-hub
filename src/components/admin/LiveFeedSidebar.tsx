@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,7 +18,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Bell, XCircle, Phone, MessageCircle, DoorOpen } from 'lucide-react';
+import { Bell, XCircle, Phone, MessageCircle, DoorOpen, Trash2 } from 'lucide-react';
 import { RoomAssignDialog } from './RoomAssignDialog';
 
 interface PendingBooking {
@@ -38,6 +39,7 @@ interface Props {
 
 export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
   const { t } = useTranslation();
+  const { isOwner } = useAuth();
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -47,6 +49,10 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [bookingToReject, setBookingToReject] = useState<PendingBooking | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  // Delete confirmation state (owner only)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookingToDelete, setBookingToDelete] = useState<PendingBooking | null>(null);
 
   useEffect(() => {
     if (hotelId) {
@@ -133,6 +139,45 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     onBookingUpdated?.();
   };
 
+  // Delete booking (owner only)
+  const handleDeleteWithConfirm = (booking: PendingBooking) => {
+    setBookingToDelete(booking);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!bookingToDelete) return;
+
+    // Delete related booking_rooms entries
+    await supabase
+      .from('booking_rooms')
+      .delete()
+      .eq('booking_id', bookingToDelete.id);
+
+    // Delete related booking_services entries
+    await supabase
+      .from('booking_services')
+      .delete()
+      .eq('booking_id', bookingToDelete.id);
+
+    // Delete the booking
+    const { error } = await supabase
+      .from('bookings')
+      .delete()
+      .eq('id', bookingToDelete.id);
+
+    if (error) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    toast.success('Заявка удалена');
+    setDeleteDialogOpen(false);
+    setBookingToDelete(null);
+    fetchPendingBookings();
+    onBookingUpdated?.();
+  };
+
   const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
 
   return (
@@ -209,6 +254,16 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
                   >
                     <XCircle className="h-3 w-3" />
                   </Button>
+                  {isOwner && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs px-2 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteWithConfirm(booking)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -254,6 +309,29 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
             <AlertDialogCancel>Назад</AlertDialogCancel>
             <AlertDialogAction onClick={confirmReject} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Отклонить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog (Owner only) */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить заявку?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Гость: <strong>{bookingToDelete?.guest_name}</strong>
+              <br />
+              Это действие нельзя отменить. Запись будет полностью удалена из системы.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Удалить
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
