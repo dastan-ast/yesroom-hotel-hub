@@ -29,19 +29,7 @@ const Index = () => {
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Redirect admins to their dashboard
-  useEffect(() => {
-    if (!authLoading && !roleLoading && user) {
-      if (isSuperAdmin) {
-        navigate('/super-admin');
-      } else if (isAdmin && hotelId) {
-        navigate('/admin/dashboard');
-      } else if ((role === 'owner' || role === 'admin') && !hotelId) {
-        // Только owner/admin без отеля идут на онбординг
-        navigate('/onboarding');
-      }
-    }
-  }, [user, authLoading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
+  // Редирект удалён - теперь происходит централизованно из Auth.tsx
 
   // Parse URL params
   const checkInParam = searchParams.get('checkIn');
