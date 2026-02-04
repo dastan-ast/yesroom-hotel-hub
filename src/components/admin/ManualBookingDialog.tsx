@@ -73,6 +73,8 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const [loading, setLoading] = useState(false);
   const phoneMask = usePhoneMask();
 
+  const prevOpenRef = useRef<boolean>(false);
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -104,7 +106,10 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const lastAvailabilityKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (open && hotelId) {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+
+    if (justOpened && hotelId) {
       fetchRoomTypes();
       form.reset({
         guest_name: '',
