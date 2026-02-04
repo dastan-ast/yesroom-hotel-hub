@@ -14,8 +14,91 @@ interface SyncRequest {
 // Maximum allowed payload size (100KB)
 const MAX_PAYLOAD_SIZE = 100000;
 
+// Maximum string field length
+const MAX_STRING_LENGTH = 1000;
+
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 // Allowed tables for synchronization (whitelist)
 const ALLOWED_TABLES = ["hotels", "bookings", "clients", "room_types", "rooms", "service_catalog"];
+
+// Allowed fields per table (whitelist) - prevents data pollution
+const ALLOWED_FIELDS: Record<string, string[]> = {
+  hotels: [
+    "id", "external_id", "name", "slug", "location", "description", "logo_url", 
+    "status", "subscription_status", "created_at", "updated_at"
+  ],
+  bookings: [
+    "id", "external_id", "hotel_id", "room_id", "room_type_id", "client_id",
+    "check_in_date", "check_out_date", "guest_name", "guest_phone", "guest_count",
+    "guest_comment", "total_price", "daily_rate", "final_total", "prepayment_amount",
+    "prepayment_received", "source", "additional_info", "external_source_data",
+    "created_at", "updated_at"
+  ],
+  clients: [
+    "id", "external_id", "hotel_id", "full_name", "phone", "email", 
+    "document_number", "notes", "created_at", "updated_at"
+  ],
+  room_types: [
+    "id", "external_id", "hotel_id", "name", "description", "price_per_night",
+    "capacity", "amenities", "image_url", "images", "created_at", "updated_at"
+  ],
+  rooms: [
+    "id", "external_id", "hotel_id", "room_type_id", "room_number", "floor",
+    "status", "notes", "created_at", "updated_at"
+  ],
+  service_catalog: [
+    "id", "external_id", "hotel_id", "name", "default_price", "is_active",
+    "created_at", "updated_at"
+  ]
+};
+
+// Fields that should be validated as UUIDs
+const UUID_FIELDS = ["id", "external_id", "hotel_id", "room_id", "room_type_id", "client_id", "service_id", "booking_id"];
+
+// Validate UUID format
+function isValidUUID(value: unknown): boolean {
+  return typeof value === "string" && UUID_REGEX.test(value);
+}
+
+// Validate string length
+function validateStringLength(key: string, value: unknown): { valid: boolean; error?: string } {
+  if (typeof value === "string" && value.length > MAX_STRING_LENGTH) {
+    return { valid: false, error: `Field '${key}' exceeds maximum length of ${MAX_STRING_LENGTH} characters` };
+  }
+  return { valid: true };
+}
+
+// Validate fields against whitelist
+function validateFields(table: string, data: Record<string, unknown>): { valid: boolean; error?: string } {
+  const allowedFields = ALLOWED_FIELDS[table];
+  if (!allowedFields) {
+    return { valid: false, error: `No field whitelist defined for table '${table}'` };
+  }
+  
+  for (const key of Object.keys(data)) {
+    // Check field is allowed
+    if (!allowedFields.includes(key)) {
+      return { valid: false, error: `Field '${key}' is not allowed for table '${table}'` };
+    }
+    
+    // Check string lengths
+    const lengthCheck = validateStringLength(key, data[key]);
+    if (!lengthCheck.valid) {
+      return lengthCheck;
+    }
+    
+    // Validate UUID fields
+    if (UUID_FIELDS.includes(key) && data[key] !== null && data[key] !== undefined) {
+      if (!isValidUUID(data[key])) {
+        return { valid: false, error: `Field '${key}' must be a valid UUID` };
+      }
+    }
+  }
+  
+  return { valid: true };
+}
 
 // Validate sync request data
 function validateSyncRequest(table: string, data: unknown): { valid: boolean; error?: string } {
@@ -46,9 +129,29 @@ function validateSyncRequest(table: string, data: unknown): { valid: boolean; er
     if (!('id' in item) || !item.id) {
       return { valid: false, error: "Each data item must have a valid 'id' field (non-null UUID)" };
     }
+    
+    // Validate UUID format for id
+    if (!isValidUUID(item.id)) {
+      return { valid: false, error: "The 'id' field must be a valid UUID" };
+    }
+    
+    // Validate fields against whitelist
+    const fieldValidation = validateFields(table, item as Record<string, unknown>);
+    if (!fieldValidation.valid) {
+      return fieldValidation;
+    }
   }
   
   return { valid: true };
+}
+
+// Get external Supabase configuration from environment variables
+function getExternalConfig(): { url: string | null; anonKey: string | null; syncEnabled: boolean } {
+  const url = Deno.env.get("EXTERNAL_SUPABASE_URL");
+  const anonKey = Deno.env.get("EXTERNAL_SUPABASE_ANON_KEY");
+  const syncEnabled = Deno.env.get("EXTERNAL_SYNC_ENABLED") === "true";
+  
+  return { url: url || null, anonKey: anonKey || null, syncEnabled };
 }
 
 Deno.serve(async (req) => {
@@ -122,19 +225,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get sync settings
+    // Get sync configuration from environment variables (secure storage)
+    const externalConfig = getExternalConfig();
+    
+    if (!externalConfig.syncEnabled || !externalConfig.url || !externalConfig.anonKey) {
+      return new Response(
+        JSON.stringify({ success: false, message: "Sync is disabled or not configured" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get sync tables configuration from database (non-sensitive)
     const { data: settings } = await supabaseAdmin
       .from("platform_settings")
       .select("value")
       .eq("key", "external_supabase")
       .single();
 
-    if (!settings?.value?.sync_enabled || !settings?.value?.url || !settings?.value?.anon_key) {
-      return new Response(
-        JSON.stringify({ success: false, message: "Sync is disabled or not configured" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const syncTables = settings?.value?.sync_tables || ALLOWED_TABLES;
 
     const { table, data, operation = "upsert" }: SyncRequest = await req.json();
 
@@ -145,7 +253,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate the sync request (size limits, table whitelist, data structure)
+    // Validate the sync request (size limits, table whitelist, field whitelist, data structure)
     const validation = validateSyncRequest(table, data);
     if (!validation.valid) {
       return new Response(
@@ -155,7 +263,6 @@ Deno.serve(async (req) => {
     }
 
     // Check if table is in sync list
-    const syncTables = settings.value.sync_tables || [];
     if (!syncTables.includes(table)) {
       return new Response(
         JSON.stringify({ success: false, message: `Table ${table} is not configured for sync` }),
@@ -163,10 +270,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create external Supabase client
+    // Create external Supabase client using secure environment variables
     const externalClient = createClient(
-      settings.value.url,
-      settings.value.anon_key
+      externalConfig.url,
+      externalConfig.anonKey
     );
 
     // Transform data for external schema
@@ -210,7 +317,7 @@ Deno.serve(async (req) => {
         'booking_id': 'booking_external_id',
       };
 
-      // Map fields based on table type
+      // Map fields based on table type (only allowed fields pass through)
       for (const [key, value] of Object.entries(item)) {
         // Skip internal columns
         if (skipColumns.includes(key)) continue;
@@ -276,14 +383,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update last sync timestamp
-    await supabaseAdmin
-      .from("platform_settings")
-      .update({ 
-        value: { ...settings.value, last_sync_at: new Date().toISOString() },
-        updated_at: new Date().toISOString()
-      })
-      .eq("key", "external_supabase");
+    // Update last sync timestamp in platform_settings (non-sensitive metadata)
+    if (settings?.value) {
+      await supabaseAdmin
+        .from("platform_settings")
+        .update({ 
+          value: { ...settings.value, last_sync_at: new Date().toISOString() },
+          updated_at: new Date().toISOString()
+        })
+        .eq("key", "external_supabase");
+    }
 
     console.log(`Synced ${dataArray.length} record(s) to ${table} (${operation})`);
 
