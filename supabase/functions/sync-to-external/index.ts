@@ -173,15 +173,17 @@ Deno.serve(async (req) => {
     // External tables use hotel_external_id instead of hotel_id, 
     // room_type_external_id instead of room_type_id, etc.
     const dataArray = Array.isArray(data) ? data : [data];
-    const preparedData = dataArray.map(item => {
-      // Ensure external_id is always set (critical for upsert on external DB)
-      if (!item.id) {
-        console.error(`Missing id for item in table ${table}:`, JSON.stringify(item).slice(0, 200));
-        throw new Error(`Missing required 'id' field for ${table} sync`);
+    const preparedData = dataArray.map((item) => {
+      // Some callers may omit `id` (e.g., partial selects) but include `external_id`.
+      // The destination schema requires NOT NULL `external_id`, so we derive it from either.
+      const sourceId = (item as Record<string, unknown>)?.id ?? (item as Record<string, unknown>)?.external_id;
+      if (!sourceId) {
+        console.error(`Missing id/external_id for item in table ${table}:`, JSON.stringify(item).slice(0, 200));
+        throw new Error(`Missing required 'id' (or 'external_id') field for ${table} sync`);
       }
 
       const transformed: Record<string, unknown> = {
-        external_id: item.id,
+        external_id: sourceId,
       };
 
       // Columns to skip entirely (internal or not in external schema)
