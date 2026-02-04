@@ -17,7 +17,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -471,9 +470,11 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
                               )}
                             >
                               <div className="flex items-center gap-2">
-                                <Checkbox 
+                                <input
+                                  type="checkbox"
                                   checked={selectedRooms.includes(room.id)}
-                                  className="pointer-events-none"
+                                  readOnly
+                                  className="h-4 w-4 rounded border border-input bg-background pointer-events-none"
                                 />
                                 <div>
                                   <div className="font-medium">{room.room_number}</div>
@@ -552,7 +553,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                   <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    <input
+                      type="checkbox"
+                      checked={!!field.value}
+                      onChange={(e) => field.onChange(e.target.checked)}
+                      className="h-4 w-4 rounded border border-input bg-background"
+                    />
                   </FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel>{t('admin.prepayment')}</FormLabel>

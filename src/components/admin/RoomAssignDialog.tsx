@@ -4,7 +4,6 @@ import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -309,9 +308,11 @@ export function RoomAssignDialog({
                       >
                         <div className="flex items-center gap-2">
                           {multiRoomMode && (
-                            <Checkbox 
-                              checked={selectedRooms.includes(room.id)} 
-                              className="pointer-events-none"
+                            <input
+                              type="checkbox"
+                              checked={selectedRooms.includes(room.id)}
+                              readOnly
+                              className="h-4 w-4 rounded border border-input bg-background pointer-events-none"
                             />
                           )}
                           <div>
