@@ -42,9 +42,9 @@ function validateSyncRequest(table: string, data: unknown): { valid: boolean; er
       return { valid: false, error: "Each data item must be an object" };
     }
     
-    // Check for required id field
-    if (!('id' in item)) {
-      return { valid: false, error: "Each data item must have an 'id' field" };
+    // Check for required id field with a valid value
+    if (!('id' in item) || !item.id) {
+      return { valid: false, error: "Each data item must have a valid 'id' field (non-null UUID)" };
     }
   }
   
@@ -174,8 +174,14 @@ Deno.serve(async (req) => {
     // room_type_external_id instead of room_type_id, etc.
     const dataArray = Array.isArray(data) ? data : [data];
     const preparedData = dataArray.map(item => {
+      // Ensure external_id is always set (critical for upsert on external DB)
+      if (!item.id) {
+        console.error(`Missing id for item in table ${table}:`, JSON.stringify(item).slice(0, 200));
+        throw new Error(`Missing required 'id' field for ${table} sync`);
+      }
+
       const transformed: Record<string, unknown> = {
-        external_id: item.id, // Map local id to external_id
+        external_id: item.id,
       };
 
       // Columns to skip entirely (internal or not in external schema)
