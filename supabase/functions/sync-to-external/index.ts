@@ -186,7 +186,10 @@ Deno.serve(async (req) => {
 
       // Columns to skip entirely (internal or not in external schema)
       // NOTE: We also skip some fields conditionally per-table when the external schema differs.
-      const skipColumns = ['id', 'owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'];
+      // IMPORTANT: local tables may already have an `external_id` column (nullable).
+      // We always compute the destination `external_id` from local `id`, so we must never
+      // copy the local `external_id` over it (it can be null and would violate NOT NULL).
+      const skipColumns = ['id', 'external_id', 'owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'];
 
       // External projects often have enum mismatches. The most common is bookings.status.
       // Skipping it prevents hard failures (500) while still syncing the rest of the record.
