@@ -179,7 +179,15 @@ Deno.serve(async (req) => {
       };
 
       // Columns to skip entirely (internal or not in external schema)
+      // NOTE: We also skip some fields conditionally per-table when the external schema differs.
       const skipColumns = ['id', 'owner_id', 'trial_ends_at', 'settings', 'created_by', 'updated_by'];
+
+      // External projects often have enum mismatches. The most common is bookings.status.
+      // Skipping it prevents hard failures (500) while still syncing the rest of the record.
+      // On insert, the external DB default will apply; on upsert, missing fields are left untouched.
+      if (table === 'bookings') {
+        skipColumns.push('status');
+      }
       
       // Columns that need FK transformation (original_name -> external_name)
       const fkMappings: Record<string, string> = {
