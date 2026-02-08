@@ -20,7 +20,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Hotel, User, Building2 } from 'lucide-react';
+import { Hotel, User, Building2, Mail } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -41,7 +41,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [pendingRedirect, setPendingRedirect] = useState<'onboarding' | 'home' | null>(null);
+  const [emailSent, setEmailSent] = useState<string | null>(null);
 
   const handleToggleMode = () => {
     loginForm.reset();
@@ -50,18 +50,7 @@ export default function Auth() {
   };
 
   useEffect(() => {
-    // Ждём полной загрузки и наличия роли
     if (user && !loading && !roleLoading && role !== null) {
-      // Если есть pending redirect после регистрации, используем его
-      if (pendingRedirect === 'onboarding') {
-        navigate('/onboarding', { replace: true });
-        return;
-      } else if (pendingRedirect === 'home') {
-        navigate('/', { replace: true });
-        return;
-      }
-      
-      // Обычная логика для входа - редирект только при известной роли
       if (isSuperAdmin) {
         navigate('/super-admin', { replace: true });
       } else if (isAdmin && hotelId) {
@@ -71,9 +60,8 @@ export default function Auth() {
       } else if (role === 'guest') {
         navigate('/', { replace: true });
       }
-      // Не редиректим если роль не определена
     }
-  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate, pendingRedirect]);
+  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -89,36 +77,68 @@ export default function Auth() {
     setIsLoading(true);
     const { error } = await signIn(data.email, data.password);
     if (error) {
-      toast.error(error.message);
+      if (error.message.includes('Email not confirmed')) {
+        toast.error('Подтвердите email перед входом. Проверьте почту.');
+      } else {
+        toast.error(error.message);
+      }
     }
     setIsLoading(false);
   };
 
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
-    
-    // Устанавливаем куда редиректить после регистрации
-    if (data.userType === 'owner') {
-      setPendingRedirect('onboarding');
-    } else {
-      setPendingRedirect('home');
-    }
-    
     const { error } = await signUp(data.email, data.password, data.fullName);
     if (error) {
-      setPendingRedirect(null);
       if (error.message.includes('already registered')) {
         toast.error('Этот email уже зарегистрирован');
       } else {
         toast.error(error.message);
       }
     } else {
-      toast.success('Регистрация успешна!');
+      setEmailSent(data.email);
     }
     setIsLoading(false);
   };
 
   const selectedUserType = signupForm.watch('userType');
+
+  if (emailSent) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12 flex items-center justify-center">
+          <Card className="w-full max-w-md animate-scale-in text-center">
+            <CardHeader>
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Mail className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle className="font-display text-2xl">Проверьте почту</CardTitle>
+              <CardDescription className="text-base mt-2">
+                Мы отправили письмо на{' '}
+                <span className="font-medium text-foreground">{emailSent}</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Перейдите по ссылке в письме для подтверждения аккаунта. После этого вы сможете войти.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setEmailSent(null);
+                  setIsLogin(true);
+                }}
+              >
+                Вернуться ко входу
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
