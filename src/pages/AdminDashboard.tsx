@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3 } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -22,6 +22,8 @@ import { HelpTab } from '@/components/admin/HelpTab';
 import { StaffTab } from '@/components/admin/StaffTab';
 import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
+import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
+import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -32,6 +34,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, pending: 0, occupied: 0 });
   const [hotelName, setHotelName] = useState('');
   const [hotelStatus, setHotelStatus] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('trial');
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLiveFeed, setShowLiveFeed] = useState(true);
 
@@ -54,6 +58,7 @@ export default function AdminDashboard() {
     { id: 'integrations', icon: Key, label: 'Интеграции', permission: 'integrations' },
     { id: 'settings', icon: Settings, label: 'Настройки отеля', permission: 'settings' },
     { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
+    { id: 'subscription', icon: CreditCard, label: 'Подписка', permission: null, ownerOnly: true },
     { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
   ];
 
@@ -110,12 +115,14 @@ export default function AdminDashboard() {
     if (!hotelId) return;
     const { data } = await supabase
       .from('hotels')
-      .select('name, status')
+      .select('name, status, subscription_status, trial_ends_at')
       .eq('id', hotelId)
       .maybeSingle();
     if (data) {
       setHotelName(data.name);
       setHotelStatus(data.status);
+      setSubscriptionStatus(data.subscription_status);
+      setTrialEndsAt(data.trial_ends_at);
       
       if (data.status === 'pending') {
         navigate('/pending-approval');
@@ -240,6 +247,12 @@ export default function AdminDashboard() {
 
             <main className="flex-1 flex">
               <div className="flex-1 p-6 overflow-auto">
+                {isOwner && (
+                  <SubscriptionBanner
+                    subscriptionStatus={subscriptionStatus}
+                    trialEndsAt={trialEndsAt}
+                  />
+                )}
                 {activeTab === 'dashboard' && (
                   <div className="space-y-6">
                     <h1 className="text-2xl font-display font-bold">{t('admin.dashboard')}</h1>
@@ -388,6 +401,10 @@ export default function AdminDashboard() {
                       <StaffTab hotelId={hotelId} hotelName={hotelName} />
                     </CardContent>
                   </Card>
+                )}
+
+                {activeTab === 'subscription' && (
+                  <SubscriptionTab hotelId={hotelId} />
                 )}
 
                 {activeTab === 'help' && (
