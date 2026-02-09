@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Upload, Clock, AlertCircle } from 'lucide-react';
+import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Upload, Clock, AlertCircle, CreditCard, Plus, Trash2 } from 'lucide-react';
 import type { Json } from '@/integrations/supabase/types';
 
 interface ExternalSupabaseSettings {
@@ -36,6 +37,14 @@ const AVAILABLE_TABLES = [
   { id: 'service_catalog', label: 'Каталог услуг' },
 ];
 
+interface PricingPlan {
+  name: string;
+  price: number;
+  period: string;
+  features: string[];
+  highlighted: boolean;
+}
+
 export function SettingsTab() {
   const [settings, setSettings] = useState<ExternalSupabaseSettings>({
     url: '',
@@ -50,9 +59,13 @@ export function SettingsTab() {
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
   const [showKey, setShowKey] = useState(false);
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
+  const [pricingLoading, setPricingLoading] = useState(true);
+  const [pricingSaving, setPricingSaving] = useState(false);
 
   useEffect(() => {
     fetchSettings();
+    fetchPricingPlans();
   }, []);
 
   const fetchSettings = async () => {
@@ -238,6 +251,55 @@ export function SettingsTab() {
         ? [...prev.sync_tables, tableId]
         : prev.sync_tables.filter(t => t !== tableId)
     }));
+  };
+
+  const fetchPricingPlans = async () => {
+    setPricingLoading(true);
+    try {
+      const { data } = await supabase
+        .from('platform_settings')
+        .select('value')
+        .eq('key', 'pricing_plans')
+        .maybeSingle();
+      if (data?.value && Array.isArray(data.value)) {
+        setPricingPlans(data.value as unknown as PricingPlan[]);
+      }
+    } catch (err) {
+      console.error('Error fetching pricing plans:', err);
+    } finally {
+      setPricingLoading(false);
+    }
+  };
+
+  const addPlan = () => {
+    setPricingPlans(prev => [...prev, { name: '', price: 0, period: 'месяц', features: [], highlighted: false }]);
+  };
+
+  const removePlan = (index: number) => {
+    setPricingPlans(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updatePlan = (index: number, field: string, value: any) => {
+    setPricingPlans(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
+
+  const savePricingPlans = async () => {
+    setPricingSaving(true);
+    try {
+      const { error } = await supabase
+        .from('platform_settings')
+        .upsert({
+          key: 'pricing_plans',
+          value: JSON.parse(JSON.stringify(pricingPlans)) as Json,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+      if (error) throw error;
+      toast.success('Тарифные планы сохранены');
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка сохранения');
+    } finally {
+      setPricingSaving(false);
+    }
   };
 
   if (loading) {
@@ -441,6 +503,97 @@ export function SettingsTab() {
                 </div>
               )}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pricing Plans Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Управление тарифными планами
+          </CardTitle>
+          <CardDescription>
+            Настройте тарифные планы, которые отображаются на странице /pricing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {pricingLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              {pricingPlans.map((plan, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Тариф #{index + 1}</h4>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Checkbox
+                          checked={plan.highlighted}
+                          onCheckedChange={(checked) => updatePlan(index, 'highlighted', !!checked)}
+                        />
+                        Выделить
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removePlan(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label>Название</Label>
+                      <Input
+                        value={plan.name}
+                        onChange={(e) => updatePlan(index, 'name', e.target.value)}
+                        placeholder="Базовый"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Цена (₸)</Label>
+                      <Input
+                        type="number"
+                        value={plan.price}
+                        onChange={(e) => updatePlan(index, 'price', Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Период</Label>
+                      <Input
+                        value={plan.period}
+                        onChange={(e) => updatePlan(index, 'period', e.target.value)}
+                        placeholder="месяц"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Возможности (по одной на строку)</Label>
+                    <Textarea
+                      value={plan.features.join('\n')}
+                      onChange={(e) => updatePlan(index, 'features', e.target.value.split('\n').filter(Boolean))}
+                      rows={3}
+                      placeholder="До 10 номеров&#10;Бронирования&#10;Шахматка"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button variant="outline" onClick={addPlan} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Добавить тариф
+              </Button>
+
+              <Button onClick={savePricingPlans} disabled={pricingSaving}>
+                {pricingSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Сохранить тарифы
+              </Button>
+            </>
           )}
         </CardContent>
       </Card>
