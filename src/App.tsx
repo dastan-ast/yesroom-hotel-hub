@@ -16,6 +16,7 @@ import HotelProfile from "./pages/HotelProfile";
 import Contacts from "./pages/Contacts";
 import Pricing from "./pages/Pricing";
 import Help from "./pages/Help";
+import AccountSettings from "./pages/AccountSettings";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/help" element={<Help />} />
+              <Route path="/account" element={<AccountSettings />} />
               <Route path="/invite/:token" element={<AcceptInvite />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

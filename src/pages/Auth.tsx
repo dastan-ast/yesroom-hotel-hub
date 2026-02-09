@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Hotel, User, Building2, Mail } from 'lucide-react';
+import { Hotel, User, Building2, Mail, Lock } from 'lucide-react';
 import { lovable } from '@/integrations/lovable/index';
 
 const loginSchema = z.object({
@@ -33,8 +34,17 @@ const signupSchema = loginSchema.extend({
   userType: z.enum(['guest', 'owner']),
 });
 
+const newPasswordSchema = z.object({
+  password: z.string().min(6, 'Пароль должен быть не менее 6 символов'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Пароли не совпадают',
+  path: ['confirmPassword'],
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
+type NewPasswordFormData = z.infer<typeof newPasswordSchema>;
 
 export default function Auth() {
   const { t } = useTranslation();
@@ -44,6 +54,8 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState<string | null>(null);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
+  const [isNewPasswordLoading, setIsNewPasswordLoading] = useState(false);
 
   const handleToggleMode = () => {
     loginForm.reset();
@@ -52,6 +64,16 @@ export default function Auth() {
   };
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveryMode(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isRecoveryMode) return; // don't redirect during password recovery
     if (user && !loading && !roleLoading && role !== null) {
       if (isSuperAdmin) {
         navigate('/super-admin', { replace: true });
@@ -63,7 +85,7 @@ export default function Auth() {
         navigate('/', { replace: true });
       }
     }
-  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate]);
+  }, [user, loading, roleLoading, isAdmin, isSuperAdmin, hotelId, role, navigate, isRecoveryMode]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -74,6 +96,29 @@ export default function Auth() {
     resolver: zodResolver(signupSchema),
     defaultValues: { email: '', password: '', fullName: '', userType: 'guest' },
   });
+
+  const newPasswordForm = useForm<NewPasswordFormData>({
+    resolver: zodResolver(newPasswordSchema),
+    defaultValues: { password: '', confirmPassword: '' },
+  });
+
+  const handleNewPassword = async (data: NewPasswordFormData) => {
+    setIsNewPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: data.password });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Пароль успешно изменён');
+        setIsRecoveryMode(false);
+        navigate('/', { replace: true });
+      }
+    } catch {
+      toast.error('Произошла ошибка');
+    } finally {
+      setIsNewPasswordLoading(false);
+    }
+  };
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -120,6 +165,60 @@ export default function Auth() {
       setIsGoogleLoading(false);
     }
   };
+
+  if (isRecoveryMode) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12 flex items-center justify-center">
+          <Card className="w-full max-w-md animate-scale-in">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4">
+                <Lock className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <CardTitle className="font-display text-2xl">Новый пароль</CardTitle>
+              <CardDescription>Введите новый пароль для вашего аккаунта</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...newPasswordForm}>
+                <form onSubmit={newPasswordForm.handleSubmit(handleNewPassword)} className="space-y-4">
+                  <FormField
+                    control={newPasswordForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Новый пароль</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" autoFocus {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newPasswordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Подтвердите пароль</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={isNewPasswordLoading}>
+                    {isNewPasswordLoading ? 'Сохранение...' : 'Сохранить пароль'}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   if (emailSent) {
     return (

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { Button } from '@/components/ui/button';
-import { LogOut, LayoutDashboard, Menu, X, Shield } from 'lucide-react';
+import { LogOut, LayoutDashboard, Menu, X, Shield, Settings } from 'lucide-react';
 import { useState } from 'react';
 import logo from '@/assets/logo.png';
 
@@ -67,6 +67,12 @@ export function Navbar() {
                     </Link>
                   </Button>
                 )}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/account">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Настройки
+                  </Link>
+                </Button>
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4 mr-2" />
                   {t('nav.logout')}
@@ -125,10 +131,18 @@ export function Navbar() {
               <div className="flex items-center gap-3 pt-4 border-t">
                 <LanguageSwitcher />
                 {user ? (
-                  <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {t('nav.logout')}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to="/account" onClick={() => setMobileMenuOpen(false)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Настройки
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      {t('nav.logout')}
+                    </Button>
+                  </div>
                 ) : (
                   <Button variant="default" size="sm" asChild>
                     <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>
