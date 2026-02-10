@@ -26,6 +26,7 @@ interface Booking {
   check_out_date: string;
   status: BookingStatus;
   guest_name: string;
+  is_half_day?: boolean;
 }
 
 interface BookingRoomEntry {
@@ -42,12 +43,12 @@ const statusColors: Record<BookingStatus, string> = {
   cancelled: 'bg-destructive/40',
 };
 
-const statusOpacity: Record<BookingStatus, string> = {
-  pending: '',
-  approved: '',
-  checked_in: '',
-  checked_out: 'opacity-50',
-  cancelled: 'opacity-40',
+const statusBgHex: Record<BookingStatus, string> = {
+  pending: '#eab308cc',
+  approved: '#3b82f6cc',
+  checked_in: '#22c55ecc',
+  checked_out: '#6b728080',
+  cancelled: '#ef444466',
 };
 
 interface Props {
@@ -68,16 +69,13 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   }, [startDate]);
 
   useEffect(() => {
-    if (hotelId) {
-      fetchData();
-    }
+    if (hotelId) fetchData();
   }, [hotelId, startDate]);
 
   const fetchData = async () => {
     setLoading(true);
-    
     const endDate = addDays(startDate, 7);
-    
+
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
         .from('rooms')
@@ -87,97 +85,157 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         .order('room_number', { ascending: true }),
       supabase
         .from('bookings')
-        .select('id, room_id, check_in_date, check_out_date, status, guest_name')
+        .select('id, room_id, check_in_date, check_out_date, status, guest_name, is_half_day')
         .eq('hotel_id', hotelId)
         .gte('check_out_date', format(startDate, 'yyyy-MM-dd'))
         .lte('check_in_date', format(endDate, 'yyyy-MM-dd')),
       supabase
         .from('booking_rooms')
-        .select('booking_id, room_id, bookings(id, room_id, check_in_date, check_out_date, status, guest_name)')
+        .select('booking_id, room_id, bookings(id, room_id, check_in_date, check_out_date, status, guest_name, is_half_day)')
         .eq('hotel_id', hotelId),
     ]);
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
-    
-    // Process bookings
+
     const allBookings: Booking[] = [];
     const roomToBookingsMap = new Map<string, Set<string>>();
-    
-    // Add bookings with direct room_id
+
     if (bookingsRes.data) {
       bookingsRes.data.forEach((b: any) => {
         allBookings.push(b);
         if (b.room_id) {
-          if (!roomToBookingsMap.has(b.room_id)) {
-            roomToBookingsMap.set(b.room_id, new Set());
-          }
+          if (!roomToBookingsMap.has(b.room_id)) roomToBookingsMap.set(b.room_id, new Set());
           roomToBookingsMap.get(b.room_id)!.add(b.id);
         }
       });
     }
-    
-    // Add rooms from booking_rooms table
+
     if (bookingRoomsRes.data) {
       (bookingRoomsRes.data as BookingRoomEntry[]).forEach((br) => {
         if (br.bookings) {
-          // Check if booking is within date range
           const bookingCheckIn = parseISO(br.bookings.check_in_date);
           const bookingCheckOut = parseISO(br.bookings.check_out_date);
-          const rangeStart = startDate;
-          const rangeEnd = endDate;
-          
-          if (bookingCheckIn < rangeEnd && bookingCheckOut > rangeStart) {
-            // Add booking if not already present
-            if (!allBookings.find(b => b.id === br.bookings!.id)) {
-              allBookings.push(br.bookings);
-            }
-            
-            // Map room to booking
-            if (!roomToBookingsMap.has(br.room_id)) {
-              roomToBookingsMap.set(br.room_id, new Set());
-            }
+          if (bookingCheckIn < endDate && bookingCheckOut > startDate) {
+            if (!allBookings.find(b => b.id === br.bookings!.id)) allBookings.push(br.bookings);
+            if (!roomToBookingsMap.has(br.room_id)) roomToBookingsMap.set(br.room_id, new Set());
             roomToBookingsMap.get(br.room_id)!.add(br.booking_id);
           }
         }
       });
     }
-    
+
     setBookings(allBookings);
     setBookingRoomMap(roomToBookingsMap);
     setLoading(false);
   };
 
+  // Get booking for a specific cell (room + date)
   const getBookingForCell = (roomId: string, date: Date): Booking | null => {
-    // Check if room has any bookings
     const bookingIds = bookingRoomMap.get(roomId);
-    if (!bookingIds || bookingIds.size === 0) {
-      // Fallback to direct room_id check for backward compatibility
-      const booking = bookings.find(b => {
-        if (b.room_id !== roomId) return false;
-        // Apply active filter
-        if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(b.status)) return false;
-        const checkIn = parseISO(b.check_in_date);
-        const checkOut = parseISO(b.check_out_date);
-        return isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) });
-      });
-      return booking || null;
+    const candidates = bookingIds && bookingIds.size > 0
+      ? Array.from(bookingIds).map(id => bookings.find(b => b.id === id)).filter(Boolean) as Booking[]
+      : bookings.filter(b => b.room_id === roomId);
+
+    for (const booking of candidates) {
+      if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(booking.status)) continue;
+      const checkIn = parseISO(booking.check_in_date);
+      const checkOut = parseISO(booking.check_out_date);
+      
+      // For half-day bookings, only check-in day matters
+      if (booking.is_half_day) {
+        if (isSameDay(date, checkIn)) return booking;
+        continue;
+      }
+      
+      if (isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) })) return booking;
     }
-    
-    // Find booking that covers this date
-    for (const bookingId of bookingIds) {
-      const booking = bookings.find(b => b.id === bookingId);
-      if (booking) {
-        // Apply active filter
-        if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(booking.status)) continue;
-        const checkIn = parseISO(booking.check_in_date);
-        const checkOut = parseISO(booking.check_out_date);
-        if (isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) })) {
-          return booking;
+    return null;
+  };
+
+  // Determine cell halves: which booking occupies left half (before 12:00) and right half (after 12:00)
+  const getCellBookings = (roomId: string, date: Date): { left: Booking | null; right: Booking | null } => {
+    const bookingIds = bookingRoomMap.get(roomId);
+    const candidates = bookingIds && bookingIds.size > 0
+      ? Array.from(bookingIds).map(id => bookings.find(b => b.id === id)).filter(Boolean) as Booking[]
+      : bookings.filter(b => b.room_id === roomId);
+
+    let leftBooking: Booking | null = null;
+    let rightBooking: Booking | null = null;
+
+    for (const booking of candidates) {
+      if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(booking.status)) continue;
+      const checkIn = parseISO(booking.check_in_date);
+      const checkOut = parseISO(booking.check_out_date);
+
+      if (booking.is_half_day) {
+        // Half-day: only right half on check-in day
+        if (isSameDay(date, checkIn)) rightBooking = booking;
+        continue;
+      }
+
+      const isCheckInDay = isSameDay(date, checkIn);
+      const isCheckOutDay = isSameDay(date, checkOut);
+      const isBetween = date > checkIn && date < checkOut;
+
+      if (isCheckOutDay) {
+        // Check-out day: left half (before 12:00)
+        leftBooking = booking;
+      }
+      if (isCheckInDay) {
+        // Check-in day: right half (after 12:00)
+        rightBooking = booking;
+      }
+      if (isBetween) {
+        // Middle days: both halves
+        leftBooking = booking;
+        rightBooking = booking;
+      }
+    }
+
+    return { left: leftBooking, right: rightBooking };
+  };
+
+  // Calculate booking span for guest name positioning
+  const getBookingSpan = (booking: Booking, roomId: string): { startIdx: number; span: number } | null => {
+    const checkIn = parseISO(booking.check_in_date);
+    const checkOut = parseISO(booking.check_out_date);
+
+    let startIdx = -1;
+    let endIdx = -1;
+
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i];
+      if (booking.is_half_day) {
+        if (isSameDay(day, checkIn)) { startIdx = i; endIdx = i; break; }
+      } else {
+        // Check-in day or between
+        if (isSameDay(day, checkIn) || (day > checkIn && day < checkOut)) {
+          if (startIdx === -1) startIdx = i;
+          endIdx = i;
         }
       }
     }
-    
-    return null;
+
+    if (startIdx === -1) return null;
+    return { startIdx, span: endIdx - startIdx + 1 };
+  };
+
+  // Determine which bookings should show guest name in this row
+  const getRowBookingSpans = (roomId: string): { booking: Booking; startIdx: number; span: number }[] => {
+    const seen = new Set<string>();
+    const result: { booking: Booking; startIdx: number; span: number }[] = [];
+
+    for (let i = 0; i < days.length; i++) {
+      const { left, right } = getCellBookings(roomId, days[i]);
+      for (const b of [left, right]) {
+        if (b && !seen.has(b.id)) {
+          seen.add(b.id);
+          const spanInfo = getBookingSpan(b, roomId);
+          if (spanInfo) result.push({ booking: b, ...spanInfo });
+        }
+      }
+    }
+    return result;
   };
 
   const handlePrev = () => setStartDate(prev => addDays(prev, -7));
@@ -194,50 +252,31 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         <h2 className="text-xl font-semibold">Шахматка</h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Switch
-              id="show-active-only"
-              checked={showOnlyActive}
-              onCheckedChange={setShowOnlyActive}
-            />
+            <Switch id="show-active-only" checked={showOnlyActive} onCheckedChange={setShowOnlyActive} />
             <Label htmlFor="show-active-only" className="text-sm text-muted-foreground cursor-pointer">
               Только активные
             </Label>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrev}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleToday}>
-              Сегодня
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Button variant="outline" size="sm" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="sm" onClick={handleToday}>Сегодня</Button>
+            <Button variant="outline" size="sm" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs">
+        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-yellow-400/80" /><span>{t('admin.pending')}</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-blue-400/80" /><span>{t('admin.approved')}</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-green-500/80" /><span>{t('admin.checkedIn')}</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" /><span>{t('admin.checkedOut')}</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-destructive/40 opacity-40" /><span>{t('admin.cancelled')}</span></div>
         <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-yellow-400/80" />
-          <span>{t('admin.pending')}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-blue-400/80" />
-          <span>{t('admin.approved')}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-green-500/80" />
-          <span>{t('admin.checkedIn')}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" />
-          <span>{t('admin.checkedOut')}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded bg-destructive/40 opacity-40" />
-          <span>{t('admin.cancelled')}</span>
+          <div className="w-4 h-4 rounded border border-dashed border-muted-foreground/50 flex">
+            <div className="w-1/2" /><div className="w-1/2 bg-green-500/50 rounded-r" />
+          </div>
+          <span>Полсуток</span>
         </div>
       </div>
 
@@ -253,7 +292,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                 <th
                   key={day.toISOString()}
                   className={cn(
-                    'border-r p-1.5 text-center text-xs font-medium min-w-[60px]',
+                    'border-r p-1.5 text-center text-xs font-medium min-w-[90px]',
                     isSameDay(day, new Date()) && 'bg-primary/10'
                   )}
                 >
@@ -266,46 +305,86 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                  Нет номеров
-                </td>
+                <td colSpan={8} className="p-8 text-center text-muted-foreground">Нет номеров</td>
               </tr>
             ) : (
-              rooms.map(room => (
-                <tr key={room.id} className="border-t hover:bg-muted/20">
-                  <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
-                    <div>{room.room_number}</div>
-                    <div className="text-xs text-muted-foreground">{room.room_types?.name}</div>
-                  </td>
-                  {days.map(day => {
-                    const booking = getBookingForCell(room.id, day);
-                    return (
-                      <td
-                        key={day.toISOString()}
-                        className={cn(
-                          'border-r p-0.5 text-center',
-                          isSameDay(day, new Date()) && 'bg-primary/5'
-                        )}
-                      >
-                        {booking && (
-                          <div
-                            className={cn(
-                              'h-8 rounded text-xs flex items-center justify-center text-white font-medium truncate px-1',
-                              statusColors[booking.status],
-                              statusOpacity[booking.status]
-                            )}
-                            title={`${booking.guest_name} (${booking.status})`}
-                          >
-                            {isSameDay(parseISO(booking.check_in_date), day) 
-                              ? booking.guest_name.split(' ')[0] 
-                              : ''}
+              rooms.map(room => {
+                const spans = getRowBookingSpans(room.id);
+                return (
+                  <tr key={room.id} className="border-t hover:bg-muted/20 relative">
+                    <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
+                      <div>{room.room_number}</div>
+                      <div className="text-xs text-muted-foreground">{room.room_types?.name}</div>
+                    </td>
+                    {days.map((day, dayIdx) => {
+                      const { left, right } = getCellBookings(room.id, day);
+                      const hasContent = left || right;
+                      const sameBoth = left && right && left.id === right.id;
+
+                      return (
+                        <td
+                          key={day.toISOString()}
+                          className={cn(
+                            'border-r p-0 text-center relative',
+                            isSameDay(day, new Date()) && 'bg-primary/5'
+                          )}
+                          style={{ height: '40px' }}
+                        >
+                          <div className="flex h-full w-full">
+                            {/* Left half (before 12:00) */}
+                            <div
+                              className="w-1/2 h-full"
+                              style={{ backgroundColor: left ? statusBgHex[left.status] : 'transparent' }}
+                              title={left ? `${left.guest_name} (${left.status})` : undefined}
+                            />
+                            {/* Right half (after 12:00) */}
+                            <div
+                              className="w-1/2 h-full"
+                              style={{ backgroundColor: right ? statusBgHex[right.status] : 'transparent' }}
+                              title={right ? `${right.guest_name} (${right.status})` : undefined}
+                            />
                           </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
+                        </td>
+                      );
+                    })}
+                    {/* Overlay guest names */}
+                    {spans.map(({ booking, startIdx, span }) => {
+                      const isHalfDay = booking.is_half_day;
+                      // Calculate left offset: room column (112px) + startIdx * cellWidth
+                      // Each cell is ~90px min, use percentage based approach
+                      const cellWidthPercent = 100 / 7;
+                      const leftPercent = startIdx * cellWidthPercent;
+                      const widthPercent = span * cellWidthPercent;
+
+                      return (
+                        <td
+                          key={booking.id}
+                          className="absolute top-0 pointer-events-none"
+                          style={{
+                            left: `calc(112px + ${leftPercent}% * (100% - 112px) / 100)`,
+                            width: 0,
+                            height: 0,
+                            padding: 0,
+                            border: 'none',
+                          }}
+                        >
+                          <div
+                            className="absolute top-1/2 -translate-y-1/2 text-white text-[10px] font-medium truncate text-center pointer-events-none z-[5]"
+                            style={{
+                              left: isHalfDay ? '50%' : '0',
+                              width: isHalfDay 
+                                ? `calc((100vw - 112px) / 7 * 0.5)` 
+                                : `calc((100vw - 112px) / 7 * ${span})`,
+                            }}
+                          >
+                            {booking.guest_name.split(' ').slice(0, 2).join(' ')}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

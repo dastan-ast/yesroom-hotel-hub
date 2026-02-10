@@ -152,6 +152,7 @@ export type Database = {
           guest_phone: string
           hotel_id: string | null
           id: string
+          is_half_day: boolean
           prepayment_amount: number | null
           prepayment_received: boolean
           room_id: string | null
@@ -177,6 +178,7 @@ export type Database = {
           guest_phone: string
           hotel_id?: string | null
           id?: string
+          is_half_day?: boolean
           prepayment_amount?: number | null
           prepayment_received?: boolean
           room_id?: string | null
@@ -202,6 +204,7 @@ export type Database = {
           guest_phone?: string
           hotel_id?: string | null
           id?: string
+          is_half_day?: boolean
           prepayment_amount?: number | null
           prepayment_received?: boolean
           room_id?: string | null

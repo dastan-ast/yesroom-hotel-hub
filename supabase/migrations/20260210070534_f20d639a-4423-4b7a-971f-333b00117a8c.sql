@@ -1,0 +1,1 @@
+ALTER TABLE public.bookings ADD COLUMN is_half_day boolean NOT NULL DEFAULT false;

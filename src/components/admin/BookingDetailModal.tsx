@@ -88,7 +88,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
       .select(`
         id, guest_name, guest_phone, check_in_date, check_out_date,
         status, source, prepayment_amount, prepayment_received, daily_rate,
-        guest_count, guest_comment, room_id, room_type_id,
+        guest_count, guest_comment, room_id, room_type_id, is_half_day,
         rooms(room_number),
         room_types(name, price_per_night)
       `)
@@ -159,6 +159,9 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
             <Badge className={statusColors[booking.status]} variant="outline">
               {statusLabels[booking.status]}
             </Badge>
+            {(booking as any).is_half_day && (
+              <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -195,17 +198,24 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Заезд</Label>
+                <Label className="text-muted-foreground text-xs">Заезд (с 12:00)</Label>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span>{format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru })}</span>
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Выезд</Label>
+                <Label className="text-muted-foreground text-xs">
+                  {(booking as any).is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
+                </Label>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>{format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })}</span>
+                  <span>
+                    {(booking as any).is_half_day 
+                      ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
+                      : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
+                    }
+                  </span>
                 </div>
               </div>
             </div>
