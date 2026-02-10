@@ -311,15 +311,16 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               rooms.map(room => {
                 const spans = getRowBookingSpans(room.id);
                 return (
-                  <tr key={room.id} className="border-t hover:bg-muted/20 relative">
+                  <tr key={room.id} className="border-t hover:bg-muted/20">
                     <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
                       <div>{room.room_number}</div>
                       <div className="text-xs text-muted-foreground">{room.room_types?.name}</div>
                     </td>
                     {days.map((day, dayIdx) => {
                       const { left, right } = getCellBookings(room.id, day);
-                      const hasContent = left || right;
-                      const sameBoth = left && right && left.id === right.id;
+
+                      // Find if this cell is the START of a booking span to render guest name
+                      const spanForCell = spans.find(s => s.startIdx === dayIdx);
 
                       return (
                         <td
@@ -344,41 +345,31 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                               title={right ? `${right.guest_name} (${right.status})` : undefined}
                             />
                           </div>
-                        </td>
-                      );
-                    })}
-                    {/* Overlay guest names */}
-                    {spans.map(({ booking, startIdx, span }) => {
-                      const isHalfDay = booking.is_half_day;
-                      // Calculate left offset: room column (112px) + startIdx * cellWidth
-                      // Each cell is ~90px min, use percentage based approach
-                      const cellWidthPercent = 100 / 7;
-                      const leftPercent = startIdx * cellWidthPercent;
-                      const widthPercent = span * cellWidthPercent;
-
-                      return (
-                        <td
-                          key={booking.id}
-                          className="absolute top-0 pointer-events-none"
-                          style={{
-                            left: `calc(112px + ${leftPercent}% * (100% - 112px) / 100)`,
-                            width: 0,
-                            height: 0,
-                            padding: 0,
-                            border: 'none',
-                          }}
-                        >
-                          <div
-                            className="absolute top-1/2 -translate-y-1/2 text-white text-[10px] font-medium truncate text-center pointer-events-none z-[5]"
-                            style={{
-                              left: isHalfDay ? '50%' : '0',
-                              width: isHalfDay 
-                                ? `calc((100vw - 112px) / 7 * 0.5)` 
-                                : `calc((100vw - 112px) / 7 * ${span})`,
-                            }}
-                          >
-                            {booking.guest_name.split(' ').slice(0, 2).join(' ')}
-                          </div>
+                          {/* Guest name overlay - rendered inside the first cell of the booking */}
+                          {spanForCell && (() => {
+                            const { booking, span } = spanForCell;
+                            const isHalfDay = booking.is_half_day;
+                            // Width: spans across multiple cells using calc
+                            // For half-day: only right half of this cell (50%)
+                            // For regular: from right half of check-in cell across all middle cells to left half of check-out cell
+                            const widthCalc = isHalfDay
+                              ? '50%'
+                              : span === 1
+                                ? '50%' // single day: only right half (check-in afternoon)
+                                : `calc(50% + ${(span - 1) * 100}% - 50%)`; // right half of first + (span-2) full + left half of last
+                            return (
+                              <div
+                                className="absolute top-0 left-1/2 h-full flex items-center pointer-events-none z-[5]"
+                                style={{
+                                  width: widthCalc,
+                                }}
+                              >
+                                <span className="w-full text-white text-[10px] font-medium truncate text-center drop-shadow-sm">
+                                  {booking.guest_name.split(' ').slice(0, 2).join(' ')}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
                       );
                     })}

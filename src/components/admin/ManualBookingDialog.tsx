@@ -90,6 +90,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   });
 
   const watchIsHalfDay = form.watch('is_half_day');
+  const [halfDayCheckInHour, setHalfDayCheckInHour] = useState(12);
 
   const watchPrepayment = form.watch('prepayment_received');
   const watchCheckIn = form.watch('check_in_date');
@@ -127,6 +128,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
         is_half_day: false,
       });
       phoneMask.setValue('');
+      setHalfDayCheckInHour(12);
       setSelectedRooms([]);
       setAvailableRooms([]);
       setRoomsOpen(false);
@@ -268,7 +270,10 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       guest_count: data.guest_count || 1,
       status: status,
       hotel_id: hotelId,
-      additional_info: hasRoomsSelected ? { total_rooms: selectedRooms.length } : {},
+      additional_info: {
+        ...(hasRoomsSelected ? { total_rooms: selectedRooms.length } : {}),
+        ...(data.is_half_day ? { half_day_check_in_hour: halfDayCheckInHour } : {}),
+      },
       is_half_day: data.is_half_day,
     } as any).select('id').single();
 
@@ -456,9 +461,29 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
               )}
 
               {watchIsHalfDay && (
-                <div className="flex flex-col justify-center">
-                  <Label className="text-sm text-muted-foreground">Выезд</Label>
-                  <p className="text-sm font-medium">В тот же день (до 00:00)</p>
+                <div className="flex flex-col justify-center space-y-2">
+                  <div>
+                    <Label className="text-sm font-medium">Время заселения</Label>
+                    <Select value={String(halfDayCheckInHour)} onValueChange={(v) => setHalfDayCheckInHour(Number(v))}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <SelectItem key={i} value={String(i)}>
+                            {String(i).padStart(2, '0')}:00
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Выезд</Label>
+                    <p className="text-sm font-medium">
+                      {String((halfDayCheckInHour + 12) % 24).padStart(2, '0')}:00
+                      {halfDayCheckInHour >= 12 ? ' (след. день)' : ''}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
