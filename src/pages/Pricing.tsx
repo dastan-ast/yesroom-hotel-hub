@@ -155,6 +155,22 @@ export default function Pricing() {
             </div>
           </div>
 
+          {/* Presentation CTA */}
+          <Card className="mb-12 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardContent className="pt-6 text-center space-y-4">
+              <h2 className="text-2xl font-display font-bold">Узнайте больше о YesRoom</h2>
+              <p className="text-muted-foreground max-w-lg mx-auto">
+                Посмотрите презентацию платформы — возможности, надёжность и как начать работу
+              </p>
+              <Button size="lg" asChild>
+                <Link to="/presentation">
+                  Смотреть презентацию
+                  <ArrowRight className="h-5 w-5 ml-2" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Остались вопросы?</p>
             <Button variant="outline" asChild>

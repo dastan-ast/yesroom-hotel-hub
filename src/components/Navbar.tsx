@@ -39,9 +39,6 @@ export function Navbar() {
             <Link to="/contacts" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Контакты
             </Link>
-            <Link to="/presentation" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Презентация
-            </Link>
             {isAdmin && (
               <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 {t('nav.dashboard')}
@@ -121,13 +118,6 @@ export function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Контакты
-              </Link>
-              <Link 
-                to="/presentation" 
-                className="text-sm font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Презентация
               </Link>
               {isAdmin && (
                 <Link 
