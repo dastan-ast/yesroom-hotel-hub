@@ -19,6 +19,7 @@ import Help from "./pages/Help";
 import AccountSettings from "./pages/AccountSettings";
 import NotFound from "./pages/NotFound";
 import AcceptInvite from "./pages/AcceptInvite";
+import Presentation from "./pages/Presentation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/help" element={<Help />} />
               <Route path="/account" element={<AccountSettings />} />
               <Route path="/invite/:token" element={<AcceptInvite />} />
+              <Route path="/presentation" element={<Presentation />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
