@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { logAdminAction } from '@/lib/activityLog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -68,7 +69,7 @@ const statusPriority: Record<BookingStatus, number> = {
 
 export function BookingsTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
-  const { isOwner } = useAuth();
+  const { isOwner, user, profile } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -147,6 +148,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     }
 
     toast.success(t('common.success'));
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: booking.id, details: { guest_name: booking.guest_name } });
     fetchBookings();
   };
 
@@ -174,6 +176,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     }
 
     toast.success('Бронирование подтверждено (без номера)');
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_approved', entityType: 'booking', entityId: bookingId, details: {} });
     fetchBookings();
   };
 
@@ -220,6 +223,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     }
 
     toast.success('Бронирование отменено');
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_cancelled', entityType: 'booking', entityId: bookingToCancel.id, details: { guest_name: bookingToCancel.guest_name, reason: cancelReason || null } });
     setCancelDialogOpen(false);
     setBookingToCancel(null);
     setCancelReason('');
@@ -258,6 +262,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     }
 
     toast.success('Заселение отменено');
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_undo_checkin', entityType: 'booking', entityId: bookingToUndoCheckIn.id, details: { guest_name: bookingToUndoCheckIn.guest_name } });
     setUndoCheckInDialogOpen(false);
     setBookingToUndoCheckIn(null);
     fetchBookings();
@@ -308,6 +313,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     }
 
     toast.success('Бронирование удалено');
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_deleted', entityType: 'booking', entityId: bookingToDelete.id, details: { guest_name: bookingToDelete.guest_name } });
     setDeleteDialogOpen(false);
     setBookingToDelete(null);
     fetchBookings();
