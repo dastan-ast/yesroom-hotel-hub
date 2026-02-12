@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { logAdminAction } from '@/lib/activityLog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,6 +22,7 @@ interface Client {
 
 export function ClientsTab({ hotelId }: { hotelId?: string }) {
   const { t } = useTranslation();
+  const { user, profile } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,19 +78,21 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
         toast.error(t('common.error'));
         return;
       }
+      logAdminAction({ hotelId: hotelId!, userId: user!.id, userName: profile?.full_name || '', action: 'client_updated', entityType: 'client', entityId: selectedClient.id, details: { client_name: data.full_name || selectedClient.full_name } });
     } else {
-      const { error } = await supabase.from('clients').insert([{
+      const { data: inserted, error } = await supabase.from('clients').insert([{
         full_name: data.full_name!,
         phone: data.phone!,
         email: data.email,
         document_number: data.document_number,
         notes: data.notes,
         hotel_id: hotelId
-      }]);
+      }]).select('id').single();
       if (error) {
         toast.error(t('common.error'));
         return;
       }
+      logAdminAction({ hotelId: hotelId!, userId: user!.id, userName: profile?.full_name || '', action: 'client_created', entityType: 'client', entityId: inserted?.id, details: { client_name: data.full_name } });
     }
     toast.success(t('common.success'));
     setDialogOpen(false);

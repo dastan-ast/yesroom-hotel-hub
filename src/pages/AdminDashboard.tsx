@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard, ScrollText } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -24,6 +24,7 @@ import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
 import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
+import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -59,6 +60,7 @@ export default function AdminDashboard() {
     { id: 'settings', icon: Settings, label: 'Настройки отеля', permission: 'settings' },
     { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
     { id: 'subscription', icon: CreditCard, label: 'Подписка', permission: null, ownerOnly: true },
+    { id: 'activity-log', icon: ScrollText, label: 'Журнал действий', permission: null, ownerOnly: true },
     { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
   ];
 
@@ -405,6 +407,14 @@ export default function AdminDashboard() {
 
                 {activeTab === 'subscription' && (
                   <SubscriptionTab hotelId={hotelId} />
+                )}
+
+                {activeTab === 'activity-log' && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <ActivityLogTab hotelId={hotelId} />
+                    </CardContent>
+                  </Card>
                 )}
 
                 {activeTab === 'help' && (

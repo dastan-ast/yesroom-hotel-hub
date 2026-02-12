@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { logAdminAction } from '@/lib/activityLog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -65,6 +67,7 @@ interface Props {
 
 export function ServiceLogTab({ hotelId }: Props) {
   const { t } = useTranslation();
+  const { user, profile } = useAuth();
   const [services, setServices] = useState<BookingService[]>([]);
   const [activeBookings, setActiveBookings] = useState<ActiveBooking[]>([]);
   const [catalogServices, setCatalogServices] = useState<CatalogService[]>([]);
@@ -154,6 +157,7 @@ export function ServiceLogTab({ hotelId }: Props) {
       toast.error(t('common.error'));
     } else {
       toast.success('Услуга добавлена');
+      logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'service_added', entityType: 'service', entityId: selectedBooking, details: { service_name: customName.trim(), amount: unitPrice * qty } });
       setDialogOpen(false);
       resetForm();
       fetchData();
@@ -170,11 +174,13 @@ export function ServiceLogTab({ hotelId }: Props) {
   };
 
   const handleDeleteService = async (id: string) => {
+    const svc = services.find(s => s.id === id);
     const { error } = await supabase.from('booking_services').delete().eq('id', id);
     if (error) {
       toast.error(t('common.error'));
     } else {
       toast.success('Услуга удалена');
+      logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'service_removed', entityType: 'service', entityId: id, details: { service_name: svc?.service_name } });
       fetchData();
     }
   };

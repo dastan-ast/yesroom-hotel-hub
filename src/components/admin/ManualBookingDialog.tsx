@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,8 @@ import { format, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
 import { syncBookingToExternal } from '@/lib/syncBooking';
+import { useAuth } from '@/contexts/AuthContext';
+import { logAdminAction } from '@/lib/activityLog';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CalendarIcon, ChevronDown, BedDouble } from 'lucide-react';
+import { CalendarIcon, ChevronDown, BedDouble, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +67,7 @@ interface Props {
 
 export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: Props) {
   const { t } = useTranslation();
+  const { user, profile } = useAuth();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
@@ -72,6 +75,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loading, setLoading] = useState(false);
   const phoneMask = usePhoneMask();
+
+  // Client search state
+  const [clientSuggestions, setClientSuggestions] = useState<{ id: string; full_name: string; phone: string }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const prevOpenRef = useRef<boolean>(false);
 
@@ -132,6 +141,8 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       setSelectedRooms([]);
       setAvailableRooms([]);
       setRoomsOpen(false);
+      setClientSuggestions([]);
+      setShowSuggestions(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hotelId]);
@@ -151,6 +162,36 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       .select('id, name, price_per_night')
       .eq('hotel_id', hotelId);
     if (data) setRoomTypes(data);
+  };
+
+  // Client search
+  const searchClients = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setClientSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const { data } = await supabase
+      .from('clients')
+      .select('id, full_name, phone')
+      .eq('hotel_id', hotelId)
+      .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
+      .limit(5);
+    setClientSuggestions(data || []);
+    setShowSuggestions((data || []).length > 0);
+  }, [hotelId]);
+
+  const handleGuestNameChange = (value: string, onChange: (v: string) => void) => {
+    onChange(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => searchClients(value), 300);
+  };
+
+  const selectClient = (client: { full_name: string; phone: string }) => {
+    form.setValue('guest_name', client.full_name);
+    phoneMask.setValue(client.phone);
+    setShowSuggestions(false);
+    setClientSuggestions([]);
   };
 
   const fetchAvailableRooms = async () => {
@@ -311,6 +352,8 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
     // Sync to external (async)
     syncBookingToExternal(booking.id).catch(console.error);
 
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_created', entityType: 'booking', entityId: booking.id, details: { guest_name: data.guest_name, phone: phoneMask.value } });
+
     toast.success(t('common.success'));
     onOpenChange(false);
     onSuccess();
@@ -331,11 +374,36 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
               control={form.control}
               name="guest_name"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="relative">
                   <FormLabel>{t('booking.guestName')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Иванов Иван Иванович" {...field} />
+                    <Input
+                      placeholder="Иванов Иван Иванович"
+                      {...field}
+                      onChange={(e) => handleGuestNameChange(e.target.value, field.onChange)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                      autoComplete="off"
+                    />
                   </FormControl>
+                  {showSuggestions && clientSuggestions.length > 0 && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-md max-h-[180px] overflow-y-auto"
+                    >
+                      {clientSuggestions.map(client => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2 text-sm"
+                          onMouseDown={() => selectClient(client)}
+                        >
+                          <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{client.full_name}</span>
+                          <span className="text-muted-foreground ml-auto">{client.phone}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
