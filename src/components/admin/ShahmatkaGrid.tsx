@@ -256,16 +256,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                 rooms.map(room => (
                   <tr key={room.id} className="border-t hover:bg-muted/20">
                     <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="cursor-default">{room.room_number}</div>
-                        </TooltipTrigger>
-                        {room.room_types?.name && (
-                          <TooltipContent side="right">
-                            <p>{room.room_types.name}</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
+                      {room.room_number}
                     </td>
                     {days.map((day) => {
                       const { left, right } = getCellBookings(room.id, day);
