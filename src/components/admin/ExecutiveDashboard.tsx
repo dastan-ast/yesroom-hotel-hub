@@ -1,8 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, startOfMonth, endOfMonth, addDays, subDays, isSameDay, parseISO, differenceInDays, startOfDay, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addDays, subDays, isSameDay, parseISO, differenceInDays, startOfDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -74,6 +80,76 @@ export function ExecutiveDashboard({ hotelId }: Props) {
   const [piePeriod, setPiePeriod] = useState<string>('7days');
   const [pieData, setPieData] = useState<RoomStatusDistribution[]>([]);
   const [pieLoading, setPieLoading] = useState(false);
+
+  // Occupancy report state
+  const [reportStart, setReportStart] = useState<Date>(startOfMonth(new Date()));
+  const [reportEnd, setReportEnd] = useState<Date>(new Date());
+  const [reportData, setReportData] = useState<{ room_number: string; type: string; daysOccupied: number; daysFree: number; percent: number }[]>([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportTotalPercent, setReportTotalPercent] = useState(0);
+
+  // Fetch occupancy report
+  const fetchReport = async () => {
+    setReportLoading(true);
+    const startStr = format(reportStart, 'yyyy-MM-dd');
+    const endStr = format(addDays(reportEnd, 1), 'yyyy-MM-dd');
+    const totalDays = differenceInDays(reportEnd, reportStart) + 1;
+
+    const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
+      supabase.from('rooms').select('id, room_number, room_types(name)').eq('hotel_id', hotelId).order('room_number'),
+      supabase.from('bookings').select('id, room_id, check_in_date, check_out_date, status')
+        .eq('hotel_id', hotelId).in('status', ['approved', 'checked_in', 'checked_out'])
+        .lt('check_in_date', endStr).gt('check_out_date', startStr),
+      supabase.from('booking_rooms').select('room_id, bookings!inner(check_in_date, check_out_date, status)')
+        .eq('hotel_id', hotelId),
+    ]);
+
+    const rooms = roomsRes.data || [];
+    const allBookings = bookingsRes.data || [];
+    const brEntries = (bookingRoomsRes.data || []) as any[];
+
+    // Build room -> booking days map
+    const roomDays = new Map<string, number>();
+
+    const countDays = (roomId: string, checkIn: string, checkOut: string) => {
+      const ci = parseISO(checkIn) < reportStart ? reportStart : parseISO(checkIn);
+      const co = parseISO(checkOut) > addDays(reportEnd, 1) ? addDays(reportEnd, 1) : parseISO(checkOut);
+      const days = differenceInDays(co, ci);
+      if (days > 0) roomDays.set(roomId, (roomDays.get(roomId) || 0) + days);
+    };
+
+    for (const b of allBookings) {
+      if (b.room_id) countDays(b.room_id, b.check_in_date, b.check_out_date);
+    }
+    for (const br of brEntries) {
+      if (br.bookings && ['approved', 'checked_in', 'checked_out'].includes(br.bookings.status)) {
+        if (br.bookings.check_in_date < endStr && br.bookings.check_out_date > startStr) {
+          countDays(br.room_id, br.bookings.check_in_date, br.bookings.check_out_date);
+        }
+      }
+    }
+
+    const data = rooms.map((r: any) => {
+      const occupied = Math.min(roomDays.get(r.id) || 0, totalDays);
+      return {
+        room_number: r.room_number,
+        type: r.room_types?.name || '—',
+        daysOccupied: occupied,
+        daysFree: totalDays - occupied,
+        percent: totalDays > 0 ? Math.round((occupied / totalDays) * 100) : 0,
+      };
+    });
+
+    const totalOccupied = data.reduce((s: number, r: any) => s + r.daysOccupied, 0);
+    const totalPossible = rooms.length * totalDays;
+    setReportTotalPercent(totalPossible > 0 ? Math.round((totalOccupied / totalPossible) * 100) : 0);
+    setReportData(data);
+    setReportLoading(false);
+  };
+
+  useEffect(() => {
+    if (hotelId && reportStart && reportEnd) fetchReport();
+  }, [hotelId, reportStart, reportEnd]);
 
   useEffect(() => {
     if (hotelId) {
@@ -471,6 +547,82 @@ export function ExecutiveDashboard({ hotelId }: Props) {
             <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-yellow-500" /><span>20-49%</span></div>
             <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-muted" /><span>0-19%</span></div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Occupancy Report */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Отчёт по номерам
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal", !reportStart && "text-muted-foreground")}>
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  {format(reportStart, 'd MMM yyyy', { locale: ru })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={reportStart} onSelect={(d) => d && setReportStart(d)} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">—</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal", !reportEnd && "text-muted-foreground")}>
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  {format(reportEnd, 'd MMM yyyy', { locale: ru })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={reportEnd} onSelect={(d) => d && setReportEnd(d)} className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {reportLoading ? (
+            <div className="py-4 text-center text-muted-foreground text-sm">Загрузка...</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Номер</TableHead>
+                    <TableHead>Тип</TableHead>
+                    <TableHead className="text-right">Дней занят</TableHead>
+                    <TableHead className="text-right">Дней свободен</TableHead>
+                    <TableHead className="text-right">% загрузки</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportData.map((row) => (
+                    <TableRow key={row.room_number}>
+                      <TableCell className="font-medium">{row.room_number}</TableCell>
+                      <TableCell>{row.type}</TableCell>
+                      <TableCell className="text-right">{row.daysOccupied}</TableCell>
+                      <TableCell className="text-right">{row.daysFree}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={row.percent >= 80 ? 'default' : row.percent >= 50 ? 'secondary' : 'outline'}>
+                          {row.percent}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-bold border-t-2">
+                    <TableCell colSpan={4}>Общая загрузка отеля</TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="default">{reportTotalPercent}%</Badge>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

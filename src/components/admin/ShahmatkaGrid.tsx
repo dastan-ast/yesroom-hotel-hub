@@ -6,10 +6,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ManualBookingDialog } from './ManualBookingDialog';
+import { BookingDetailModal } from './BookingDetailModal';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
+
+const statusLabelsRu: Record<BookingStatus, string> = {
+  pending: 'Ожидает',
+  approved: 'Подтверждено',
+  checked_in: 'Заселён',
+  checked_out: 'Выселен',
+  cancelled: 'Отменено',
+};
 
 interface Room {
   id: string;
@@ -35,14 +46,6 @@ interface BookingRoomEntry {
   bookings: Booking | null;
 }
 
-const statusColors: Record<BookingStatus, string> = {
-  pending: 'bg-yellow-400/80',
-  approved: 'bg-blue-400/80',
-  checked_in: 'bg-green-500/80',
-  checked_out: 'bg-muted-foreground/40',
-  cancelled: 'bg-destructive/40',
-};
-
 const statusBgHex: Record<BookingStatus, string> = {
   pending: '#eab308cc',
   approved: '#3b82f6cc',
@@ -63,6 +66,13 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
+
+  // Manual booking dialog
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+
+  // Booking detail modal
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -129,30 +139,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     setLoading(false);
   };
 
-  // Get booking for a specific cell (room + date)
-  const getBookingForCell = (roomId: string, date: Date): Booking | null => {
-    const bookingIds = bookingRoomMap.get(roomId);
-    const candidates = bookingIds && bookingIds.size > 0
-      ? Array.from(bookingIds).map(id => bookings.find(b => b.id === id)).filter(Boolean) as Booking[]
-      : bookings.filter(b => b.room_id === roomId);
-
-    for (const booking of candidates) {
-      if (showOnlyActive && !['pending', 'approved', 'checked_in'].includes(booking.status)) continue;
-      const checkIn = parseISO(booking.check_in_date);
-      const checkOut = parseISO(booking.check_out_date);
-      
-      // For half-day bookings, only check-in day matters
-      if (booking.is_half_day) {
-        if (isSameDay(date, checkIn)) return booking;
-        continue;
-      }
-      
-      if (isWithinInterval(date, { start: checkIn, end: addDays(checkOut, -1) })) return booking;
-    }
-    return null;
-  };
-
-  // Determine cell halves: which booking occupies left half (before 12:00) and right half (after 12:00)
+  // Determine cell halves
   const getCellBookings = (roomId: string, date: Date): { left: Booking | null; right: Booking | null } => {
     const bookingIds = bookingRoomMap.get(roomId);
     const candidates = bookingIds && bookingIds.size > 0
@@ -168,7 +155,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
       const checkOut = parseISO(booking.check_out_date);
 
       if (booking.is_half_day) {
-        // Half-day: only right half on check-in day
         if (isSameDay(date, checkIn)) rightBooking = booking;
         continue;
       }
@@ -177,65 +163,19 @@ export function ShahmatkaGrid({ hotelId }: Props) {
       const isCheckOutDay = isSameDay(date, checkOut);
       const isBetween = date > checkIn && date < checkOut;
 
-      if (isCheckOutDay) {
-        // Check-out day: left half (before 12:00)
-        leftBooking = booking;
-      }
-      if (isCheckInDay) {
-        // Check-in day: right half (after 12:00)
-        rightBooking = booking;
-      }
-      if (isBetween) {
-        // Middle days: both halves
-        leftBooking = booking;
-        rightBooking = booking;
-      }
+      if (isCheckOutDay) leftBooking = booking;
+      if (isCheckInDay) rightBooking = booking;
+      if (isBetween) { leftBooking = booking; rightBooking = booking; }
     }
 
     return { left: leftBooking, right: rightBooking };
   };
 
-  // Calculate booking span for guest name positioning
-  const getBookingSpan = (booking: Booking, roomId: string): { startIdx: number; span: number } | null => {
-    const checkIn = parseISO(booking.check_in_date);
-    const checkOut = parseISO(booking.check_out_date);
-
-    let startIdx = -1;
-    let endIdx = -1;
-
-    for (let i = 0; i < days.length; i++) {
-      const day = days[i];
-      if (booking.is_half_day) {
-        if (isSameDay(day, checkIn)) { startIdx = i; endIdx = i; break; }
-      } else {
-        // Check-in day or between
-        if (isSameDay(day, checkIn) || (day > checkIn && day < checkOut)) {
-          if (startIdx === -1) startIdx = i;
-          endIdx = i;
-        }
-      }
+  const handleCellClick = (booking: Booking | null) => {
+    if (booking) {
+      setSelectedBookingId(booking.id);
+      setDetailModalOpen(true);
     }
-
-    if (startIdx === -1) return null;
-    return { startIdx, span: endIdx - startIdx + 1 };
-  };
-
-  // Determine which bookings should show guest name in this row
-  const getRowBookingSpans = (roomId: string): { booking: Booking; startIdx: number; span: number }[] => {
-    const seen = new Set<string>();
-    const result: { booking: Booking; startIdx: number; span: number }[] = [];
-
-    for (let i = 0; i < days.length; i++) {
-      const { left, right } = getCellBookings(roomId, days[i]);
-      for (const b of [left, right]) {
-        if (b && !seen.has(b.id)) {
-          seen.add(b.id);
-          const spanInfo = getBookingSpan(b, roomId);
-          if (spanInfo) result.push({ booking: b, ...spanInfo });
-        }
-      }
-    }
-    return result;
   };
 
   const handlePrev = () => setStartDate(prev => addDays(prev, -7));
@@ -247,80 +187,88 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold">Шахматка</h2>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Switch id="show-active-only" checked={showOnlyActive} onCheckedChange={setShowOnlyActive} />
-            <Label htmlFor="show-active-only" className="text-sm text-muted-foreground cursor-pointer">
-              Только активные
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
-            <Button variant="outline" size="sm" onClick={handleToday}>Сегодня</Button>
-            <Button variant="outline" size="sm" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold">Шахматка</h2>
+          <div className="flex items-center gap-4">
+            <Button size="sm" onClick={() => setBookingDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Новое бронирование
+            </Button>
+            <div className="flex items-center gap-2">
+              <Switch id="show-active-only" checked={showOnlyActive} onCheckedChange={setShowOnlyActive} />
+              <Label htmlFor="show-active-only" className="text-sm text-muted-foreground cursor-pointer">
+                Только активные
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="outline" size="sm" onClick={handleToday}>Сегодня</Button>
+              <Button variant="outline" size="sm" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-3 text-xs">
-        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-yellow-400/80" /><span>{t('admin.pending')}</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-blue-400/80" /><span>{t('admin.approved')}</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-green-500/80" /><span>{t('admin.checkedIn')}</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" /><span>{t('admin.checkedOut')}</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-destructive/40 opacity-40" /><span>{t('admin.cancelled')}</span></div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded border border-dashed border-muted-foreground/50 flex">
-            <div className="w-1/2" /><div className="w-1/2 bg-green-500/50 rounded-r" />
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-yellow-400/80" /><span>{t('admin.pending')}</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-blue-400/80" /><span>{t('admin.approved')}</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-green-500/80" /><span>{t('admin.checkedIn')}</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" /><span>{t('admin.checkedOut')}</span></div>
+          <div className="flex items-center gap-1.5"><div className="w-4 h-4 rounded bg-destructive/40 opacity-40" /><span>{t('admin.cancelled')}</span></div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded border border-dashed border-muted-foreground/50 flex">
+              <div className="w-1/2" /><div className="w-1/2 bg-green-500/50 rounded-r" />
+            </div>
+            <span>Полсуток</span>
           </div>
-          <span>Полсуток</span>
         </div>
-      </div>
 
-      {/* Grid */}
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="w-full border-collapse min-w-[800px]">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="border-r p-2 text-left text-sm font-medium w-28 sticky left-0 bg-muted/50 z-10">
-                Номер
-              </th>
-              {days.map(day => (
-                <th
-                  key={day.toISOString()}
-                  className={cn(
-                    'border-r p-1.5 text-center text-xs font-medium min-w-[90px]',
-                    isSameDay(day, new Date()) && 'bg-primary/10'
-                  )}
-                >
-                  <div>{format(day, 'EEE', { locale: ru })}</div>
-                  <div className="font-bold">{format(day, 'd')}</div>
+        {/* Grid */}
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="border-r p-2 text-left text-sm font-medium w-28 sticky left-0 bg-muted/50 z-10">
+                  Номер
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rooms.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="p-8 text-center text-muted-foreground">Нет номеров</td>
+                {days.map(day => (
+                  <th
+                    key={day.toISOString()}
+                    className={cn(
+                      'border-r p-1.5 text-center text-xs font-medium min-w-[90px]',
+                      isSameDay(day, new Date()) && 'bg-primary/10'
+                    )}
+                  >
+                    <div>{format(day, 'EEE', { locale: ru })}</div>
+                    <div className="font-bold">{format(day, 'd')}</div>
+                  </th>
+                ))}
               </tr>
-            ) : (
-              rooms.map(room => {
-                const spans = getRowBookingSpans(room.id);
-                return (
+            </thead>
+            <tbody>
+              {rooms.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">Нет номеров</td>
+                </tr>
+              ) : (
+                rooms.map(room => (
                   <tr key={room.id} className="border-t hover:bg-muted/20">
                     <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
-                      <div>{room.room_number}</div>
-                      <div className="text-xs text-muted-foreground">{room.room_types?.name}</div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="cursor-default">{room.room_number}</div>
+                        </TooltipTrigger>
+                        {room.room_types?.name && (
+                          <TooltipContent side="right">
+                            <p>{room.room_types.name}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     </td>
-                    {days.map((day, dayIdx) => {
+                    {days.map((day) => {
                       const { left, right } = getCellBookings(room.id, day);
-
-                      // Find if this cell is the START of a booking span to render guest name
-                      const spanForCell = spans.find(s => s.startIdx === dayIdx);
 
                       return (
                         <td
@@ -332,54 +280,66 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                           style={{ height: '40px' }}
                         >
                           <div className="flex h-full w-full">
-                            {/* Left half (before 12:00) */}
-                            <div
-                              className="w-1/2 h-full"
-                              style={{ backgroundColor: left ? statusBgHex[left.status] : 'transparent' }}
-                              title={left ? `${left.guest_name} (${left.status})` : undefined}
-                            />
-                            {/* Right half (after 12:00) */}
-                            <div
-                              className="w-1/2 h-full"
-                              style={{ backgroundColor: right ? statusBgHex[right.status] : 'transparent' }}
-                              title={right ? `${right.guest_name} (${right.status})` : undefined}
-                            />
+                            {/* Left half */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={cn("w-1/2 h-full", left && "cursor-pointer")}
+                                  style={{ backgroundColor: left ? statusBgHex[left.status] : 'transparent' }}
+                                  onClick={() => handleCellClick(left)}
+                                />
+                              </TooltipTrigger>
+                              {left && (
+                                <TooltipContent side="top">
+                                  <p>{left.guest_name} — {statusLabelsRu[left.status]}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                            {/* Right half */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={cn("w-1/2 h-full", right && "cursor-pointer")}
+                                  style={{ backgroundColor: right ? statusBgHex[right.status] : 'transparent' }}
+                                  onClick={() => handleCellClick(right)}
+                                />
+                              </TooltipTrigger>
+                              {right && (
+                                <TooltipContent side="top">
+                                  <p>{right.guest_name} — {statusLabelsRu[right.status]}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
                           </div>
-                          {/* Guest name overlay - rendered inside the first cell of the booking */}
-                          {spanForCell && (() => {
-                            const { booking, span } = spanForCell;
-                            const isHalfDay = booking.is_half_day;
-                            // Width: spans across multiple cells using calc
-                            // For half-day: only right half of this cell (50%)
-                            // For regular: from right half of check-in cell across all middle cells to left half of check-out cell
-                            const widthCalc = isHalfDay
-                              ? '50%'
-                              : span === 1
-                                ? '50%' // single day: only right half (check-in afternoon)
-                                : `calc(50% + ${(span - 1) * 100}% - 50%)`; // right half of first + (span-2) full + left half of last
-                            return (
-                              <div
-                                className="absolute top-0 left-1/2 h-full flex items-center pointer-events-none z-[5]"
-                                style={{
-                                  width: widthCalc,
-                                }}
-                              >
-                                <span className="w-full text-white text-[10px] font-medium truncate text-center drop-shadow-sm">
-                                  {booking.guest_name.split(' ').slice(0, 2).join(' ')}
-                                </span>
-                              </div>
-                            );
-                          })()}
                         </td>
                       );
                     })}
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Manual Booking Dialog */}
+        <ManualBookingDialog
+          open={bookingDialogOpen}
+          onOpenChange={setBookingDialogOpen}
+          onSuccess={() => fetchData()}
+          hotelId={hotelId}
+        />
+
+        {/* Booking Detail Modal */}
+        {selectedBookingId && (
+          <BookingDetailModal
+            open={detailModalOpen}
+            onOpenChange={setDetailModalOpen}
+            bookingId={selectedBookingId}
+            hotelId={hotelId}
+            onUpdate={() => fetchData()}
+          />
+        )}
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
