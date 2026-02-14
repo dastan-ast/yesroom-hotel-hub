@@ -186,8 +186,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -10));
-  const handleNext = () => setStartDate((prev) => addDays(prev, 10));
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -7));
+  const handleNext = () => setStartDate((prev) => addDays(prev, 7));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
   if (loading) {
@@ -197,13 +197,9 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-3">
-        {/* Компактная шапка */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h2 className="text-lg font-bold uppercase tracking-tight">Оперативный план (10д)</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8">
-              <Plus className="h-4 w-4 mr-1" /> Бронь
-            </Button>
+        {/* Шапка: Навигация + Легенда */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center border rounded-md bg-background h-8">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
@@ -215,89 +211,133 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8">
+              <Plus className="h-4 w-4 mr-1" /> Бронь
+            </Button>
+          </div>
+
+          {/* Легенда вместо "Оперативного плана" */}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-medium text-muted-foreground pb-1 border-b">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-[#eab308cc]" />
+              <span>Ожидает</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-[#3b82f6cc]" />
+              <span>Подтверждено</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-[#22c55ecc]" />
+              <span>Заселён</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-[#6b728080]" />
+              <span>Выселен</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm border border-dashed border-slate-400" />
+              <span>Полсуток</span>
+            </div>
           </div>
         </div>
 
-        {/* Сетка с защитой от наложения на меню */}
-        <div
-          className="relative z-0 overflow-auto border rounded-lg max-h-[70vh] bg-white shadow-sm"
-          style={{ isolation: "isolate" }} // Критично для фиксации бага с меню
-        >
-          <table className="w-full border-separate border-spacing-0">
-            <thead className="sticky top-0 z-20 bg-slate-50">
-              <tr>
-                <th className="border-b border-r p-2 text-[10px] font-bold w-16 sticky left-0 bg-slate-100 z-30">№</th>
+        {/* Grid */}
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="border-r p-2 text-left text-sm font-medium w-28 sticky left-0 bg-muted/50 z-10">
+                  Номер
+                </th>
                 {days.map((day) => (
                   <th
                     key={day.toISOString()}
                     className={cn(
-                      "border-b border-r p-1 text-center min-w-[80px] sm:min-w-[100px]",
-                      isSameDay(day, new Date()) && "bg-primary/5",
+                      "border-r p-1.5 text-center text-xs font-medium min-w-[90px]",
+                      isSameDay(day, new Date()) && "bg-primary/10",
                     )}
                   >
-                    <div className="text-[9px] text-muted-foreground uppercase">
-                      {format(day, "EEE", { locale: ru })}
-                    </div>
-                    <div className="text-sm font-bold">{format(day, "d MMM", { locale: ru })}</div>
+                    <div>{format(day, "EEE", { locale: ru })}</div>
+                    <div className="font-bold">{format(day, "d")}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rooms.map((room) => (
-                <tr key={room.id} className="h-10">
-                  <td className="border-b border-r p-2 text-xs font-bold sticky left-0 bg-white z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
-                    {room.room_number}
+              {rooms.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    Нет номеров
                   </td>
-                  {days.map((day) => {
-                    const { left, right } = getCellBookings(room.id, day);
-                    return (
-                      <td
-                        key={day.toISOString()}
-                        className={cn(
-                          "border-b border-r p-0 relative",
-                          isSameDay(day, new Date()) && "bg-primary/[0.02]",
-                        )}
-                      >
-                        <div className="flex h-full w-full gap-0.5 p-0.5">
-                          <div
-                            className="w-1/2 h-8 rounded-sm cursor-pointer transition-opacity hover:opacity-80"
-                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f1f5f9" }}
-                            onClick={() => handleCellClick(left)}
-                          >
-                            {left && <div className="w-full h-full" title={left.guest_name} />}
-                          </div>
-                          <div
-                            className="w-1/2 h-8 rounded-sm cursor-pointer transition-opacity hover:opacity-80"
-                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f1f5f9" }}
-                            onClick={() => handleCellClick(right)}
-                          >
-                            {right && <div className="w-full h-full" title={right.guest_name} />}
-                          </div>
-                        </div>
-                      </td>
-                    );
-                  })}
                 </tr>
-              ))}
+              ) : (
+                rooms.map((room) => (
+                  <tr key={room.id} className="border-t hover:bg-muted/20">
+                    <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
+                      {room.room_number}
+                    </td>
+                    {days.map((day) => {
+                      const { left, right } = getCellBookings(room.id, day);
+                      return (
+                        <td
+                          key={day.toISOString()}
+                          className={cn(
+                            "border-b border-r p-0 h-12 relative min-w-[100px] sm:min-w-[120px]",
+                            isSameDay(day, new Date()) && "bg-primary/[0.03]",
+                          )}
+                        >
+                          <div className="flex h-full w-full gap-0.5 p-0.5">
+                            {/* Левая часть */}
+                            <div
+                              className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden transition-opacity hover:opacity-90"
+                              style={{ backgroundColor: left ? statusBgHex[left.status] : "#f1f5f9" }}
+                              onClick={() => handleCellClick(left)}
+                            >
+                              {left && (
+                                <span className="text-[9px] font-bold text-white leading-tight text-center px-0.5 truncate">
+                                  {left.guest_name.split(" ")[0]}
+                                </span>
+                              )}
+                            </div>
+                            {/* Правая часть */}
+                            <div
+                              className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden transition-opacity hover:opacity-90"
+                              style={{ backgroundColor: right ? statusBgHex[right.status] : "#f1f5f9" }}
+                              onClick={() => handleCellClick(right)}
+                            >
+                              {right && (
+                                <span className="text-[9px] font-bold text-white leading-tight text-center px-0.5 truncate">
+                                  {right.guest_name.split(" ")[0]}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Скрытые диалоги */}
+        {/* Manual Booking Dialog */}
         <ManualBookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
-          onSuccess={fetchData}
+          onSuccess={() => fetchData()}
           hotelId={hotelId}
         />
+
+        {/* Booking Detail Modal */}
         {selectedBookingId && (
           <BookingDetailModal
             open={detailModalOpen}
             onOpenChange={setDetailModalOpen}
             bookingId={selectedBookingId}
             hotelId={hotelId}
-            onUpdate={fetchData}
+            onUpdate={() => fetchData()}
           />
         )}
       </div>
