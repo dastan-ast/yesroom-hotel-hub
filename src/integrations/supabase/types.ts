@@ -303,6 +303,73 @@ export type Database = {
           },
         ]
       }
+      checkout_adjustments: {
+        Row: {
+          adjusted_by: string
+          adjusted_by_name: string
+          adjusted_total: number
+          booking_id: string
+          created_at: string
+          hotel_id: string
+          id: string
+          original_total: number
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          adjusted_by: string
+          adjusted_by_name?: string
+          adjusted_total?: number
+          booking_id: string
+          created_at?: string
+          hotel_id: string
+          id?: string
+          original_total?: number
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          adjusted_by?: string
+          adjusted_by_name?: string
+          adjusted_total?: number
+          booking_id?: string
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          original_total?: number
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkout_adjustments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_adjustments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkout_adjustments_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string

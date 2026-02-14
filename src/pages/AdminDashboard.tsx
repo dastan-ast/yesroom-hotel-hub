@@ -25,6 +25,7 @@ import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
 import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
 import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
+import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -288,6 +289,11 @@ export default function AdminDashboard() {
                         </CardContent>
                       </Card>
                     </div>
+
+                    {/* Owner: checkout amount adjustments */}
+                    {isOwner && hotelId && (
+                      <CheckoutAdjustmentsWidget hotelId={hotelId} />
+                    )}
 
                     <div className="grid lg:grid-cols-2 gap-6">
                       <Card>

@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { logAdminAction } from '@/lib/activityLog';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,7 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search, AlertTriangle } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
@@ -319,6 +320,16 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
+  // Check if booking is overdue (checked_in past checkout date)
+  const isOverdue = (booking: Booking) => {
+    if (booking.status !== 'checked_in') return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkOut = new Date(booking.check_out_date);
+    checkOut.setHours(0, 0, 0, 0);
+    return checkOut < today;
+  };
+
   // Filtered and sorted bookings
   const filteredBookings = useMemo(() => {
     let result = [...bookings];
@@ -337,11 +348,19 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       );
     }
 
-    // Sort by status priority
-    result.sort((a, b) => statusPriority[a.status] - statusPriority[b.status]);
+    // Sort: overdue first, then by status priority
+    result.sort((a, b) => {
+      const aOverdue = isOverdue(a) ? -1 : 0;
+      const bOverdue = isOverdue(b) ? -1 : 0;
+      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+      return statusPriority[a.status] - statusPriority[b.status];
+    });
 
     return result;
   }, [bookings, statusFilter, searchQuery]);
+
+  // Count overdue bookings
+  const overdueCount = useMemo(() => bookings.filter(isOverdue).length, [bookings]);
 
   const getStatusLabel = (status: BookingStatus) => {
     const labels: Record<BookingStatus, string> = {
@@ -405,6 +424,16 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </Select>
       </div>
 
+      {/* Overdue alert */}
+      {overdueCount > 0 && (
+        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+          <span className="text-sm font-medium text-destructive">
+            {overdueCount} {overdueCount === 1 ? 'гость' : overdueCount < 5 ? 'гостя' : 'гостей'} просрочили дату выезда! Необходимо выселить или продлить.
+          </span>
+        </div>
+      )}
+
       {filteredBookings.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {bookings.length === 0 ? t('admin.noBookings') : 'Нет бронирований по заданным фильтрам'}
@@ -414,7 +443,12 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
           {filteredBookings.map((booking) => (
             <div
               key={booking.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border bg-card gap-4"
+              className={cn(
+                "flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border gap-4",
+                isOverdue(booking) 
+                  ? "bg-destructive/5 border-destructive/40 ring-1 ring-destructive/20"
+                  : "bg-card"
+              )}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -428,6 +462,12 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   {booking.prepayment_received && (
                     <Badge variant="outline" className="text-green-600 border-green-600">
                       ₸ {t('admin.prepayment')}
+                    </Badge>
+                  )}
+                  {isOverdue(booking) && (
+                    <Badge variant="destructive" className="text-xs animate-pulse">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Просрочен
                     </Badge>
                   )}
                 </div>
