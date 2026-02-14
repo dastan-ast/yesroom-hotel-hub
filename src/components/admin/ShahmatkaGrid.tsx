@@ -67,12 +67,17 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
+  // Manual booking dialog
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+
+  // Booking detail modal
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
-  // Принцип Парето: Фокус на 1 дне для максимальной ясности
-  const days = useMemo(() => [startDate], [startDate]);
+  // Генерируем 10 дней, начиная с выбранной даты
+  const days = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => addDays(startDate, i));
+  }, [startDate]);
 
   useEffect(() => {
     if (hotelId) fetchData();
@@ -80,7 +85,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, 1);
+    const endDate = addDays(startDate, 10); // Изменено с 1 на 10
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -102,8 +107,10 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         )
         .eq("hotel_id", hotelId),
     ]);
+    // ... далее остальной код функции fetchData без изменений
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
+
     const allBookings: Booking[] = [];
     const roomToBookingsMap = new Map<string, Set<string>>();
 
@@ -120,9 +127,9 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     if (bookingRoomsRes.data) {
       (bookingRoomsRes.data as BookingRoomEntry[]).forEach((br) => {
         if (br.bookings) {
-          const bIn = parseISO(br.bookings.check_in_date);
-          const bOut = parseISO(br.bookings.check_out_date);
-          if (bIn < endDate && bOut >= startDate) {
+          const bookingCheckIn = parseISO(br.bookings.check_in_date);
+          const bookingCheckOut = parseISO(br.bookings.check_out_date);
+          if (bookingCheckIn < endDate && bookingCheckOut > startDate) {
             if (!allBookings.find((b) => b.id === br.bookings!.id)) allBookings.push(br.bookings);
             if (!roomToBookingsMap.has(br.room_id)) roomToBookingsMap.set(br.room_id, new Set());
             roomToBookingsMap.get(br.room_id)!.add(br.booking_id);
@@ -130,58 +137,80 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         }
       });
     }
+
     setBookings(allBookings);
     setBookingRoomMap(roomToBookingsMap);
     setLoading(false);
   };
 
-  const getCellBookings = (roomId: string, date: Date) => {
+  // Determine cell halves
+  const getCellBookings = (roomId: string, date: Date): { left: Booking | null; right: Booking | null } => {
     const bookingIds = bookingRoomMap.get(roomId);
-    const candidates = bookingIds
-      ? (Array.from(bookingIds)
-          .map((id) => bookings.find((b) => b.id === id))
-          .filter(Boolean) as Booking[])
-      : bookings.filter((b) => b.room_id === roomId);
-    let left: Booking | null = null;
-    let right: Booking | null = null;
-    for (const b of candidates) {
-      if (showOnlyActive && !["pending", "approved", "checked_in"].includes(b.status)) continue;
-      const bin = parseISO(b.check_in_date);
-      const bout = parseISO(b.check_out_date);
-      if (b.is_half_day && isSameDay(date, bin)) {
-        right = b;
+    const candidates =
+      bookingIds && bookingIds.size > 0
+        ? (Array.from(bookingIds)
+            .map((id) => bookings.find((b) => b.id === id))
+            .filter(Boolean) as Booking[])
+        : bookings.filter((b) => b.room_id === roomId);
+
+    let leftBooking: Booking | null = null;
+    let rightBooking: Booking | null = null;
+
+    for (const booking of candidates) {
+      if (showOnlyActive && !["pending", "approved", "checked_in"].includes(booking.status)) continue;
+      const checkIn = parseISO(booking.check_in_date);
+      const checkOut = parseISO(booking.check_out_date);
+
+      if (booking.is_half_day) {
+        if (isSameDay(date, checkIn)) rightBooking = booking;
         continue;
       }
-      if (isSameDay(date, bout)) left = b;
-      if (isSameDay(date, bin)) right = b;
-      if (date > bin && date < bout) {
-        left = b;
-        right = b;
+
+      const isCheckInDay = isSameDay(date, checkIn);
+      const isCheckOutDay = isSameDay(date, checkOut);
+      const isBetween = date > checkIn && date < checkOut;
+
+      if (isCheckOutDay) leftBooking = booking;
+      if (isCheckInDay) rightBooking = booking;
+      if (isBetween) {
+        leftBooking = booking;
+        rightBooking = booking;
       }
     }
-    return { left, right };
+
+    return { left: leftBooking, right: rightBooking };
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -1));
-  const handleNext = () => setStartDate((prev) => addDays(prev, 1));
+  const handleCellClick = (booking: Booking | null) => {
+    if (booking) {
+      setSelectedBookingId(booking.id);
+      setDetailModalOpen(true);
+    }
+  };
 
-  if (loading) return <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>;
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -7));
+  const handleNext = () => setStartDate((prev) => addDays(prev, 7));
+  const handleToday = () => setStartDate(startOfDay(new Date()));
+
+  if (loading) {
+    return <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>;
+  }
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-4">
-        {/* Панель управления */}
+        {/* Заголовок и Навигация */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold uppercase">Оперативный план</h2>
+          <h2 className="text-xl font-semibold uppercase tracking-tight">Оперативный план (10 дней)</h2>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handlePrev}>
-              <ChevronLeft className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={() => setStartDate((prev) => addDays(prev, -10))}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> -10 дн.
             </Button>
             <Button variant="outline" size="sm" onClick={() => setStartDate(startOfDay(new Date()))}>
               Сегодня
             </Button>
-            <Button variant="outline" size="sm" onClick={handleNext}>
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={() => setStartDate((prev) => addDays(prev, 10))}>
+              +10 дн. <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
             <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="ml-2">
               <Plus className="h-4 w-4 mr-1" /> Бронь
@@ -189,19 +218,33 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
-        {/* Сетка с фиксированными заголовками */}
-        <div className="overflow-auto border rounded-lg max-h-[70vh] relative bg-white shadow-sm">
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-sm">
+        {/* Сетка с фиксированными заголовками и Snap-эффектом */}
+        <div className="overflow-auto border rounded-xl max-h-[75vh] relative bg-white shadow-md snap-x snap-mandatory">
+          <table className="w-full border-separate border-spacing-0">
+            <thead className="sticky top-0 z-30 bg-white/95 backdrop-blur-md">
               <tr>
-                <th className="border-r p-3 text-left text-[10px] font-bold w-24 sticky left-0 bg-muted z-40 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                {/* Фиксированный "Номер" */}
+                <th className="border-b border-r p-4 text-left text-[10px] font-bold w-24 sticky left-0 bg-slate-50 z-40 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                   НОМЕР
                 </th>
                 {days.map((day) => (
-                  <th key={day.toISOString()} className="p-4 text-center">
-                    <div className="text-xs text-muted-foreground uppercase">{format(day, "EEEE", { locale: ru })}</div>
-                    <div className="text-2xl font-black text-primary tracking-tight">
-                      {format(day, "d MMMM yyyy", { locale: ru })}
+                  <th
+                    key={day.toISOString()}
+                    className={cn(
+                      "border-b border-r p-3 text-center min-w-[150px] snap-center transition-colors",
+                      isSameDay(day, new Date()) ? "bg-primary/10" : "",
+                    )}
+                  >
+                    <div className="text-[10px] text-muted-foreground uppercase">
+                      {format(day, "EEE", { locale: ru })}
+                    </div>
+                    <div
+                      className={cn(
+                        "text-lg font-bold",
+                        isSameDay(day, new Date()) ? "text-primary" : "text-slate-700",
+                      )}
+                    >
+                      {format(day, "d MMM", { locale: ru })}
                     </div>
                   </th>
                 ))}
@@ -209,36 +252,40 @@ export function ShahmatkaGrid({ hotelId }: Props) {
             </thead>
             <tbody>
               {rooms.map((room) => (
-                <tr key={room.id} className="border-t hover:bg-muted/5 transition-colors">
-                  <td className="border-r p-4 font-black text-sm sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
+                <tr key={room.id} className="hover:bg-slate-50/50 transition-colors">
+                  {/* Номер комнаты (Sticky) */}
+                  <td className="border-b border-r p-4 font-black text-sm sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
                     {room.room_number}
                   </td>
                   {days.map((day) => {
                     const { left, right } = getCellBookings(room.id, day);
+                    const isToday = isSameDay(day, new Date());
+
                     return (
-                      <td key={day.toISOString()} className="p-0 h-20 relative min-w-[300px]">
-                        <div className="flex h-full w-full gap-1 p-1">
-                          {/* Слот выезда (Лево) */}
+                      <td
+                        key={day.toISOString()}
+                        className={cn("border-b border-r p-0 h-14 relative snap-center", isToday && "bg-primary/5")}
+                      >
+                        <div className="flex h-full w-full gap-0.5 p-1">
                           <div
-                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f8fafc" }}
+                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-all active:scale-95"
+                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f1f5f9" }}
                             onClick={() => left && (setSelectedBookingId(left.id), setDetailModalOpen(true))}
                           >
                             {left && (
-                              <span className="text-[10px] font-bold text-white text-center leading-tight px-1">
-                                {left.guest_name}
+                              <span className="text-[9px] font-bold text-white truncate px-0.5">
+                                {left.guest_name.split(" ")[0]}
                               </span>
                             )}
                           </div>
-                          {/* Слот заезда (Право) */}
                           <div
-                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f8fafc" }}
+                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-all active:scale-95"
+                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f1f5f9" }}
                             onClick={() => right && (setSelectedBookingId(right.id), setDetailModalOpen(true))}
                           >
                             {right && (
-                              <span className="text-[10px] font-bold text-white text-center leading-tight px-1">
-                                {right.guest_name}
+                              <span className="text-[9px] font-bold text-white truncate px-0.5">
+                                {right.guest_name.split(" ")[0]}
                               </span>
                             )}
                           </div>
@@ -252,6 +299,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </table>
         </div>
 
+        {/* Компоненты диалогов */}
         <ManualBookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
