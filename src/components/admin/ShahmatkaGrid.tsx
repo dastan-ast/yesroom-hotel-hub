@@ -67,15 +67,13 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
 
-  // Manual booking dialog
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-
-  // Booking detail modal
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
+  // Изменено на 10 дней для лучшего обзора
   const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
+    return Array.from({ length: 10 }, (_, i) => addDays(startDate, i));
   }, [startDate]);
 
   useEffect(() => {
@@ -84,7 +82,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, 7);
+    const endDate = addDays(startDate, 10);
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -141,7 +139,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     setLoading(false);
   };
 
-  // Determine cell halves
   const getCellBookings = (roomId: string, date: Date): { left: Booking | null; right: Booking | null } => {
     const bookingIds = bookingRoomMap.get(roomId);
     const candidates =
@@ -156,6 +153,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
     for (const booking of candidates) {
       if (showOnlyActive && !["pending", "approved", "checked_in"].includes(booking.status)) continue;
+
       const checkIn = parseISO(booking.check_in_date);
       const checkOut = parseISO(booking.check_out_date);
 
@@ -175,7 +173,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         rightBooking = booking;
       }
     }
-
     return { left: leftBooking, right: rightBooking };
   };
 
@@ -186,158 +183,168 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -7));
-  const handleNext = () => setStartDate((prev) => addDays(prev, 7));
+  // Шаг навигации изменен на 10 для соответствия сетке
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -10));
+  const handleNext = () => setStartDate((prev) => addDays(prev, 10));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
-  if (loading) {
-    return <div className="py-8 text-center text-muted-foreground">{t("common.loading")}</div>;
-  }
+  if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-3">
-        {/* Шапка: Навигация + Легенда */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center border rounded-md bg-background h-8">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>
+        {/* Панель управления: Навигация + Фильтр + Кнопка */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center border rounded-md h-8 overflow-hidden bg-background">
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none border-r" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" className="h-7 px-2 text-xs font-medium" onClick={handleToday}>
+              <Button variant="ghost" className="h-7 px-3 text-xs font-medium" onClick={handleToday}>
                 Сегодня
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNext}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none border-l" onClick={handleNext}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8">
-              <Plus className="h-4 w-4 mr-1" /> Бронь
-            </Button>
+
+            {/* Тумблер активных броней */}
+            <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md border h-8">
+              <Switch
+                id="active-filter"
+                checked={showOnlyActive}
+                onCheckedChange={setShowOnlyActive}
+                className="scale-75"
+              />
+              <Label
+                htmlFor="active-filter"
+                className="text-[10px] font-semibold text-slate-600 uppercase cursor-pointer"
+              >
+                Только активные
+              </Label>
+            </div>
           </div>
 
-          {/* Легенда вместо "Оперативного плана" */}
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-medium text-muted-foreground pb-1 border-b">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#eab308cc]" />
-              <span>Ожидает</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#3b82f6cc]" />
-              <span>Подтверждено</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#22c55ecc]" />
-              <span>Заселён</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-[#6b728080]" />
-              <span>Выселен</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm border border-dashed border-slate-400" />
-              <span>Полсуток</span>
-            </div>
+          <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm">
+            <Plus className="h-4 w-4 mr-1" /> Бронь
+          </Button>
+        </div>
+
+        {/* Легенда */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-bold uppercase text-slate-500 border-b pb-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[#eab308cc]" />
+            <span>Ожидает</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[#3b82f6cc]" />
+            <span>Подтверждено</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[#22c55ecc]" />
+            <span>Заселён</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[#6b728080]" />
+            <span>Выселен</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm bg-[#ef444466]" />
+            <span>Отмена</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm border border-dashed border-slate-400" />
+            <span>Полсуток</span>
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="overflow-x-auto border rounded-lg">
-          <table className="w-full border-collapse min-w-[800px]">
-            <thead>
-              <tr className="bg-muted/50">
-                <th className="border-r p-2 text-left text-sm font-medium w-28 sticky left-0 bg-muted/50 z-10">
-                  Номер
-                </th>
+        {/* Контейнер таблицы с исправленным наложением (isolation: isolate) */}
+        <div
+          className="relative z-0 overflow-auto border rounded-xl bg-white shadow-md max-h-[70vh]"
+          style={{ isolation: "isolate" }}
+        >
+          <table className="w-full border-separate border-spacing-0">
+            <thead className="sticky top-0 z-30 bg-slate-50 shadow-sm">
+              <tr>
+                <th className="border-b border-r p-2 text-[10px] font-black w-16 sticky left-0 bg-slate-100 z-40">№</th>
                 {days.map((day) => (
                   <th
                     key={day.toISOString()}
                     className={cn(
-                      "border-r p-1.5 text-center text-xs font-medium min-w-[90px]",
-                      isSameDay(day, new Date()) && "bg-primary/10",
+                      "border-b border-r p-1 text-center min-w-[100px] sm:min-w-[120px]",
+                      isSameDay(day, new Date()) && "bg-primary/5",
                     )}
                   >
-                    <div>{format(day, "EEE", { locale: ru })}</div>
-                    <div className="font-bold">{format(day, "d")}</div>
+                    <div className="text-[9px] text-slate-400 uppercase leading-none">
+                      {format(day, "EEE", { locale: ru })}
+                    </div>
+                    <div className="text-sm font-bold text-slate-700">{format(day, "d MMM", { locale: ru })}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rooms.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                    Нет номеров
+              {rooms.map((room) => (
+                <tr key={room.id} className="h-12 hover:bg-slate-50/50 transition-colors">
+                  <td className="border-b border-r p-2 text-xs font-black sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
+                    {room.room_number}
                   </td>
-                </tr>
-              ) : (
-                rooms.map((room) => (
-                  <tr key={room.id} className="border-t hover:bg-muted/20">
-                    <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
-                      {room.room_number}
-                    </td>
-                    {days.map((day) => {
-                      const { left, right } = getCellBookings(room.id, day);
-                      return (
-                        <td
-                          key={day.toISOString()}
-                          className={cn(
-                            "border-b border-r p-0 h-12 relative min-w-[100px] sm:min-w-[120px]",
-                            isSameDay(day, new Date()) && "bg-primary/[0.03]",
-                          )}
-                        >
-                          <div className="flex h-full w-full gap-0.5 p-0.5">
-                            {/* Левая часть */}
-                            <div
-                              className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden transition-opacity hover:opacity-90"
-                              style={{ backgroundColor: left ? statusBgHex[left.status] : "#f1f5f9" }}
-                              onClick={() => handleCellClick(left)}
-                            >
-                              {left && (
-                                <span className="text-[9px] font-bold text-white leading-tight text-center px-0.5 truncate">
-                                  {left.guest_name.split(" ")[0]}
-                                </span>
-                              )}
-                            </div>
-                            {/* Правая часть */}
-                            <div
-                              className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden transition-opacity hover:opacity-90"
-                              style={{ backgroundColor: right ? statusBgHex[right.status] : "#f1f5f9" }}
-                              onClick={() => handleCellClick(right)}
-                            >
-                              {right && (
-                                <span className="text-[9px] font-bold text-white leading-tight text-center px-0.5 truncate">
-                                  {right.guest_name.split(" ")[0]}
-                                </span>
-                              )}
-                            </div>
+                  {days.map((day) => {
+                    const { left, right } = getCellBookings(room.id, day);
+                    return (
+                      <td
+                        key={day.toISOString()}
+                        className={cn(
+                          "border-b border-r p-0 relative",
+                          isSameDay(day, new Date()) && "bg-primary/[0.02]",
+                        )}
+                      >
+                        <div className="flex h-full w-full gap-0.5 p-0.5">
+                          <div
+                            className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all"
+                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f8fafc" }}
+                            onClick={() => handleCellClick(left)}
+                          >
+                            {left && (
+                              <span className="text-[10px] font-bold text-white truncate px-1">
+                                {left.guest_name.split(" ")[0]}
+                              </span>
+                            )}
                           </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
+                          <div
+                            className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all"
+                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f8fafc" }}
+                            onClick={() => handleCellClick(right)}
+                          >
+                            {right && (
+                              <span className="text-[10px] font-bold text-white truncate px-1">
+                                {right.guest_name.split(" ")[0]}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
-        {/* Manual Booking Dialog */}
         <ManualBookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
-          onSuccess={() => fetchData()}
+          onSuccess={fetchData}
           hotelId={hotelId}
         />
-
-        {/* Booking Detail Modal */}
         {selectedBookingId && (
           <BookingDetailModal
             open={detailModalOpen}
             onOpenChange={setDetailModalOpen}
             bookingId={selectedBookingId}
             hotelId={hotelId}
-            onUpdate={() => fetchData()}
+            onUpdate={fetchData}
           />
         )}
       </div>
