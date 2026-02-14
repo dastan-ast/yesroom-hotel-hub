@@ -74,18 +74,15 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
-  // Генерируем 10 дней, начиная с выбранной даты
+  // Внутри ShahmatkaGrid
   const days = useMemo(() => {
     return Array.from({ length: 10 }, (_, i) => addDays(startDate, i));
   }, [startDate]);
 
-  useEffect(() => {
-    if (hotelId) fetchData();
-  }, [hotelId, startDate]);
-
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, 10); // Изменено с 1 на 10
+    const endDate = addDays(startDate, 10); // Меняем 7 на 10
+    // ... остальной код запроса без изменений
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -107,7 +104,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         )
         .eq("hotel_id", hotelId),
     ]);
-    // ... далее остальной код функции fetchData без изменений
 
     if (roomsRes.data) setRooms(roomsRes.data as Room[]);
 
@@ -199,113 +195,166 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-4">
-        {/* Заголовок и Навигация */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold uppercase tracking-tight">Оперативный план (10 дней)</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setStartDate((prev) => addDays(prev, -10))}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> -10 дн.
+          <h2 className="text-xl font-semibold">Шахматка</h2>
+          <div className="flex items-center gap-4">
+            <Button size="sm" onClick={() => setBookingDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Новое бронирование
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setStartDate(startOfDay(new Date()))}>
-              Сегодня
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setStartDate((prev) => addDays(prev, 10))}>
-              +10 дн. <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="ml-2">
-              <Plus className="h-4 w-4 mr-1" /> Бронь
-            </Button>
+            <div className="flex items-center gap-2">
+              <Switch id="show-active-only" checked={showOnlyActive} onCheckedChange={setShowOnlyActive} />
+              <Label htmlFor="show-active-only" className="text-sm text-muted-foreground cursor-pointer">
+                Только активные
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handlePrev}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleToday}>
+                Сегодня
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Сетка с фиксированными заголовками и Snap-эффектом */}
-        <div className="overflow-auto border rounded-xl max-h-[75vh] relative bg-white shadow-md snap-x snap-mandatory">
-          <table className="w-full border-separate border-spacing-0">
-            <thead className="sticky top-0 z-30 bg-white/95 backdrop-blur-md">
-              <tr>
-                {/* Фиксированный "Номер" */}
-                <th className="border-b border-r p-4 text-left text-[10px] font-bold w-24 sticky left-0 bg-slate-50 z-40 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                  НОМЕР
+        {/* Legend */}
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded bg-yellow-400/80" />
+            <span>{t("admin.pending")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded bg-blue-400/80" />
+            <span>{t("admin.approved")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded bg-green-500/80" />
+            <span>{t("admin.checkedIn")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded bg-muted-foreground/40 opacity-50" />
+            <span>{t("admin.checkedOut")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded bg-destructive/40 opacity-40" />
+            <span>{t("admin.cancelled")}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded border border-dashed border-muted-foreground/50 flex">
+              <div className="w-1/2" />
+              <div className="w-1/2 bg-green-500/50 rounded-r" />
+            </div>
+            <span>Полсуток</span>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="overflow-x-auto border rounded-lg">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="border-r p-2 text-left text-sm font-medium w-28 sticky left-0 bg-muted/50 z-10">
+                  Номер
                 </th>
                 {days.map((day) => (
                   <th
                     key={day.toISOString()}
                     className={cn(
-                      "border-b border-r p-3 text-center min-w-[150px] snap-center transition-colors",
-                      isSameDay(day, new Date()) ? "bg-primary/10" : "",
+                      "border-r p-1.5 text-center text-xs font-medium min-w-[90px]",
+                      isSameDay(day, new Date()) && "bg-primary/10",
                     )}
                   >
-                    <div className="text-[10px] text-muted-foreground uppercase">
-                      {format(day, "EEE", { locale: ru })}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-lg font-bold",
-                        isSameDay(day, new Date()) ? "text-primary" : "text-slate-700",
-                      )}
-                    >
-                      {format(day, "d MMM", { locale: ru })}
-                    </div>
+                    <div>{format(day, "EEE", { locale: ru })}</div>
+                    <div className="font-bold">{format(day, "d")}</div>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rooms.map((room) => (
-                <tr key={room.id} className="hover:bg-slate-50/50 transition-colors">
-                  {/* Номер комнаты (Sticky) */}
-                  <td className="border-b border-r p-4 font-black text-sm sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.1)]">
-                    {room.room_number}
+              {rooms.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                    Нет номеров
                   </td>
-                  {days.map((day) => {
-                    const { left, right } = getCellBookings(room.id, day);
-                    const isToday = isSameDay(day, new Date());
-
-                    return (
-                      <td
-                        key={day.toISOString()}
-                        className={cn("border-b border-r p-0 h-14 relative snap-center", isToday && "bg-primary/5")}
-                      >
-                        <div className="flex h-full w-full gap-0.5 p-1">
-                          <div
-                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-all active:scale-95"
-                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f1f5f9" }}
-                            onClick={() => left && (setSelectedBookingId(left.id), setDetailModalOpen(true))}
-                          >
-                            {left && (
-                              <span className="text-[9px] font-bold text-white truncate px-0.5">
-                                {left.guest_name.split(" ")[0]}
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className="w-1/2 h-full rounded flex items-center justify-center cursor-pointer hover:opacity-80 transition-all active:scale-95"
-                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f1f5f9" }}
-                            onClick={() => right && (setSelectedBookingId(right.id), setDetailModalOpen(true))}
-                          >
-                            {right && (
-                              <span className="text-[9px] font-bold text-white truncate px-0.5">
-                                {right.guest_name.split(" ")[0]}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                    );
-                  })}
                 </tr>
-              ))}
+              ) : (
+                rooms.map((room) => (
+                  <tr key={room.id} className="border-t hover:bg-muted/20">
+                    <td className="border-r p-2 text-sm font-medium sticky left-0 bg-background z-10">
+                      {room.room_number}
+                    </td>
+                    {days.map((day) => {
+                      const { left, right } = getCellBookings(room.id, day);
+
+                      return (
+                        <td
+                          key={day.toISOString()}
+                          className={cn(
+                            "border-r p-0 text-center relative",
+                            isSameDay(day, new Date()) && "bg-primary/5",
+                          )}
+                          style={{ height: "40px" }}
+                        >
+                          <div className="flex h-full w-full">
+                            {/* Left half */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={cn("w-1/2 h-full", left && "cursor-pointer")}
+                                  style={{ backgroundColor: left ? statusBgHex[left.status] : "transparent" }}
+                                  onClick={() => handleCellClick(left)}
+                                />
+                              </TooltipTrigger>
+                              {left && (
+                                <TooltipContent side="top">
+                                  <p>
+                                    {left.guest_name} — {statusLabelsRu[left.status]}
+                                  </p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                            {/* Right half */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={cn("w-1/2 h-full", right && "cursor-pointer")}
+                                  style={{ backgroundColor: right ? statusBgHex[right.status] : "transparent" }}
+                                  onClick={() => handleCellClick(right)}
+                                />
+                              </TooltipTrigger>
+                              {right && (
+                                <TooltipContent side="top">
+                                  <p>
+                                    {right.guest_name} — {statusLabelsRu[right.status]}
+                                  </p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Компоненты диалогов */}
+        {/* Manual Booking Dialog */}
         <ManualBookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
           onSuccess={() => fetchData()}
           hotelId={hotelId}
         />
+
+        {/* Booking Detail Modal */}
         {selectedBookingId && (
           <BookingDetailModal
             open={detailModalOpen}
