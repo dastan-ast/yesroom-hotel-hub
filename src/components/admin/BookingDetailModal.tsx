@@ -474,33 +474,40 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                     )}
 
                     {!isMulti && (
-                      <div className="space-y-1">
+                      <div className="space-y-2">
                         <Label className="text-muted-foreground text-xs">Номер</Label>
-                        <div className="flex items-center gap-2">
-                          <BedDouble className="h-4 w-4 text-muted-foreground" />
-                          <span>
-                            {booking.allRooms.length > 0
-                              ? booking.allRooms.map(r => `№ ${r.room_number} (${r.room_type_name})`).join(', ')
-                              : 'Не назначен'}
-                          </span>
-                          {booking.is_half_day && (
-                            <Badge variant="secondary" className="text-xs">Полсуток</Badge>
-                          )}
-                          {['approved', 'checked_in'].includes(booking.status) && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                setRoomChangeBookingId(booking.id);
-                                setRoomChangeDialogOpen(true);
-                              }}
-                            >
-                              <ArrowRightLeft className="h-3 w-3 mr-1" />
-                              Сменить номер
-                            </Button>
-                          )}
-                        </div>
+                        {booking.allRooms.length > 0 ? (
+                          booking.allRooms.map((room, rIdx) => (
+                            <div key={room.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
+                              <div className="flex items-center gap-2">
+                                <BedDouble className="h-4 w-4 text-muted-foreground" />
+                                <span>№ {room.room_number} ({room.room_type_name})</span>
+                              </div>
+                              {['approved', 'checked_in'].includes(booking.status) && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    setRoomChangeBookingId(booking.id);
+                                    setRoomChangeDialogOpen(true);
+                                  }}
+                                >
+                                  <ArrowRightLeft className="h-3 w-3 mr-1" />
+                                  Сменить номер
+                                </Button>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <BedDouble className="h-4 w-4 text-muted-foreground" />
+                            <span>Не назначен</span>
+                          </div>
+                        )}
+                        {booking.is_half_day && (
+                          <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+                        )}
                       </div>
                     )}
 
