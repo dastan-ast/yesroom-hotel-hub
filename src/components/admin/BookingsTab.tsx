@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search, AlertTriangle } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search, AlertTriangle, BedDouble } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
@@ -51,6 +51,16 @@ interface Booking {
   additional_info: Record<string, any> | null;
 }
 
+/** A grouped booking card representing 1+ bookings for same guest */
+interface BookingGroup {
+  key: string;
+  primary: Booking;
+  bookings: Booking[];
+  roomCount: number;
+  hasDifferentDates: boolean;
+  isGrouped: boolean;
+}
+
 const statusColors: Record<BookingStatus, string> = {
   pending: 'bg-yellow-500/20 text-yellow-700 border-yellow-500',
   approved: 'bg-blue-500/20 text-blue-700 border-blue-500',
@@ -67,6 +77,8 @@ const statusPriority: Record<BookingStatus, number> = {
   checked_out: 3,
   cancelled: 4,
 };
+
+const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'approved', 'checked_in'];
 
 export function BookingsTab({ hotelId }: { hotelId: string }) {
   const { t } = useTranslation();
@@ -97,7 +109,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   // Booking detail modal state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [bookingToView, setBookingToView] = useState<Booking | null>(null);
+  const [detailBookingIds, setDetailBookingIds] = useState<string[]>([]);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -153,6 +165,19 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
+  // Check-in all bookings in a group
+  const handleCheckInGroup = async (group: BookingGroup) => {
+    for (const booking of group.bookings) {
+      if (booking.status === 'approved' && booking.room_id) {
+        await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', booking.id);
+        await supabase.from('rooms').update({ status: 'occupied' }).eq('id', booking.room_id);
+      }
+    }
+    toast.success(t('common.success'));
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: group.primary.id, details: { guest_name: group.primary.guest_name, grouped: group.bookings.length } });
+    fetchBookings();
+  };
+
   // Open checkout modal instead of direct checkout
   const handleOpenCheckout = (booking: Booking) => {
     setBookingToCheckout(booking);
@@ -160,8 +185,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   };
 
   // Open detail modal
-  const handleOpenDetail = (booking: Booking) => {
-    setBookingToView(booking);
+  const handleOpenDetail = (group: BookingGroup) => {
+    setDetailBookingIds(group.bookings.map(b => b.id));
     setDetailModalOpen(true);
   };
 
@@ -181,6 +206,17 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
+  // Approve all bookings in group
+  const handleQuickApproveGroup = async (group: BookingGroup) => {
+    for (const booking of group.bookings) {
+      if (booking.status === 'pending') {
+        await supabase.from('bookings').update({ status: 'approved' }).eq('id', booking.id);
+      }
+    }
+    toast.success('Все бронирования подтверждены');
+    fetchBookings();
+  };
+
   // Cancel booking with confirmation
   const handleCancelWithConfirm = (booking: Booking) => {
     setBookingToCancel(booking);
@@ -191,7 +227,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const confirmCancellation = async () => {
     if (!bookingToCancel) return;
 
-    // Build updated additional_info with cancellation reason
     const updatedAdditionalInfo = {
       ...(bookingToCancel.additional_info || {}),
       cancellation_reason: cancelReason || null,
@@ -211,16 +246,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
-    // Release room if assigned
     if (bookingToCancel.room_id) {
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({ status: 'available' })
-        .eq('id', bookingToCancel.room_id);
-
-      if (roomError) {
-        toast.error('Ошибка при освобождении номера');
-      }
+      await supabase.from('rooms').update({ status: 'available' }).eq('id', bookingToCancel.room_id);
     }
 
     toast.success('Бронирование отменено');
@@ -250,16 +277,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
-    // Return room to booked status
     if (bookingToUndoCheckIn.room_id) {
-      const { error: roomError } = await supabase
-        .from('rooms')
-        .update({ status: 'booked' })
-        .eq('id', bookingToUndoCheckIn.room_id);
-
-      if (roomError) {
-        toast.error('Ошибка при обновлении статуса номера');
-      }
+      await supabase.from('rooms').update({ status: 'booked' }).eq('id', bookingToUndoCheckIn.room_id);
     }
 
     toast.success('Заселение отменено');
@@ -282,31 +301,14 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const confirmDelete = async () => {
     if (!bookingToDelete) return;
 
-    // Delete related booking_rooms entries
-    await supabase
-      .from('booking_rooms')
-      .delete()
-      .eq('booking_id', bookingToDelete.id);
+    await supabase.from('booking_rooms').delete().eq('booking_id', bookingToDelete.id);
+    await supabase.from('booking_services').delete().eq('booking_id', bookingToDelete.id);
 
-    // Delete related booking_services entries
-    await supabase
-      .from('booking_services')
-      .delete()
-      .eq('booking_id', bookingToDelete.id);
-
-    // Release room if assigned
     if (bookingToDelete.room_id) {
-      await supabase
-        .from('rooms')
-        .update({ status: 'available' })
-        .eq('id', bookingToDelete.room_id);
+      await supabase.from('rooms').update({ status: 'available' }).eq('id', bookingToDelete.room_id);
     }
 
-    // Delete the booking
-    const { error } = await supabase
-      .from('bookings')
-      .delete()
-      .eq('id', bookingToDelete.id);
+    const { error } = await supabase.from('bookings').delete().eq('id', bookingToDelete.id);
 
     if (error) {
       toast.error(t('common.error'));
@@ -320,7 +322,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Check if booking is overdue (checked_in past checkout date)
+  // Check if booking is overdue
   const isOverdue = (booking: Booking) => {
     if (booking.status !== 'checked_in') return false;
     const today = new Date();
@@ -330,36 +332,75 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     return checkOut < today;
   };
 
-  // Filtered and sorted bookings
-  const filteredBookings = useMemo(() => {
-    let result = [...bookings];
+  const isGroupOverdue = (group: BookingGroup) => group.bookings.some(isOverdue);
 
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      result = result.filter(b => b.status === statusFilter);
+  // Group bookings by guest_phone + status for active statuses
+  const groupedBookings = useMemo((): BookingGroup[] => {
+    const groups: BookingGroup[] = [];
+    const grouped = new Map<string, Booking[]>();
+
+    for (const booking of bookings) {
+      // Only group active statuses
+      if (ACTIVE_STATUSES.includes(booking.status)) {
+        const key = `${booking.guest_phone}__${booking.status}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(booking);
+      } else {
+        // Non-active bookings go as individual entries
+        groups.push({
+          key: booking.id,
+          primary: booking,
+          bookings: [booking],
+          roomCount: 1,
+          hasDifferentDates: false,
+          isGrouped: false,
+        });
+      }
     }
 
-    // Apply search filter
+    for (const [key, bks] of grouped.entries()) {
+      const hasDifferentDates = bks.some(b => 
+        b.check_in_date !== bks[0].check_in_date || b.check_out_date !== bks[0].check_out_date
+      );
+      groups.push({
+        key,
+        primary: bks[0],
+        bookings: bks,
+        roomCount: bks.length,
+        hasDifferentDates,
+        isGrouped: bks.length > 1,
+      });
+    }
+
+    return groups;
+  }, [bookings]);
+
+  // Filtered and sorted groups
+  const filteredGroups = useMemo(() => {
+    let result = [...groupedBookings];
+
+    if (statusFilter !== 'all') {
+      result = result.filter(g => g.primary.status === statusFilter);
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(b => 
-        b.guest_name.toLowerCase().includes(query) ||
-        b.guest_phone.includes(query)
+      result = result.filter(g => 
+        g.primary.guest_name.toLowerCase().includes(query) ||
+        g.primary.guest_phone.includes(query)
       );
     }
 
-    // Sort: overdue first, then by status priority
     result.sort((a, b) => {
-      const aOverdue = isOverdue(a) ? -1 : 0;
-      const bOverdue = isOverdue(b) ? -1 : 0;
+      const aOverdue = isGroupOverdue(a) ? -1 : 0;
+      const bOverdue = isGroupOverdue(b) ? -1 : 0;
       if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-      return statusPriority[a.status] - statusPriority[b.status];
+      return statusPriority[a.primary.status] - statusPriority[b.primary.status];
     });
 
     return result;
-  }, [bookings, statusFilter, searchQuery]);
+  }, [groupedBookings, statusFilter, searchQuery]);
 
-  // Count overdue bookings
   const overdueCount = useMemo(() => bookings.filter(isOverdue).length, [bookings]);
 
   const getStatusLabel = (status: BookingStatus) => {
@@ -383,6 +424,28 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   };
 
   const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+
+  // Get room type names for a group
+  const getRoomTypeNames = (group: BookingGroup) => {
+    const names = group.bookings
+      .map(b => b.room_types?.name)
+      .filter(Boolean);
+    if (names.length === 0) return null;
+    const unique = [...new Set(names)];
+    return unique.join(', ');
+  };
+
+  // Get date range display for a group
+  const getDateDisplay = (group: BookingGroup) => {
+    if (!group.isGrouped || !group.hasDifferentDates) {
+      return `${format(new Date(group.primary.check_in_date), 'dd.MM')} — ${format(new Date(group.primary.check_out_date), 'dd.MM.yyyy')}`;
+    }
+    const allCheckIns = group.bookings.map(b => b.check_in_date);
+    const allCheckOuts = group.bookings.map(b => b.check_out_date);
+    const minIn = allCheckIns.sort()[0];
+    const maxOut = allCheckOuts.sort().reverse()[0];
+    return `${format(new Date(minIn), 'dd.MM')} — ${format(new Date(maxOut), 'dd.MM.yyyy')}`;
+  };
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
@@ -434,137 +497,161 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </div>
       )}
 
-      {filteredBookings.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {bookings.length === 0 ? t('admin.noBookings') : 'Нет бронирований по заданным фильтрам'}
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredBookings.map((booking) => (
-            <div
-              key={booking.id}
-              className={cn(
-                "flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border gap-4",
-                isOverdue(booking) 
-                  ? "bg-destructive/5 border-destructive/40 ring-1 ring-destructive/20"
-                  : "bg-card"
-              )}
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-medium">{booking.guest_name}</span>
-                  <Badge className={statusColors[booking.status]} variant="outline">
-                    {getStatusLabel(booking.status)}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {getSourceLabel(booking.source)}
-                  </Badge>
-                  {booking.prepayment_received && (
-                    <Badge variant="outline" className="text-green-600 border-green-600">
-                      ₸ {t('admin.prepayment')}
+          {filteredGroups.map((group) => {
+            const overdue = isGroupOverdue(group);
+            const primary = group.primary;
+
+            return (
+              <div
+                key={group.key}
+                className={cn(
+                  "flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border gap-4",
+                  overdue
+                    ? "bg-destructive/5 border-destructive/40 ring-1 ring-destructive/20"
+                    : "bg-card"
+                )}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-medium">{primary.guest_name}</span>
+                    <Badge className={statusColors[primary.status]} variant="outline">
+                      {getStatusLabel(primary.status)}
                     </Badge>
-                  )}
-                  {isOverdue(booking) && (
-                    <Badge variant="destructive" className="text-xs animate-pulse">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Просрочен
+                    <Badge variant="secondary" className="text-xs">
+                      {getSourceLabel(primary.source)}
                     </Badge>
-                  )}
+                    {group.isGrouped && (
+                      <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                        <BedDouble className="h-3 w-3 mr-1" />
+                        {group.roomCount} номеров
+                      </Badge>
+                    )}
+                    {primary.prepayment_received && (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        ₸ {t('admin.prepayment')}
+                      </Badge>
+                    )}
+                    {overdue && (
+                      <Badge variant="destructive" className="text-xs animate-pulse">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Просрочен
+                      </Badge>
+                    )}
+                    {group.hasDifferentDates && (
+                      <Badge variant="outline" className="text-xs text-amber-600 border-amber-500">
+                        Разные даты
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <button
+                      onClick={() => setHistoryPhone(primary.guest_phone)}
+                      className="hover:text-primary flex items-center gap-1"
+                    >
+                      <Phone className="h-3 w-3" />
+                      {primary.guest_phone}
+                    </button>
+                    <a
+                      href={`https://wa.me/${formatPhone(primary.guest_phone).replace('+', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                    {getRoomTypeNames(group) && (
+                      <span>• {getRoomTypeNames(group)}</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {getDateDisplay(group)}
+                  </p>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <button
-                    onClick={() => setHistoryPhone(booking.guest_phone)}
-                    className="hover:text-primary flex items-center gap-1"
-                  >
-                    <Phone className="h-3 w-3" />
-                    {booking.guest_phone}
-                  </button>
-                  <a
-                    href={`https://wa.me/${formatPhone(booking.guest_phone).replace('+', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-green-600 hover:text-green-700"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
-                  <span>• {booking.room_types?.name}</span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(booking.check_in_date), 'dd.MM')} —{' '}
-                  {format(new Date(booking.check_out_date), 'dd.MM.yyyy')}
-                </p>
-              </div>
                 <div className="flex gap-2 flex-wrap">
                   {/* View detail button for all statuses */}
-                  <Button size="sm" variant="ghost" onClick={() => handleOpenDetail(booking)}>
+                  <Button size="sm" variant="ghost" onClick={() => handleOpenDetail(group)}>
                     <Eye className="h-4 w-4" />
                   </Button>
-                  {booking.status === 'pending' && (
+                  {primary.status === 'pending' && (
                     <>
-                      <Button size="sm" onClick={() => {
-                        setSelectedBooking(booking);
-                        setAssignDialogOpen(true);
-                      }}>
-                        <DoorOpen className="h-4 w-4 mr-1" />
-                        Назначить номер
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleQuickApprove(booking.id)}>
+                      {!group.isGrouped && (
+                        <Button size="sm" onClick={() => {
+                          setSelectedBooking(primary);
+                          setAssignDialogOpen(true);
+                        }}>
+                          <DoorOpen className="h-4 w-4 mr-1" />
+                          Назначить номер
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => 
+                        group.isGrouped ? handleQuickApproveGroup(group) : handleQuickApprove(primary.id)
+                      }>
                         <CheckCircle className="h-4 w-4 mr-1" />
                         {t('admin.approve')}
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
+                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(primary)}>
                         <XCircle className="h-4 w-4 mr-1" />
                         Отменить
                       </Button>
                     </>
                   )}
-                  {booking.status === 'approved' && !booking.room_id && (
+                  {primary.status === 'approved' && !primary.room_id && !group.isGrouped && (
                     <Button size="sm" variant="outline" onClick={() => {
-                      setSelectedBooking(booking);
+                      setSelectedBooking(primary);
                       setAssignDialogOpen(true);
                     }}>
                       <DoorOpen className="h-4 w-4 mr-1" />
                       Назначить номер
                     </Button>
                   )}
-                  {booking.status === 'approved' && (
+                  {primary.status === 'approved' && (
                     <>
-                      <Button size="sm" onClick={() => handleCheckIn(booking)}>
+                      <Button size="sm" onClick={() => 
+                        group.isGrouped ? handleCheckInGroup(group) : handleCheckIn(primary)
+                      }>
                         <LogIn className="h-4 w-4 mr-1" />
                         {t('admin.checkIn')}
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(booking)}>
+                      <Button size="sm" variant="destructive" onClick={() => handleCancelWithConfirm(primary)}>
                         <XCircle className="h-4 w-4 mr-1" />
                         Отменить
                       </Button>
                     </>
                   )}
-                  {booking.status === 'checked_in' && (
+                  {primary.status === 'checked_in' && (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckout(booking)}>
+                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckout(primary)}>
                         <LogOut className="h-4 w-4 mr-1" />
                         {t('admin.checkOut')}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleUndoCheckInWithConfirm(booking)}>
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Отменить заселение
-                      </Button>
+                      {!group.isGrouped && (
+                        <Button size="sm" variant="outline" onClick={() => handleUndoCheckInWithConfirm(primary)}>
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Отменить заселение
+                        </Button>
+                      )}
                     </>
                   )}
-                  {/* Delete button for owners (not for checked_in) */}
-                  {isOwner && booking.status !== 'checked_in' && (
+                  {isOwner && primary.status !== 'checked_in' && !group.isGrouped && (
                     <Button 
                       size="sm" 
                       variant="ghost" 
                       className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteWithConfirm(booking)}
+                      onClick={() => handleDeleteWithConfirm(primary)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -656,11 +743,11 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       )}
 
       {/* Booking Detail Modal */}
-      {bookingToView && (
+      {detailBookingIds.length > 0 && (
         <BookingDetailModal
           open={detailModalOpen}
           onOpenChange={setDetailModalOpen}
-          bookingId={bookingToView.id}
+          bookingIds={detailBookingIds}
           hotelId={hotelId}
           onUpdate={fetchBookings}
         />

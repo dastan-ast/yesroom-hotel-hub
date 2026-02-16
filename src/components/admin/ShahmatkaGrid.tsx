@@ -342,7 +342,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           <BookingDetailModal
             open={detailModalOpen}
             onOpenChange={setDetailModalOpen}
-            bookingId={selectedBookingId}
+            bookingIds={[selectedBookingId]}
             hotelId={hotelId}
             onUpdate={fetchData}
           />
