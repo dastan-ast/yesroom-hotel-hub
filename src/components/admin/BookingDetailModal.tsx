@@ -29,8 +29,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus } from 'lucide-react';
+import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft } from 'lucide-react';
 import { BookingServicesTab } from './BookingServicesTab';
+import { RoomAssignDialog } from './RoomAssignDialog';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -52,6 +53,8 @@ interface BookingDetails {
   rooms: { room_number: string } | null;
   room_types: { name: string; price_per_night: number } | null;
   is_half_day?: boolean;
+  // All assigned rooms (from booking_rooms + room_id)
+  allRooms: { id: string; room_number: string; room_type_name: string }[];
 }
 
 interface Props {
@@ -101,6 +104,10 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   const [newCheckoutDate, setNewCheckoutDate] = useState('');
   const [processingExtend, setProcessingExtend] = useState(false);
 
+  // Room change state
+  const [roomChangeDialogOpen, setRoomChangeDialogOpen] = useState(false);
+  const [roomChangeBookingId, setRoomChangeBookingId] = useState<string | null>(null);
+
   const isMulti = bookingIds.length > 1;
   const primary = allBookings[0] || null;
 
@@ -125,10 +132,42 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       .in('id', bookingIds);
 
     if (data) {
-      setAllBookings(data as BookingDetails[]);
+      // Fetch all booking_rooms for these bookings
+      const { data: allBookingRooms } = await supabase
+        .from('booking_rooms')
+        .select('booking_id, room_id, rooms:room_id(id, room_number, room_type_id, room_types(name))')
+        .in('booking_id', bookingIds);
+
+      const bookingRoomsMap = new Map<string, { id: string; room_number: string; room_type_name: string }[]>();
+      (allBookingRooms || []).forEach((br: any) => {
+        if (!bookingRoomsMap.has(br.booking_id)) bookingRoomsMap.set(br.booking_id, []);
+        const room = br.rooms;
+        if (room) {
+          bookingRoomsMap.get(br.booking_id)!.push({
+            id: room.id,
+            room_number: room.room_number,
+            room_type_name: room.room_types?.name || '',
+          });
+        }
+      });
+
+      const enriched = data.map((b: any) => {
+        const multiRooms = bookingRoomsMap.get(b.id) || [];
+        // If no booking_rooms but has room_id, use that
+        if (multiRooms.length === 0 && b.room_id && b.rooms) {
+          multiRooms.push({
+            id: b.room_id,
+            room_number: b.rooms.room_number,
+            room_type_name: b.room_types?.name || '',
+          });
+        }
+        return { ...b, allRooms: multiRooms } as BookingDetails;
+      });
+
+      setAllBookings(enriched);
       const prepVals: Record<string, string> = {};
-      data.forEach(b => {
-        prepVals[b.id] = ((b as any).prepayment_amount ?? 0).toString();
+      enriched.forEach(b => {
+        prepVals[b.id] = (b.prepayment_amount ?? 0).toString();
       });
       setPrepaymentValues(prepVals);
     }
@@ -400,10 +439,12 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                 return (
                   <div key={booking.id} className="space-y-3">
                     {isMulti && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <BedDouble className="h-4 w-4 text-primary" />
                         <span className="font-medium text-sm">
-                          Номер {idx + 1}: {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : 'Не назначен'}
+                          Номер {idx + 1}: {booking.allRooms.length > 0
+                            ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ')
+                            : 'Не назначен'}
                           {booking.room_types?.name && ` — ${booking.room_types.name}`}
                         </span>
                         {bOverdue && (
@@ -415,6 +456,20 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                         {booking.is_half_day && (
                           <Badge variant="secondary" className="text-xs">Полсуток</Badge>
                         )}
+                        {['approved', 'checked_in'].includes(booking.status) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setRoomChangeBookingId(booking.id);
+                              setRoomChangeDialogOpen(true);
+                            }}
+                          >
+                            <ArrowRightLeft className="h-3 w-3 mr-1" />
+                            Сменить
+                          </Button>
+                        )}
                       </div>
                     )}
 
@@ -424,11 +479,26 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                         <div className="flex items-center gap-2">
                           <BedDouble className="h-4 w-4 text-muted-foreground" />
                           <span>
-                            {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : 'Не назначен'}
-                            {booking.room_types?.name && ` — ${booking.room_types.name}`}
+                            {booking.allRooms.length > 0
+                              ? booking.allRooms.map(r => `№ ${r.room_number} (${r.room_type_name})`).join(', ')
+                              : 'Не назначен'}
                           </span>
                           {booking.is_half_day && (
                             <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+                          )}
+                          {['approved', 'checked_in'].includes(booking.status) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setRoomChangeBookingId(booking.id);
+                                setRoomChangeDialogOpen(true);
+                              }}
+                            >
+                              <ArrowRightLeft className="h-3 w-3 mr-1" />
+                              Сменить номер
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -551,7 +621,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                   {isMulti && (
                     <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
                       <BedDouble className="h-4 w-4 text-primary" />
-                      {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : `Номер ${idx + 1}`}
+                      {booking.allRooms.length > 0 ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ') : `Номер ${idx + 1}`}
                       {booking.room_types?.name && ` — ${booking.room_types.name}`}
                     </h3>
                   )}
@@ -576,7 +646,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                       {isMulti && (
                         <p className="font-medium text-sm flex items-center gap-2">
                           <BedDouble className="h-4 w-4 text-primary" />
-                          {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : `Номер ${idx + 1}`}
+                          {booking.allRooms.length > 0 ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ') : `Номер ${idx + 1}`}
                           {booking.room_types?.name && ` — ${booking.room_types.name}`}
                         </p>
                       )}
@@ -743,6 +813,57 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Room Change Dialog */}
+      {roomChangeBookingId && (() => {
+        const changingBooking = allBookings.find(b => b.id === roomChangeBookingId);
+        return (
+          <RoomAssignDialog
+            open={roomChangeDialogOpen}
+            onOpenChange={setRoomChangeDialogOpen}
+            bookingId={roomChangeBookingId}
+            hotelId={hotelId}
+            roomTypeId={changingBooking?.room_type_id}
+            checkInDate={changingBooking?.check_in_date}
+            checkOutDate={changingBooking?.check_out_date}
+            multiRoom={true}
+            onSuccess={async () => {
+              // Get old room info for logging
+              const oldRooms = changingBooking?.allRooms.map(r => r.room_number).join(', ') || 'не назначен';
+              
+              // Release old rooms
+              if (changingBooking?.allRooms && changingBooking.allRooms.length > 0) {
+                const oldStatus = changingBooking.status === 'checked_in' ? 'available' : 'available';
+                await supabase
+                  .from('rooms')
+                  .update({ status: oldStatus as any })
+                  .in('id', changingBooking.allRooms.map(r => r.id));
+              }
+
+              // Log room change for owner notification
+              if (user) {
+                logAdminAction({
+                  hotelId,
+                  userId: user.id,
+                  userName: profile?.full_name || '',
+                  action: 'room_changed',
+                  entityType: 'booking',
+                  entityId: roomChangeBookingId,
+                  details: {
+                    guest_name: changingBooking?.guest_name,
+                    old_rooms: oldRooms,
+                    status: changingBooking?.status,
+                  },
+                });
+              }
+
+              fetchBookings();
+              onUpdate?.();
+              setRoomChangeBookingId(null);
+            }}
+          />
+        );
+      })()}
     </>
   );
 }

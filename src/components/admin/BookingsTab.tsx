@@ -136,7 +136,28 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   };
 
   const handleCheckIn = async (booking: Booking) => {
-    if (!booking.room_id) {
+    // Check both room_id and booking_rooms for assigned rooms
+    const roomIdsToOccupy: string[] = [];
+    
+    if (booking.room_id) {
+      roomIdsToOccupy.push(booking.room_id);
+    }
+    
+    // Also get rooms from booking_rooms table
+    const { data: bookingRooms } = await supabase
+      .from('booking_rooms')
+      .select('room_id')
+      .eq('booking_id', booking.id);
+    
+    if (bookingRooms) {
+      for (const br of bookingRooms) {
+        if (!roomIdsToOccupy.includes(br.room_id)) {
+          roomIdsToOccupy.push(br.room_id);
+        }
+      }
+    }
+
+    if (roomIdsToOccupy.length === 0) {
       toast.error('Номер не назначен');
       return;
     }
@@ -151,31 +172,53 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
+    // Mark ALL assigned rooms as occupied
     const { error: roomError } = await supabase
       .from('rooms')
       .update({ status: 'occupied' })
-      .eq('id', booking.room_id);
+      .in('id', roomIdsToOccupy);
 
     if (roomError) {
       toast.error(t('common.error'));
       return;
     }
 
-    toast.success(t('common.success'));
-    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: booking.id, details: { guest_name: booking.guest_name } });
+    toast.success(roomIdsToOccupy.length > 1 
+      ? `Гость заселён в ${roomIdsToOccupy.length} номеров` 
+      : t('common.success')
+    );
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: booking.id, details: { guest_name: booking.guest_name, rooms_count: roomIdsToOccupy.length } });
     fetchBookings();
   };
 
   // Check-in all bookings in a group
   const handleCheckInGroup = async (group: BookingGroup) => {
+    let totalRooms = 0;
     for (const booking of group.bookings) {
-      if (booking.status === 'approved' && booking.room_id) {
-        await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', booking.id);
-        await supabase.from('rooms').update({ status: 'occupied' }).eq('id', booking.room_id);
+      if (booking.status !== 'approved') continue;
+      
+      const roomIdsToOccupy: string[] = [];
+      if (booking.room_id) roomIdsToOccupy.push(booking.room_id);
+      
+      const { data: bookingRooms } = await supabase
+        .from('booking_rooms')
+        .select('room_id')
+        .eq('booking_id', booking.id);
+      
+      if (bookingRooms) {
+        for (const br of bookingRooms) {
+          if (!roomIdsToOccupy.includes(br.room_id)) roomIdsToOccupy.push(br.room_id);
+        }
       }
+
+      if (roomIdsToOccupy.length === 0) continue;
+
+      await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', booking.id);
+      await supabase.from('rooms').update({ status: 'occupied' }).in('id', roomIdsToOccupy);
+      totalRooms += roomIdsToOccupy.length;
     }
-    toast.success(t('common.success'));
-    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: group.primary.id, details: { guest_name: group.primary.guest_name, grouped: group.bookings.length } });
+    toast.success(`Гость заселён в ${totalRooms} номеров`);
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_checked_in', entityType: 'booking', entityId: group.primary.id, details: { guest_name: group.primary.guest_name, grouped: group.bookings.length, rooms_count: totalRooms } });
     fetchBookings();
   };
 
