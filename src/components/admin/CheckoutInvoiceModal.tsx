@@ -149,6 +149,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingId, hotelId, o
   const dailyRate = booking?.daily_rate ?? booking?.room_types?.price_per_night ?? 0;
   const allRooms = getAllRoomsDisplay();
   const roomCount = Math.max(allRooms.length, 1);
+  // Room count multiplier for backward compat with old booking_rooms entries
   const stayTotal = nights * dailyRate * roomCount;
   const servicesTotal = services.reduce((sum, s) => sum + (s.total_price || 0), 0);
   const grandTotal = stayTotal + servicesTotal;
