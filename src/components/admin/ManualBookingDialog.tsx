@@ -318,56 +318,49 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
     setLoading(true);
     
-    // Determine status based on room selection
     const hasRoomsSelected = selectedRooms.length > 0;
     const status = hasRoomsSelected ? 'approved' : 'pending';
-    
-    const { data: booking, error } = await supabase.from('bookings').insert({
-      guest_name: data.guest_name,
-      guest_phone: phoneMask.value,
-      room_type_id: data.room_type_id,
-      room_id: hasRoomsSelected ? selectedRooms[0] : null,
-      check_in_date: format(data.check_in_date, 'yyyy-MM-dd'),
-      check_out_date: data.is_half_day 
-        ? format(data.check_in_date, 'yyyy-MM-dd') 
-        : format(data.check_out_date!, 'yyyy-MM-dd'),
-      source: data.source,
-      prepayment_received: data.prepayment_received,
-      prepayment_amount: data.prepayment_received ? (data.prepayment_amount || 0) : 0,
-      guest_comment: data.guest_comment || null,
-      guest_count: data.guest_count || 1,
-      status: status,
-      hotel_id: hotelId,
-      additional_info: {
-        ...(hasRoomsSelected ? { total_rooms: selectedRooms.length } : {}),
-        ...(data.is_half_day ? { half_day_check_in_hour: halfDayCheckInHour } : {}),
-      },
-      is_half_day: data.is_half_day,
-    } as any).select('id').single();
 
-    if (error || !booking) {
-      toast.error(t('common.error'));
-      setLoading(false);
-      return;
-    }
+    const checkOutDate = data.is_half_day 
+      ? format(data.check_in_date, 'yyyy-MM-dd') 
+      : format(data.check_out_date!, 'yyyy-MM-dd');
 
-    // If rooms were selected, create booking_rooms entries
-    if (hasRoomsSelected) {
-      const roomEntries = selectedRooms.map(roomId => ({
-        booking_id: booking.id,
+    // ONE ROOM = ONE BOOKING: Create separate booking for each selected room
+    const roomsToCreate = hasRoomsSelected ? selectedRooms : [null];
+    const createdBookingIds: string[] = [];
+
+    for (const roomId of roomsToCreate) {
+      const { data: booking, error } = await supabase.from('bookings').insert({
+        guest_name: data.guest_name,
+        guest_phone: phoneMask.value,
+        room_type_id: data.room_type_id,
         room_id: roomId,
+        check_in_date: format(data.check_in_date, 'yyyy-MM-dd'),
+        check_out_date: checkOutDate,
+        source: data.source,
+        prepayment_received: data.prepayment_received,
+        prepayment_amount: data.prepayment_received ? (data.prepayment_amount || 0) : 0,
+        guest_comment: data.guest_comment || null,
+        guest_count: data.guest_count || 1,
+        status: status,
         hotel_id: hotelId,
-      }));
+        additional_info: {
+          ...(data.is_half_day ? { half_day_check_in_hour: halfDayCheckInHour } : {}),
+        },
+        is_half_day: data.is_half_day,
+      } as any).select('id').single();
 
-      const { error: bookingRoomsError } = await supabase
-        .from('booking_rooms')
-        .insert(roomEntries);
-
-      if (bookingRoomsError) {
-        console.error('Error inserting booking_rooms:', bookingRoomsError);
+      if (error || !booking) {
+        toast.error(t('common.error'));
+        setLoading(false);
+        return;
       }
 
-      // Update room statuses to booked
+      createdBookingIds.push(booking.id);
+    }
+
+    // Update room statuses to booked
+    if (hasRoomsSelected) {
       await supabase
         .from('rooms')
         .update({ status: 'booked' })
@@ -376,12 +369,17 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
     setLoading(false);
 
-    // Sync to external (async)
-    syncBookingToExternal(booking.id).catch(console.error);
+    // Sync to external (async) - sync first booking
+    if (createdBookingIds.length > 0) {
+      syncBookingToExternal(createdBookingIds[0]).catch(console.error);
+    }
 
-    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_created', entityType: 'booking', entityId: booking.id, details: { guest_name: data.guest_name, phone: phoneMask.value } });
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_created', entityType: 'booking', entityId: createdBookingIds[0], details: { guest_name: data.guest_name, phone: phoneMask.value, rooms_count: roomsToCreate.length } });
 
-    toast.success(t('common.success'));
+    toast.success(selectedRooms.length > 1 
+      ? `Создано ${selectedRooms.length} бронирований` 
+      : t('common.success')
+    );
     onOpenChange(false);
     onSuccess();
   };

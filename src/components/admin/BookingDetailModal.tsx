@@ -202,11 +202,13 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
     const dailyRate = booking.daily_rate ?? booking.room_types?.price_per_night ?? 0;
-    const stayTotal = nights * dailyRate;
+    // Multiply by room count for backward compat with old booking_rooms entries
+    const roomCount = Math.max(booking.allRooms.length, 1);
+    const stayTotal = nights * dailyRate * roomCount;
     const servicesTotal = servicesTotals[booking.id] || 0;
     const total = stayTotal + servicesTotal;
     const prepayment = parseFloat(prepaymentValues[booking.id]) || 0;
-    return { nights, dailyRate, stayTotal, servicesTotal, total, prepayment };
+    return { nights, dailyRate, roomCount, stayTotal, servicesTotal, total, prepayment };
   };
 
   // Grand totals across all bookings
@@ -625,7 +627,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                       )}
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">
-                          Проживание ({calc.nights} {calc.nights === 1 ? 'ночь' : calc.nights < 5 ? 'ночи' : 'ночей'} × {calc.dailyRate.toLocaleString()} ₸)
+                          Проживание ({calc.roomCount > 1 ? `${calc.roomCount} ном. × ` : ''}{calc.nights} {calc.nights === 1 ? 'ночь' : calc.nights < 5 ? 'ночи' : 'ночей'} × {calc.dailyRate.toLocaleString()} ₸)
                         </span>
                         <span>{calc.stayTotal.toLocaleString()} ₸</span>
                       </div>
