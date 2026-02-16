@@ -7,6 +7,7 @@ import { format, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
 import { syncBookingToExternal } from '@/lib/syncBooking';
+import { checkRoomAvailability } from '@/lib/checkRoomAvailability';
 import { useAuth } from '@/contexts/AuthContext';
 import { logAdminAction } from '@/lib/activityLog';
 import {
@@ -25,7 +26,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CalendarIcon, ChevronDown, BedDouble, User } from 'lucide-react';
+import { CalendarIcon, ChevronDown, BedDouble, User, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -74,6 +84,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const [roomsOpen, setRoomsOpen] = useState(false);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
   const phoneMask = usePhoneMask();
 
   // Client search state
@@ -287,6 +298,22 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
     if (!data.is_half_day && !data.check_out_date) {
       toast.error('Укажите дату выезда');
       return;
+    }
+
+    const checkInStr = format(data.check_in_date, 'yyyy-MM-dd');
+    const checkOutStr = data.is_half_day
+      ? format(addDays(data.check_in_date, 1), 'yyyy-MM-dd')
+      : format(data.check_out_date!, 'yyyy-MM-dd');
+
+    // Check room pool availability
+    if (data.room_type_id && selectedRooms.length === 0) {
+      const result = await checkRoomAvailability(hotelId, data.room_type_id, checkInStr, checkOutStr);
+      if (!result.available) {
+        const typeName = roomTypes.find(rt => rt.id === data.room_type_id)?.name || '';
+        setAvailabilityWarning(
+          `На выбранные даты все номера типа "${typeName}" заняты (${result.totalRooms} из ${result.totalRooms}). Бронирование всё равно будет создано со статусом "Ожидает".`
+        );
+      }
     }
 
     setLoading(true);
@@ -753,6 +780,23 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
           </form>
         </Form>
       </DialogContent>
+      {/* Room Availability Warning */}
+      <AlertDialog open={!!availabilityWarning} onOpenChange={(open) => !open && setAvailabilityWarning(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Нет свободных номеров
+            </AlertDialogTitle>
+            <AlertDialogDescription>{availabilityWarning}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setAvailabilityWarning(null)}>
+              Понятно
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

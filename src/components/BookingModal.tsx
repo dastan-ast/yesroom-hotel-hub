@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { checkRoomAvailability } from '@/lib/checkRoomAvailability';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
 import { BookingSuccess } from '@/components/BookingSuccess';
 import { Button } from '@/components/ui/button';
@@ -119,6 +120,16 @@ export function BookingModal({
 
     if (!guestName || !phoneMask.value || !checkIn || !checkOut || !selectedRoomType) {
       toast.error('Заполните все обязательные поля');
+      return;
+    }
+
+    // Check room pool availability
+    const checkInStr = format(checkIn, 'yyyy-MM-dd');
+    const checkOutStr = format(checkOut, 'yyyy-MM-dd');
+    const availability = await checkRoomAvailability(hotelId, selectedRoomType, checkInStr, checkOutStr);
+    if (!availability.available) {
+      const roomName = roomTypes.find(r => r.id === selectedRoomType)?.name || '';
+      toast.error(`К сожалению, на выбранные даты нет свободных номеров типа "${roomName}". Попробуйте другие даты.`);
       return;
     }
 
