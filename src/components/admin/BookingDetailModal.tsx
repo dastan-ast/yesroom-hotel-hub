@@ -384,12 +384,17 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
               <Badge className={statusColors[primary.status]} variant="outline">
                 {statusLabels[primary.status]}
               </Badge>
-              {isMulti && (
-                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                  <BedDouble className="h-3 w-3 mr-1" />
-                  {allBookings.length} номеров
-                </Badge>
-              )}
+              {(() => {
+                const totalRooms = isMulti
+                  ? allBookings.reduce((s, b) => s + Math.max(b.allRooms.length, 1), 0)
+                  : primary.allRooms.length;
+                return totalRooms > 1 ? (
+                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                    <BedDouble className="h-3 w-3 mr-1" />
+                    {totalRooms} номеров
+                  </Badge>
+                ) : null;
+              })()}
               {hasOverdue && (
                 <Badge variant="destructive" className="text-xs animate-pulse">
                   <AlertTriangle className="h-3 w-3 mr-1" />
@@ -435,132 +440,93 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                 const bOverdue = booking.status === 'checked_in' && 
                   isBefore(parseISO(booking.check_out_date), startOfDay(new Date()));
                 const calc = getBookingCalc(booking);
+                const roomsToShow = booking.allRooms.length > 0 ? booking.allRooms : [null];
 
                 return (
                   <div key={booking.id} className="space-y-3">
-                    {isMulti && (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <BedDouble className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-sm">
-                          Номер {idx + 1}: {booking.allRooms.length > 0
-                            ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ')
-                            : 'Не назначен'}
-                          {booking.room_types?.name && ` — ${booking.room_types.name}`}
-                        </span>
-                        {bOverdue && (
-                          <Badge variant="destructive" className="text-xs animate-pulse">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Просрочен
-                          </Badge>
-                        )}
-                        {booking.is_half_day && (
-                          <Badge variant="secondary" className="text-xs">Полсуток</Badge>
-                        )}
-                        {['approved', 'checked_in'].includes(booking.status) && (
+                    {/* Each room as a separate block */}
+                    {roomsToShow.map((room, rIdx) => (
+                      <div key={room?.id || `unassigned-${rIdx}`} className="p-3 border rounded-lg space-y-3 bg-muted/20">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <BedDouble className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-sm">
+                              {room ? `№ ${room.room_number} (${room.room_type_name})` : 'Номер не назначен'}
+                            </span>
+                            {bOverdue && (
+                              <Badge variant="destructive" className="text-xs animate-pulse">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Просрочен
+                              </Badge>
+                            )}
+                            {booking.is_half_day && (
+                              <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+                            )}
+                          </div>
+                          {['approved', 'checked_in'].includes(booking.status) && room && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setRoomChangeBookingId(booking.id);
+                                setRoomChangeDialogOpen(true);
+                              }}
+                            >
+                              <ArrowRightLeft className="h-3 w-3 mr-1" />
+                              Сменить номер
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">Заезд</Label>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
+                                {format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-muted-foreground text-xs">
+                              {booking.is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
+                                {booking.is_half_day
+                                  ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
+                                  : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Extend button per room for checked_in - only show once per booking on first room */}
+                        {rIdx === 0 && booking.status === 'checked_in' && (
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="h-7 text-xs"
+                            variant="outline"
                             onClick={() => {
-                              setRoomChangeBookingId(booking.id);
-                              setRoomChangeDialogOpen(true);
+                              setExtendBookingId(booking.id);
+                              setNewCheckoutDate(booking.check_out_date);
+                              setExtendDialogOpen(true);
                             }}
                           >
-                            <ArrowRightLeft className="h-3 w-3 mr-1" />
-                            Сменить
+                            <CalendarPlus className="h-4 w-4 mr-1" />
+                            Продлить
                           </Button>
                         )}
                       </div>
-                    )}
-
-                    {!isMulti && (
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground text-xs">Номер</Label>
-                        {booking.allRooms.length > 0 ? (
-                          booking.allRooms.map((room, rIdx) => (
-                            <div key={room.id} className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
-                              <div className="flex items-center gap-2">
-                                <BedDouble className="h-4 w-4 text-muted-foreground" />
-                                <span>№ {room.room_number} ({room.room_type_name})</span>
-                              </div>
-                              {['approved', 'checked_in'].includes(booking.status) && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs"
-                                  onClick={() => {
-                                    setRoomChangeBookingId(booking.id);
-                                    setRoomChangeDialogOpen(true);
-                                  }}
-                                >
-                                  <ArrowRightLeft className="h-3 w-3 mr-1" />
-                                  Сменить номер
-                                </Button>
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <BedDouble className="h-4 w-4 text-muted-foreground" />
-                            <span>Не назначен</span>
-                          </div>
-                        )}
-                        {booking.is_half_day && (
-                          <Badge variant="secondary" className="text-xs">Полсуток</Badge>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">Заезд</Label>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
-                            {format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">
-                          {booking.is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
-                        </Label>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
-                            {booking.is_half_day
-                              ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
-                              : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
-                            }
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
 
                     {booking.guest_comment && (
                       <div className="space-y-1">
-                        <Label className="text-muted-foreground text-xs">
-                          Комментарий{isMulti ? ` (${booking.rooms?.room_number || `#${idx + 1}`})` : ''}
-                        </Label>
+                        <Label className="text-muted-foreground text-xs">Комментарий</Label>
                         <p className="text-sm p-2 bg-muted/50 rounded">{booking.guest_comment}</p>
-                      </div>
-                    )}
-
-                    {/* Extend button per room for checked_in */}
-                    {booking.status === 'checked_in' && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setExtendBookingId(booking.id);
-                            setNewCheckoutDate(booking.check_out_date);
-                            setExtendDialogOpen(true);
-                          }}
-                        >
-                          <CalendarPlus className="h-4 w-4 mr-1" />
-                          Продлить{isMulti ? ` (${booking.rooms?.room_number || `#${idx + 1}`})` : ''}
-                        </Button>
                       </div>
                     )}
 
@@ -625,7 +591,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
             <TabsContent value="services" className="mt-4 space-y-6">
               {allBookings.map((booking, idx) => (
                 <div key={booking.id}>
-                  {isMulti && (
+                  {(isMulti || booking.allRooms.length > 1) && (
                     <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
                       <BedDouble className="h-4 w-4 text-primary" />
                       {booking.allRooms.length > 0 ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ') : `Номер ${idx + 1}`}
@@ -650,7 +616,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                   const calc = getBookingCalc(booking);
                   return (
                     <div key={booking.id} className="space-y-2">
-                      {isMulti && (
+                      {(isMulti || booking.allRooms.length > 1) && (
                         <p className="font-medium text-sm flex items-center gap-2">
                           <BedDouble className="h-4 w-4 text-primary" />
                           {booking.allRooms.length > 0 ? booking.allRooms.map(r => `№ ${r.room_number}`).join(', ') : `Номер ${idx + 1}`}
