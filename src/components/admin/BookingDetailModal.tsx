@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle } from 'lucide-react';
+import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus } from 'lucide-react';
 import { BookingServicesTab } from './BookingServicesTab';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
@@ -94,6 +94,11 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
   const [checkoutAmount, setCheckoutAmount] = useState('');
   const [checkoutReason, setCheckoutReason] = useState('');
   const [processingCheckout, setProcessingCheckout] = useState(false);
+
+  // Extend stay state
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [newCheckoutDate, setNewCheckoutDate] = useState('');
+  const [processingExtend, setProcessingExtend] = useState(false);
 
   useEffect(() => {
     if (open && bookingId) {
@@ -259,6 +264,40 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
     onUpdate?.();
   };
 
+  // Extend stay
+  const handleExtendStay = async () => {
+    if (!booking || !user || !newCheckoutDate) return;
+    setProcessingExtend(true);
+
+    const { error } = await supabase
+      .from('bookings')
+      .update({ check_out_date: newCheckoutDate })
+      .eq('id', booking.id);
+
+    if (error) {
+      toast.error(t('common.error'));
+    } else {
+      logAdminAction({
+        hotelId,
+        userId: user.id,
+        userName: profile?.full_name || '',
+        action: 'booking_extended',
+        entityType: 'booking',
+        entityId: booking.id,
+        details: {
+          guest_name: booking.guest_name,
+          old_checkout: booking.check_out_date,
+          new_checkout: newCheckoutDate,
+        },
+      });
+      toast.success('Бронирование продлено');
+      setExtendDialogOpen(false);
+      fetchBooking();
+      onUpdate?.();
+    }
+    setProcessingExtend(false);
+  };
+
   if (loading || !booking) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -406,14 +445,27 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
                         </p>
                       </div>
                     )}
-                    <Button
-                      className="w-full"
-                      variant={isOverdue ? 'destructive' : 'default'}
-                      onClick={handleStartCheckout}
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Выселить гостя
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        variant={isOverdue ? 'destructive' : 'default'}
+                        onClick={handleStartCheckout}
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Выселить
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        variant="outline"
+                        onClick={() => {
+                          setNewCheckoutDate(booking.check_out_date);
+                          setExtendDialogOpen(true);
+                        }}
+                      >
+                        <CalendarPlus className="h-4 w-4 mr-2" />
+                        Продлить
+                      </Button>
+                    </div>
                   </div>
                 </>
               )}
@@ -521,6 +573,37 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
             <AlertDialogCancel>Отмена</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmCheckout} disabled={processingCheckout}>
               {processingCheckout ? '...' : 'Подтвердить выселение'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Extend Stay Dialog */}
+      <AlertDialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Продление проживания</AlertDialogTitle>
+            <AlertDialogDescription>
+              Гость: <strong>{booking.guest_name}</strong>
+              <br />
+              Текущая дата выезда: {format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-sm">Новая дата выезда</Label>
+              <Input
+                type="date"
+                value={newCheckoutDate}
+                onChange={(e) => setNewCheckoutDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExtendStay} disabled={processingExtend || !newCheckoutDate}>
+              {processingExtend ? '...' : 'Подтвердить продление'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
