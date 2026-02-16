@@ -33,6 +33,7 @@ import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
 import { CheckoutInvoiceModal } from './CheckoutInvoiceModal';
 import { BookingDetailModal } from './BookingDetailModal';
+import { checkRoomAvailability } from '@/lib/checkRoomAvailability';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -190,7 +191,37 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     setDetailModalOpen(true);
   };
 
+  // Availability warning state
+  const [availabilityWarningOpen, setAvailabilityWarningOpen] = useState(false);
+  const [availabilityWarningMsg, setAvailabilityWarningMsg] = useState('');
+  const [pendingApproveAction, setPendingApproveAction] = useState<(() => Promise<void>) | null>(null);
+
   const handleQuickApprove = async (bookingId: string) => {
+    // Find the booking to check availability
+    const booking = bookings.find(b => b.id === bookingId);
+    if (booking && booking.room_type_id) {
+      const result = await checkRoomAvailability(
+        hotelId,
+        booking.room_type_id,
+        booking.check_in_date,
+        booking.check_out_date,
+        booking.id
+      );
+      if (!result.available) {
+        setAvailabilityWarningMsg(
+          `На даты ${booking.check_in_date} — ${booking.check_out_date} все номера типа "${booking.room_types?.name || ''}" заняты (${result.totalRooms} из ${result.totalRooms}). Подтвердить всё равно?`
+        );
+        setPendingApproveAction(() => async () => {
+          await doApprove(bookingId);
+        });
+        setAvailabilityWarningOpen(true);
+        return;
+      }
+    }
+    await doApprove(bookingId);
+  };
+
+  const doApprove = async (bookingId: string) => {
     const { error } = await supabase
       .from('bookings')
       .update({ status: 'approved' })
@@ -201,7 +232,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
-    toast.success('Бронирование подтверждено (без номера)');
+    toast.success('Бронирование подтверждено');
     logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_approved', entityType: 'booking', entityId: bookingId, details: {} });
     fetchBookings();
   };
@@ -771,6 +802,31 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Room Availability Warning Dialog */}
+      <AlertDialog open={availabilityWarningOpen} onOpenChange={setAvailabilityWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Нет свободных номеров
+            </AlertDialogTitle>
+            <AlertDialogDescription>{availabilityWarningMsg}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingApproveAction(null)}>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              setAvailabilityWarningOpen(false);
+              if (pendingApproveAction) {
+                await pendingApproveAction();
+                setPendingApproveAction(null);
+              }
+            }}>
+              Подтвердить всё равно
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
