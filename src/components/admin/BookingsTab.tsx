@@ -106,7 +106,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   // Checkout invoice modal state
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
-  const [bookingToCheckout, setBookingToCheckout] = useState<Booking | null>(null);
 
   // Booking detail modal state
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -222,9 +221,15 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Open checkout modal instead of direct checkout
-  const handleOpenCheckout = (booking: Booking) => {
-    setBookingToCheckout(booking);
+  // Checkout state for group
+  const [checkoutBookingIds, setCheckoutBookingIds] = useState<string[]>([]);
+
+  // Open checkout modal for a group of bookings
+  const handleOpenCheckoutGroup = (group: BookingGroup) => {
+    const checkedInIds = group.bookings
+      .filter(b => b.status === 'checked_in')
+      .map(b => b.id);
+    setCheckoutBookingIds(checkedInIds);
     setCheckoutModalOpen(true);
   };
 
@@ -700,7 +705,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   )}
                   {primary.status === 'checked_in' && (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckout(primary)}>
+                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckoutGroup(group)}>
                         <LogOut className="h-4 w-4 mr-1" />
                         {t('admin.checkOut')}
                       </Button>
@@ -806,11 +811,14 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       </AlertDialog>
 
       {/* Checkout Invoice Modal */}
-      {bookingToCheckout && (
+      {checkoutBookingIds.length > 0 && (
         <CheckoutInvoiceModal
           open={checkoutModalOpen}
-          onOpenChange={setCheckoutModalOpen}
-          bookingId={bookingToCheckout.id}
+          onOpenChange={(open) => {
+            setCheckoutModalOpen(open);
+            if (!open) setCheckoutBookingIds([]);
+          }}
+          bookingIds={checkoutBookingIds}
           hotelId={hotelId}
           onSuccess={fetchBookings}
         />
