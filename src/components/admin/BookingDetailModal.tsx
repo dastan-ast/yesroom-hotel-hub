@@ -57,7 +57,7 @@ interface BookingDetails {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  bookingId: string;
+  bookingIds: string[];
   hotelId: string;
   onUpdate?: () => void;
 }
@@ -78,15 +78,15 @@ const statusLabels: Record<BookingStatus, string> = {
   cancelled: 'Отменено',
 };
 
-export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onUpdate }: Props) {
+export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, onUpdate }: Props) {
   const { t } = useTranslation();
-  const { user, profile, isOwner } = useAuth();
-  const [booking, setBooking] = useState<BookingDetails | null>(null);
+  const { user, profile } = useAuth();
+  const [allBookings, setAllBookings] = useState<BookingDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [servicesTotal, setServicesTotal] = useState(0);
+  const [servicesTotals, setServicesTotals] = useState<Record<string, number>>({});
   
-  // Prepayment editing
-  const [prepaymentValue, setPrepaymentValue] = useState('');
+  // Prepayment editing (per-booking)
+  const [prepaymentValues, setPrepaymentValues] = useState<Record<string, string>>({});
   const [savingPrepayment, setSavingPrepayment] = useState(false);
 
   // Checkout state
@@ -97,16 +97,20 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
 
   // Extend stay state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
+  const [extendBookingId, setExtendBookingId] = useState<string | null>(null);
   const [newCheckoutDate, setNewCheckoutDate] = useState('');
   const [processingExtend, setProcessingExtend] = useState(false);
 
-  useEffect(() => {
-    if (open && bookingId) {
-      fetchBooking();
-    }
-  }, [open, bookingId]);
+  const isMulti = bookingIds.length > 1;
+  const primary = allBookings[0] || null;
 
-  const fetchBooking = async () => {
+  useEffect(() => {
+    if (open && bookingIds.length > 0) {
+      fetchBookings();
+    }
+  }, [open, bookingIds]);
+
+  const fetchBookings = async () => {
     setLoading(true);
 
     const { data, error } = await supabase
@@ -118,21 +122,22 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
         rooms(room_number),
         room_types(name, price_per_night)
       `)
-      .eq('id', bookingId)
-      .single();
+      .in('id', bookingIds);
 
     if (data) {
-      setBooking(data as BookingDetails);
-      setPrepaymentValue((data.prepayment_amount ?? 0).toString());
+      setAllBookings(data as BookingDetails[]);
+      const prepVals: Record<string, string> = {};
+      data.forEach(b => {
+        prepVals[b.id] = ((b as any).prepayment_amount ?? 0).toString();
+      });
+      setPrepaymentValues(prepVals);
     }
-    if (error) console.error('Error fetching booking:', error);
+    if (error) console.error('Error fetching bookings:', error);
     setLoading(false);
   };
 
-  const handleSavePrepayment = async () => {
-    if (!booking) return;
-
-    const amount = parseFloat(prepaymentValue) || 0;
+  const handleSavePrepayment = async (bookingId: string) => {
+    const amount = parseFloat(prepaymentValues[bookingId]) || 0;
     setSavingPrepayment(true);
 
     const { error } = await supabase
@@ -141,55 +146,74 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
         prepayment_amount: amount,
         prepayment_received: amount > 0,
       })
-      .eq('id', booking.id);
+      .eq('id', bookingId);
 
     if (error) {
       toast.error(t('common.error'));
     } else {
       toast.success('Предоплата сохранена');
-      fetchBooking();
+      fetchBookings();
       onUpdate?.();
     }
 
     setSavingPrepayment(false);
   };
 
-  // Calculate totals
-  const nights = booking
-    ? differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date))
-    : 0;
+  // Calculate per-booking totals
+  const getBookingCalc = (booking: BookingDetails) => {
+    const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
+    const dailyRate = booking.daily_rate ?? booking.room_types?.price_per_night ?? 0;
+    const stayTotal = nights * dailyRate;
+    const servicesTotal = servicesTotals[booking.id] || 0;
+    const total = stayTotal + servicesTotal;
+    const prepayment = parseFloat(prepaymentValues[booking.id]) || 0;
+    return { nights, dailyRate, stayTotal, servicesTotal, total, prepayment };
+  };
 
-  const dailyRate = booking?.daily_rate ?? booking?.room_types?.price_per_night ?? 0;
-  const stayTotal = nights * dailyRate;
-  const grandTotal = stayTotal + servicesTotal;
-  const prepayment = parseFloat(prepaymentValue) || 0;
-  const balanceDue = grandTotal - prepayment;
+  // Grand totals across all bookings
+  const grandCalc = allBookings.reduce(
+    (acc, b) => {
+      const c = getBookingCalc(b);
+      acc.stayTotal += c.stayTotal;
+      acc.servicesTotal += c.servicesTotal;
+      acc.total += c.total;
+      acc.prepayment += c.prepayment;
+      return acc;
+    },
+    { stayTotal: 0, servicesTotal: 0, total: 0, prepayment: 0 }
+  );
+  const balanceDue = grandCalc.total - grandCalc.prepayment;
 
-  // Check if booking is overdue
-  const isOverdue = booking?.status === 'checked_in' && 
-    isBefore(parseISO(booking.check_out_date), startOfDay(new Date()));
+  // Check if any booking is overdue
+  const hasOverdue = allBookings.some(
+    b => b.status === 'checked_in' && isBefore(parseISO(b.check_out_date), startOfDay(new Date()))
+  );
+
+  // Check if dates differ across bookings
+  const hasDifferentDates = allBookings.length > 1 && allBookings.some(
+    b => b.check_in_date !== allBookings[0].check_in_date || b.check_out_date !== allBookings[0].check_out_date
+  );
 
   // Open checkout dialog
   const handleStartCheckout = () => {
-    setCheckoutAmount(grandTotal.toString());
+    setCheckoutAmount(grandCalc.total.toString());
     setCheckoutReason('');
     setCheckoutDialogOpen(true);
   };
 
-  // Confirm checkout
+  // Confirm checkout for ALL bookings in group
   const handleConfirmCheckout = async () => {
-    if (!booking || !user) return;
+    if (!primary || !user) return;
     setProcessingCheckout(true);
 
     const finalAmount = parseFloat(checkoutAmount) || 0;
-    const amountChanged = finalAmount !== grandTotal;
+    const amountChanged = finalAmount !== grandCalc.total;
 
-    // If amount was changed, log adjustment for owner
     if (amountChanged) {
       await supabase.from('checkout_adjustments' as any).insert({
-        booking_id: booking.id,
+        booking_id: primary.id,
         hotel_id: hotelId,
-        original_total: grandTotal,
+        original_total: grandCalc.total,
         adjusted_total: finalAmount,
         reason: checkoutReason || 'Сумма изменена при выселении',
         adjusted_by: user.id,
@@ -203,48 +227,47 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
         userName: profile?.full_name || '',
         action: 'checkout_amount_adjusted',
         entityType: 'booking',
-        entityId: booking.id,
+        entityId: primary.id,
         details: {
-          guest_name: booking.guest_name,
-          original_total: grandTotal,
+          guest_name: primary.guest_name,
+          original_total: grandCalc.total,
           adjusted_total: finalAmount,
           reason: checkoutReason,
+          booking_count: allBookings.length,
         },
       });
     }
 
-    // Update booking status
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .update({
-        status: 'checked_out',
-        final_total: finalAmount,
-        daily_rate: dailyRate,
-      })
-      .eq('id', booking.id);
+    // Update all bookings and release all rooms
+    for (const booking of allBookings) {
+      if (booking.status !== 'checked_in') continue;
 
-    if (bookingError) {
-      toast.error(t('common.error'));
-      setProcessingCheckout(false);
-      return;
-    }
-
-    // Release room
-    if (booking.room_id) {
-      await supabase.from('rooms').update({ status: 'available' }).eq('id', booking.room_id);
-    }
-
-    // Release multi-rooms
-    const { data: bookingRooms } = await supabase
-      .from('booking_rooms')
-      .select('room_id')
-      .eq('booking_id', booking.id);
-    
-    if (bookingRooms && bookingRooms.length > 0) {
+      const bCalc = getBookingCalc(booking);
       await supabase
-        .from('rooms')
-        .update({ status: 'available' })
-        .in('id', bookingRooms.map(br => br.room_id));
+        .from('bookings')
+        .update({
+          status: 'checked_out',
+          final_total: amountChanged ? undefined : bCalc.total,
+          daily_rate: bCalc.dailyRate,
+        })
+        .eq('id', booking.id);
+
+      if (booking.room_id) {
+        await supabase.from('rooms').update({ status: 'available' }).eq('id', booking.room_id);
+      }
+
+      // Release multi-rooms
+      const { data: bookingRooms } = await supabase
+        .from('booking_rooms')
+        .select('room_id')
+        .eq('booking_id', booking.id);
+      
+      if (bookingRooms && bookingRooms.length > 0) {
+        await supabase
+          .from('rooms')
+          .update({ status: 'available' })
+          .in('id', bookingRooms.map(br => br.room_id));
+      }
     }
 
     logAdminAction({
@@ -253,8 +276,8 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
       userName: profile?.full_name || '',
       action: 'booking_checked_out',
       entityType: 'booking',
-      entityId: booking.id,
-      details: { guest_name: booking.guest_name, final_total: finalAmount },
+      entityId: primary.id,
+      details: { guest_name: primary.guest_name, final_total: finalAmount, booking_count: allBookings.length },
     });
 
     toast.success('Гость выселен');
@@ -264,15 +287,18 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
     onUpdate?.();
   };
 
-  // Extend stay
+  // Extend stay for a specific booking
   const handleExtendStay = async () => {
-    if (!booking || !user || !newCheckoutDate) return;
+    if (!extendBookingId || !user || !newCheckoutDate) return;
     setProcessingExtend(true);
+
+    const booking = allBookings.find(b => b.id === extendBookingId);
+    if (!booking) return;
 
     const { error } = await supabase
       .from('bookings')
       .update({ check_out_date: newCheckoutDate })
-      .eq('id', booking.id);
+      .eq('id', extendBookingId);
 
     if (error) {
       toast.error(t('common.error'));
@@ -283,7 +309,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
         userName: profile?.full_name || '',
         action: 'booking_extended',
         entityType: 'booking',
-        entityId: booking.id,
+        entityId: extendBookingId,
         details: {
           guest_name: booking.guest_name,
           old_checkout: booking.check_out_date,
@@ -292,13 +318,13 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
       });
       toast.success('Бронирование продлено');
       setExtendDialogOpen(false);
-      fetchBooking();
+      fetchBookings();
       onUpdate?.();
     }
     setProcessingExtend(false);
   };
 
-  if (loading || !booking) {
+  if (loading || allBookings.length === 0) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl">
@@ -315,14 +341,17 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              {booking.guest_name}
-              <Badge className={statusColors[booking.status]} variant="outline">
-                {statusLabels[booking.status]}
+              {primary.guest_name}
+              <Badge className={statusColors[primary.status]} variant="outline">
+                {statusLabels[primary.status]}
               </Badge>
-              {booking.is_half_day && (
-                <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+              {isMulti && (
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                  <BedDouble className="h-3 w-3 mr-1" />
+                  {allBookings.length} номеров
+                </Badge>
               )}
-              {isOverdue && (
+              {hasOverdue && (
                 <Badge variant="destructive" className="text-xs animate-pulse">
                   <AlertTriangle className="h-3 w-3 mr-1" />
                   Просрочен
@@ -351,93 +380,150 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
                   <Label className="text-muted-foreground text-xs">Телефон</Label>
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{booking.guest_phone}</span>
+                    <span>{primary.guest_phone}</span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-muted-foreground text-xs">Гостей</Label>
-                  <span>{booking.guest_count}</span>
+                  <span>{allBookings.reduce((s, b) => s + b.guest_count, 0)}</span>
                 </div>
               </div>
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Заезд (с 12:00)</Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru })}</span>
+              {/* Per-room details */}
+              {allBookings.map((booking, idx) => {
+                const bOverdue = booking.status === 'checked_in' && 
+                  isBefore(parseISO(booking.check_out_date), startOfDay(new Date()));
+                const calc = getBookingCalc(booking);
+
+                return (
+                  <div key={booking.id} className="space-y-3">
+                    {isMulti && (
+                      <div className="flex items-center gap-2">
+                        <BedDouble className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">
+                          Номер {idx + 1}: {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : 'Не назначен'}
+                          {booking.room_types?.name && ` — ${booking.room_types.name}`}
+                        </span>
+                        {bOverdue && (
+                          <Badge variant="destructive" className="text-xs animate-pulse">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Просрочен
+                          </Badge>
+                        )}
+                        {booking.is_half_day && (
+                          <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+                        )}
+                      </div>
+                    )}
+
+                    {!isMulti && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Номер</Label>
+                        <div className="flex items-center gap-2">
+                          <BedDouble className="h-4 w-4 text-muted-foreground" />
+                          <span>
+                            {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : 'Не назначен'}
+                            {booking.room_types?.name && ` — ${booking.room_types.name}`}
+                          </span>
+                          {booking.is_half_day && (
+                            <Badge variant="secondary" className="text-xs">Полсуток</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">Заезд</Label>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
+                            {format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">
+                          {booking.is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
+                            {booking.is_half_day
+                              ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
+                              : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {booking.guest_comment && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">
+                          Комментарий{isMulti ? ` (${booking.rooms?.room_number || `#${idx + 1}`})` : ''}
+                        </Label>
+                        <p className="text-sm p-2 bg-muted/50 rounded">{booking.guest_comment}</p>
+                      </div>
+                    )}
+
+                    {/* Extend button per room for checked_in */}
+                    {booking.status === 'checked_in' && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setExtendBookingId(booking.id);
+                            setNewCheckoutDate(booking.check_out_date);
+                            setExtendDialogOpen(true);
+                          }}
+                        >
+                          <CalendarPlus className="h-4 w-4 mr-1" />
+                          Продлить{isMulti ? ` (${booking.rooms?.room_number || `#${idx + 1}`})` : ''}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Prepayment per booking */}
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" />
+                        Предоплата{isMulti ? ` (${booking.rooms?.room_number || `#${idx + 1}`})` : ''}
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={prepaymentValues[booking.id] || ''}
+                          onChange={(e) => setPrepaymentValues(prev => ({ ...prev, [booking.id]: e.target.value }))}
+                          placeholder="0"
+                          className="w-40"
+                        />
+                        <span className="flex items-center text-muted-foreground">₸</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSavePrepayment(booking.id)}
+                          disabled={savingPrepayment}
+                        >
+                          {savingPrepayment ? '...' : 'Сохранить'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {idx < allBookings.length - 1 && <Separator />}
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">
-                    {booking.is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {booking.is_half_day
-                        ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
-                        : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
-                      }
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-muted-foreground text-xs">Номер</Label>
-                <div className="flex items-center gap-2">
-                  <BedDouble className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : 'Не назначен'}
-                    {booking.room_types?.name && ` — ${booking.room_types.name}`}
-                  </span>
-                </div>
-              </div>
-
-              {booking.guest_comment && (
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Комментарий</Label>
-                  <p className="text-sm p-2 bg-muted/50 rounded">{booking.guest_comment}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Prepayment Edit */}
-              <div className="space-y-2">
-                <Label className="text-muted-foreground text-xs flex items-center gap-1">
-                  <CreditCard className="h-3 w-3" />
-                  Предоплата
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={prepaymentValue}
-                    onChange={(e) => setPrepaymentValue(e.target.value)}
-                    placeholder="0"
-                    className="w-40"
-                  />
-                  <span className="flex items-center text-muted-foreground">₸</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSavePrepayment}
-                    disabled={savingPrepayment}
-                  >
-                    {savingPrepayment ? '...' : 'Сохранить'}
-                  </Button>
-                </div>
-              </div>
+                );
+              })}
 
               {/* Checkout button for checked_in bookings */}
-              {booking.status === 'checked_in' && (
+              {allBookings.some(b => b.status === 'checked_in') && (
                 <>
                   <Separator />
                   <div className="space-y-2">
-                    {isOverdue && (
+                    {hasOverdue && (
                       <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                         <p className="text-sm text-destructive">
@@ -445,67 +531,106 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
                         </p>
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1"
-                        variant={isOverdue ? 'destructive' : 'default'}
-                        onClick={handleStartCheckout}
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Выселить
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        variant="outline"
-                        onClick={() => {
-                          setNewCheckoutDate(booking.check_out_date);
-                          setExtendDialogOpen(true);
-                        }}
-                      >
-                        <CalendarPlus className="h-4 w-4 mr-2" />
-                        Продлить
-                      </Button>
-                    </div>
+                    <Button
+                      className="w-full"
+                      variant={hasOverdue ? 'destructive' : 'default'}
+                      onClick={handleStartCheckout}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Выселить{isMulti ? ' (все номера)' : ''}
+                    </Button>
                   </div>
                 </>
               )}
             </TabsContent>
 
             {/* Services Tab */}
-            <TabsContent value="services" className="mt-4">
-              <BookingServicesTab
-                hotelId={hotelId}
-                bookingId={bookingId}
-                onTotalChange={setServicesTotal}
-              />
+            <TabsContent value="services" className="mt-4 space-y-6">
+              {allBookings.map((booking, idx) => (
+                <div key={booking.id}>
+                  {isMulti && (
+                    <h3 className="font-medium text-sm mb-2 flex items-center gap-2">
+                      <BedDouble className="h-4 w-4 text-primary" />
+                      {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : `Номер ${idx + 1}`}
+                      {booking.room_types?.name && ` — ${booking.room_types.name}`}
+                    </h3>
+                  )}
+                  <BookingServicesTab
+                    hotelId={hotelId}
+                    bookingId={booking.id}
+                    onTotalChange={(total) => setServicesTotals(prev => ({ ...prev, [booking.id]: total }))}
+                  />
+                  {idx < allBookings.length - 1 && <Separator className="mt-4" />}
+                </div>
+              ))}
             </TabsContent>
 
-            {/* Bill Preview Tab */}
+            {/* Bill Tab */}
             <TabsContent value="bill" className="space-y-4 mt-4">
-              <div className="p-4 border rounded-lg space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Проживание ({nights} {nights === 1 ? 'ночь' : nights < 5 ? 'ночи' : 'ночей'} × {dailyRate.toLocaleString()} ₸)
-                  </span>
-                  <span className="font-medium">{stayTotal.toLocaleString()} ₸</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Услуги</span>
-                  <span className="font-medium">{servicesTotal.toLocaleString()} ₸</span>
-                </div>
+              <div className="p-4 border rounded-lg space-y-4">
+                {/* Per-room breakdown */}
+                {allBookings.map((booking, idx) => {
+                  const calc = getBookingCalc(booking);
+                  return (
+                    <div key={booking.id} className="space-y-2">
+                      {isMulti && (
+                        <p className="font-medium text-sm flex items-center gap-2">
+                          <BedDouble className="h-4 w-4 text-primary" />
+                          {booking.rooms?.room_number ? `№ ${booking.rooms.room_number}` : `Номер ${idx + 1}`}
+                          {booking.room_types?.name && ` — ${booking.room_types.name}`}
+                        </p>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          Проживание ({calc.nights} {calc.nights === 1 ? 'ночь' : calc.nights < 5 ? 'ночи' : 'ночей'} × {calc.dailyRate.toLocaleString()} ₸)
+                        </span>
+                        <span>{calc.stayTotal.toLocaleString()} ₸</span>
+                      </div>
+                      {calc.servicesTotal > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Услуги</span>
+                          <span>{calc.servicesTotal.toLocaleString()} ₸</span>
+                        </div>
+                      )}
+                      {calc.prepayment > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Предоплата</span>
+                          <span>−{calc.prepayment.toLocaleString()} ₸</span>
+                        </div>
+                      )}
+                      {isMulti && (
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Итого по номеру</span>
+                          <span>{(calc.total - calc.prepayment).toLocaleString()} ₸</span>
+                        </div>
+                      )}
+                      {idx < allBookings.length - 1 && <Separator className="my-2" />}
+                    </div>
+                  );
+                })}
 
                 <Separator />
 
+                {/* Grand totals */}
+                <div className="flex justify-between">
+                  <span>Проживание:</span>
+                  <span className="font-medium">{grandCalc.stayTotal.toLocaleString()} ₸</span>
+                </div>
+                {grandCalc.servicesTotal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Услуги:</span>
+                    <span className="font-medium">{grandCalc.servicesTotal.toLocaleString()} ₸</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Общий итог:</span>
-                  <span className="font-semibold">{grandTotal.toLocaleString()} ₸</span>
+                  <span className="font-semibold">{grandCalc.total.toLocaleString()} ₸</span>
                 </div>
 
-                {prepayment > 0 && (
+                {grandCalc.prepayment > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Предоплата:</span>
-                    <span>−{prepayment.toLocaleString()} ₸</span>
+                    <span>−{grandCalc.prepayment.toLocaleString()} ₸</span>
                   </div>
                 )}
 
@@ -515,15 +640,15 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
                 </div>
               </div>
 
-              {/* Checkout from bill tab too */}
-              {booking.status === 'checked_in' && (
+              {/* Checkout from bill tab */}
+              {allBookings.some(b => b.status === 'checked_in') && (
                 <Button
                   className="w-full"
-                  variant={isOverdue ? 'destructive' : 'default'}
+                  variant={hasOverdue ? 'destructive' : 'default'}
                   onClick={handleStartCheckout}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
-                  Выселить гостя
+                  Выселить гостя{isMulti ? ' (все номера)' : ''}
                 </Button>
               )}
             </TabsContent>
@@ -537,9 +662,10 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
           <AlertDialogHeader>
             <AlertDialogTitle>Выселение гостя</AlertDialogTitle>
             <AlertDialogDescription>
-              Гость: <strong>{booking.guest_name}</strong>
+              Гость: <strong>{primary?.guest_name}</strong>
+              {isMulti && <><br />Номеров: <strong>{allBookings.length}</strong></>}
               <br />
-              Номер будет освобождён.
+              {isMulti ? 'Все номера будут освобождены.' : 'Номер будет освобождён.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
@@ -550,14 +676,14 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
                 value={checkoutAmount}
                 onChange={(e) => setCheckoutAmount(e.target.value)}
               />
-              {parseFloat(checkoutAmount) !== grandTotal && (
+              {parseFloat(checkoutAmount) !== grandCalc.total && (
                 <p className="text-xs text-amber-600 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
-                  Сумма изменена (было: {grandTotal.toLocaleString()} ₸). Изменение будет отправлено владельцу.
+                  Сумма изменена (было: {grandCalc.total.toLocaleString()} ₸). Изменение будет отправлено владельцу.
                 </p>
               )}
             </div>
-            {parseFloat(checkoutAmount) !== grandTotal && (
+            {parseFloat(checkoutAmount) !== grandCalc.total && (
               <div className="space-y-1">
                 <Label className="text-sm">Причина изменения</Label>
                 <Textarea
@@ -584,9 +710,18 @@ export function BookingDetailModal({ open, onOpenChange, bookingId, hotelId, onU
           <AlertDialogHeader>
             <AlertDialogTitle>Продление проживания</AlertDialogTitle>
             <AlertDialogDescription>
-              Гость: <strong>{booking.guest_name}</strong>
-              <br />
-              Текущая дата выезда: {format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })}
+              Гость: <strong>{primary?.guest_name}</strong>
+              {extendBookingId && (() => {
+                const b = allBookings.find(x => x.id === extendBookingId);
+                return b ? (
+                  <>
+                    <br />
+                    {b.rooms?.room_number && `Номер: ${b.rooms.room_number}`}
+                    <br />
+                    Текущая дата выезда: {format(parseISO(b.check_out_date), 'dd MMMM yyyy', { locale: ru })}
+                  </>
+                ) : null;
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
