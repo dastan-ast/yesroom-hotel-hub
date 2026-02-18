@@ -44,7 +44,7 @@
   },
   "admin": {
     "dashboard": "Басқару панелі",
-    "bookingQueue": "Брондау кезегі",
+    "bookingQueue": "Брондаулар",
     "rooms": "Бөлмелер",
     "roomTypes": "Бөлме түрлері",
     "clients": "Клиенттер",

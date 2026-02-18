@@ -191,10 +191,15 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
 
   return (
-    <TooltipProvider delayDuration={200}>
+    <TooltipProvider delayDuration={150}>
       <div className="space-y-3">
-        {/* Панель управления: Навигация + Фильтр + Кнопка */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-1">
+        {/* Control panel */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-1">
+          {/* Button is first / leftmost */}
+          <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm shrink-0">
+            <Plus className="h-4 w-4 mr-1" /> Новое бронирование
+          </Button>
+
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center border rounded-md h-8 overflow-hidden bg-background">
               <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none border-r" onClick={handlePrev}>
@@ -208,7 +213,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </Button>
             </div>
 
-            {/* Тумблер активных броней */}
             <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md border h-8">
               <Switch
                 id="active-filter"
@@ -224,13 +228,9 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </Label>
             </div>
           </div>
-
-          <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm">
-            <Plus className="h-4 w-4 mr-1" /> Бронь
-          </Button>
         </div>
 
-        {/* Легенда */}
+        {/* Legend */}
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-bold uppercase text-slate-500 border-b pb-2">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm bg-[#eab308cc]" />
@@ -258,7 +258,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
-        {/* Контейнер таблицы с исправленным наложением (isolation: isolate) */}
+        {/* Grid */}
         <div
           className="relative z-0 overflow-auto border rounded-xl bg-white shadow-md max-h-[70vh]"
           style={{ isolation: "isolate" }}
@@ -291,6 +291,48 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                   </td>
                   {days.map((day) => {
                     const { left, right } = getCellBookings(room.id, day);
+                    const isSame = left && right && left.id === right.id;
+
+                    const renderTooltipBlock = (booking: Booking | null, side: "left" | "right") => {
+                      const isFullWidth = isSame;
+                      const baseClass = cn(
+                        "h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all",
+                        isFullWidth ? "w-full" : "w-1/2"
+                      );
+
+                      if (!booking) {
+                        return (
+                          <div
+                            className={baseClass}
+                            style={{ backgroundColor: "#f8fafc" }}
+                          />
+                        );
+                      }
+
+                      return (
+                        <Tooltip key={`${booking.id}-${side}`}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className={baseClass}
+                              style={{ backgroundColor: statusBgHex[booking.status] }}
+                              onClick={() => handleCellClick(booking)}
+                            >
+                              <span className="text-[10px] font-bold text-white truncate px-1">
+                                {booking.guest_name.split(" ")[0]}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            <p className="font-semibold">{booking.guest_name}</p>
+                            <p className="text-muted-foreground">{statusLabelsRu[booking.status]}</p>
+                            <p className="text-muted-foreground">
+                              {format(parseISO(booking.check_in_date), "dd.MM")} — {format(parseISO(booking.check_out_date), "dd.MM.yy")}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    };
+
                     return (
                       <td
                         key={day.toISOString()}
@@ -300,28 +342,14 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                         )}
                       >
                         <div className="flex h-full w-full gap-0.5 p-0.5">
-                          <div
-                            className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all"
-                            style={{ backgroundColor: left ? statusBgHex[left.status] : "#f8fafc" }}
-                            onClick={() => handleCellClick(left)}
-                          >
-                            {left && (
-                              <span className="text-[10px] font-bold text-white truncate px-1">
-                                {left.guest_name.split(" ")[0]}
-                              </span>
-                            )}
-                          </div>
-                          <div
-                            className="w-1/2 h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all"
-                            style={{ backgroundColor: right ? statusBgHex[right.status] : "#f8fafc" }}
-                            onClick={() => handleCellClick(right)}
-                          >
-                            {right && (
-                              <span className="text-[10px] font-bold text-white truncate px-1">
-                                {right.guest_name.split(" ")[0]}
-                              </span>
-                            )}
-                          </div>
+                          {isSame ? (
+                            renderTooltipBlock(left, "left")
+                          ) : (
+                            <>
+                              {renderTooltipBlock(left, "left")}
+                              {renderTooltipBlock(right, "right")}
+                            </>
+                          )}
                         </div>
                       </td>
                     );

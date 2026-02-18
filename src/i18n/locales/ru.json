@@ -44,7 +44,7 @@
   },
   "admin": {
     "dashboard": "Панель управления",
-    "bookingQueue": "Очередь бронирований",
+    "bookingQueue": "Бронирование",
     "rooms": "Номера",
     "roomTypes": "Типы номеров",
     "clients": "Клиенты",
