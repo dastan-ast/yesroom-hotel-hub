@@ -10,12 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,6 +94,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   // Filter state
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   
   // Cancel dialog state
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -114,6 +116,10 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchQuery]);
 
   useEffect(() => {
     if (hotelId) {
@@ -482,6 +488,11 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   const overdueCount = useMemo(() => bookings.filter(isOverdue).length, [bookings]);
 
+  const pendingCount = useMemo(() => bookings.filter(b => b.status === 'pending').length, [bookings]);
+
+  const totalPages = Math.ceil(filteredGroups.length / PAGE_SIZE);
+  const paginatedGroups = filteredGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const getStatusLabel = (status: BookingStatus) => {
     const labels: Record<BookingStatus, string> = {
       pending: t('admin.pending'),
@@ -540,30 +551,53 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Поиск по имени или телефону..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as BookingStatus | 'all')}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Все статусы" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Все статусы</SelectItem>
-            <SelectItem value="pending">Ожидают подтверждения</SelectItem>
-            <SelectItem value="approved">Подтверждено</SelectItem>
-            <SelectItem value="checked_in">Заселён</SelectItem>
-            <SelectItem value="checked_out">Выселен</SelectItem>
-            <SelectItem value="cancelled">Отменено</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Поиск по имени или телефону..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { value: 'all' as const, label: 'Все', badge: undefined as number | undefined },
+          { value: 'pending' as const, label: 'Ожидает', badge: pendingCount as number | undefined },
+          { value: 'approved' as const, label: 'Подтверждено', badge: undefined as number | undefined },
+          { value: 'checked_in' as const, label: 'Заселён', badge: undefined as number | undefined },
+          { value: 'checked_out' as const, label: 'Выселен', badge: undefined as number | undefined },
+          { value: 'cancelled' as const, label: 'Отменено', badge: undefined as number | undefined },
+        ]).map(({ value, label, badge }) => (
+          <button
+            key={value}
+            onClick={() => setStatusFilter(value)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-xs font-semibold border transition-all',
+              statusFilter === value
+                ? value === 'all'
+                  ? 'bg-foreground text-background border-foreground'
+                  : value === 'pending'
+                  ? 'bg-yellow-500 text-white border-yellow-500'
+                  : value === 'approved'
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : value === 'checked_in'
+                  ? 'bg-green-500 text-white border-green-500'
+                  : value === 'checked_out'
+                  ? 'bg-muted-foreground text-background border-muted-foreground'
+                  : 'bg-destructive text-destructive-foreground border-destructive'
+                : 'bg-background text-muted-foreground border-border hover:border-foreground/30'
+            )}
+          >
+            {label}
+            {badge !== undefined && badge > 0 && (
+              <span className="ml-1.5 bg-white/30 rounded-full px-1.5">{badge}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Overdue alert */}
@@ -582,7 +616,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredGroups.map((group) => {
+          {paginatedGroups.map((group) => {
             const overdue = isGroupOverdue(group);
             const primary = group.primary;
 
@@ -653,7 +687,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {/* View detail button for all statuses */}
                   <Button size="sm" variant="ghost" onClick={() => handleOpenDetail(group)}>
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -732,6 +765,41 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
             );
           })}
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <PaginationItem key={page}>
+                <button
+                  onClick={() => setCurrentPage(page)}
+                  className={cn(
+                    'h-9 w-9 text-sm rounded-md border transition-colors',
+                    page === currentPage
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-border hover:bg-accent'
+                  )}
+                >
+                  {page}
+                </button>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
 
       <ManualBookingDialog

@@ -44,7 +44,7 @@
   },
   "admin": {
     "dashboard": "Dashboard",
-    "bookingQueue": "Booking Queue",
+    "bookingQueue": "Bookings",
     "rooms": "Rooms",
     "roomTypes": "Room Types",
     "clients": "Clients",
