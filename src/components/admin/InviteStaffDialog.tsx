@@ -90,7 +90,7 @@ export function InviteStaffDialog({ open, onOpenChange, hotelId, hotelName, onIn
       // Send email via edge function
       const inviteUrl = `${window.location.origin}/invite/${invitation.token}`;
       
-      const { error: emailError } = await supabase.functions.invoke('send-staff-invitation', {
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-staff-invitation', {
         body: {
           email: email.toLowerCase().trim(),
           hotelName,
@@ -99,8 +99,8 @@ export function InviteStaffDialog({ open, onOpenChange, hotelId, hotelName, onIn
         },
       });
 
-      if (emailError) {
-        console.error('Email error:', emailError);
+      if (emailError || (emailResult && !emailResult.success)) {
+        console.error('Email error:', emailError || emailResult?.error);
         // Still success - invitation created, just email failed
         toast.success('Приглашение создано! Ссылка скопирована в буфер обмена.');
         navigator.clipboard.writeText(inviteUrl);
