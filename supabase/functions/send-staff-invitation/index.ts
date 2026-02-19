@@ -97,7 +97,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!response.ok) {
       console.error("Resend API error:", result);
-      throw new Error(result.message || "Failed to send email");
+      // Return 200 with success: false so the frontend fallback (clipboard copy) works
+      return new Response(
+        JSON.stringify({ success: false, error: result.message || "Failed to send email" }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        }
+      );
     }
 
     console.log("Invitation email sent successfully:", result);
@@ -111,10 +118,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
   } catch (error: any) {
     console.error("Error in send-staff-invitation function:", error);
+    // Return 200 with error info so frontend fallback works
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ success: false, error: error.message }),
       {
-        status: 500,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
