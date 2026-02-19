@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface CreateStaffRequest {
-  action: 'create' | 'update' | 'delete';
+  action: 'create' | 'update' | 'delete' | 'list';
   hotelId: string;
   email: string;
   password?: string;
@@ -68,6 +68,80 @@ serve(async (req) => {
 
     const body: CreateStaffRequest = await req.json();
     const { action, hotelId, email, password, fullName, permissions, userId } = body;
+
+    // Handle 'list' action — returns staff with emails
+    if (action === 'list') {
+      // Get all profiles linked to this hotel
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id, full_name')
+        .eq('hotel_id', hotelId);
+
+      if (profilesError) {
+        return new Response(
+          JSON.stringify({ error: profilesError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!profiles || profiles.length === 0) {
+        return new Response(
+          JSON.stringify({ staff: [] }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const userIds = profiles.map((p: any) => p.user_id);
+
+      // Filter to only admins
+      const { data: roles } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds)
+        .eq('role', 'admin');
+
+      const adminUserIds = (roles || []).map((r: any) => r.user_id);
+
+      if (adminUserIds.length === 0) {
+        return new Response(
+          JSON.stringify({ staff: [] }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get permissions
+      const { data: perms } = await supabaseAdmin
+        .from('staff_permissions')
+        .select('user_id, permissions')
+        .eq('hotel_id', hotelId)
+        .in('user_id', adminUserIds);
+
+      const permMap = new Map((perms || []).map((p: any) => [p.user_id, p.permissions]));
+
+      // Get emails via auth admin API
+      const staffWithEmails = await Promise.all(
+        profiles
+          .filter((p: any) => adminUserIds.includes(p.user_id))
+          .map(async (p: any) => {
+            let email = '';
+            try {
+              const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(p.user_id);
+              email = authUser?.user?.email || '';
+            } catch (_) {}
+            return {
+              user_id: p.user_id,
+              full_name: p.full_name,
+              email,
+              permissions: permMap.get(p.user_id) || [],
+            };
+          })
+      );
+
+      return new Response(
+        JSON.stringify({ staff: staffWithEmails }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Verify hotel ownership (skip for superadmin)
     if (roleData.role === 'owner') {

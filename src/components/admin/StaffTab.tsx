@@ -52,56 +52,20 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
   const fetchStaff = async () => {
     setLoading(true);
     try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .eq('hotel_id', hotelId);
-
-      if (profilesError) throw profilesError;
-
-      if (!profiles || profiles.length === 0) {
-        setStaff([]);
-        setLoading(false);
-        return;
-      }
-
-      const userIds = profiles.map(p => p.user_id);
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds)
-        .eq('role', 'admin');
-
-      if (rolesError) throw rolesError;
-
-      const adminUserIds = roles?.map(r => r.user_id) || [];
-      
-      if (adminUserIds.length === 0) {
-        setStaff([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data: permissions, error: permError } = await supabase
-        .from('staff_permissions')
-        .select('user_id, permissions')
-        .eq('hotel_id', hotelId)
-        .in('user_id', adminUserIds);
-
-      if (permError) throw permError;
-
-      const permissionsMap = new Map(permissions?.map(p => [p.user_id, p.permissions]) || []);
-      
-      const staffList: StaffMember[] = profiles
-        .filter(p => adminUserIds.includes(p.user_id))
-        .map(p => ({
-          user_id: p.user_id,
-          full_name: p.full_name,
+      const { data, error } = await supabase.functions.invoke('manage-staff', {
+        body: {
+          action: 'list',
+          hotelId,
           email: '',
-          permissions: permissionsMap.get(p.user_id) || [],
-        }));
+          fullName: '',
+          permissions: [],
+        },
+      });
 
-      setStaff(staffList);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setStaff(data?.staff || []);
     } catch (error: any) {
       console.error('Error fetching staff:', error);
       toast.error('Ошибка загрузки списка персонала');
@@ -334,6 +298,7 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
             <TableHeader>
               <TableRow>
                 <TableHead>Сотрудник</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Права доступа</TableHead>
                 <TableHead className="w-[100px]">Действия</TableHead>
               </TableRow>
@@ -344,6 +309,11 @@ export function StaffTab({ hotelId, hotelName = 'Отель' }: Props) {
                   <TableCell>
                     <div className="font-medium">
                       {member.full_name || 'Без имени'}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-muted-foreground">
+                      {member.email || '—'}
                     </div>
                   </TableCell>
                   <TableCell>
