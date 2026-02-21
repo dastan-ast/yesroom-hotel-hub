@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -11,8 +11,6 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ManualBookingDialog } from "./ManualBookingDialog";
 import { BookingDetailModal } from "./BookingDetailModal";
-import React, { useState, useEffect, useMemo } from "react"; // Исправленный импорт
-// ... остальные импорты остаются прежними
 
 type BookingStatus = "pending" | "approved" | "checked_in" | "checked_out" | "cancelled";
 
@@ -68,15 +66,12 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
-  // Добавь в начало компонента определение ширины экрана для адаптивности
-  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 7);
+  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 10);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 10);
-  const [hoveredDate, setHoveredDate] = useState<Date | null>(null); // Для аналитики по наведению
+  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
 
-  // Адаптивность количества дней
   useEffect(() => {
     const handleResize = () => setGridDays(window.innerWidth < 768 ? 4 : 10);
     window.addEventListener("resize", handleResize);
@@ -87,26 +82,19 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     return Array.from({ length: gridDays }, (_, i) => addDays(startDate, i));
   }, [startDate, gridDays]);
 
-  // --- ЛОГИКА АНАЛИТИКИ ПО ДНЯМ ---
   const dailyStats = useMemo(() => {
-    const targetDate = hoveredDate || new Date(); // Если не навели, берем "сегодня"
-
+    const targetDate = hoveredDate || new Date();
     const dayBookings = bookings.filter((b) => {
       const start = parseISO(b.check_in_date);
       const end = parseISO(b.check_out_date);
       return targetDate >= start && targetDate < end;
     });
-
     const checkIns = bookings.filter((b) => isSameDay(parseISO(b.check_in_date), targetDate)).length;
     const checkOuts = bookings.filter((b) => isSameDay(parseISO(b.check_out_date), targetDate)).length;
     const occupancy = rooms.length > 0 ? Math.round((dayBookings.length / rooms.length) * 100) : 0;
-
     return { occupancy, checkIns, checkOuts, total: dayBookings.length, date: targetDate };
   }, [bookings, rooms, hoveredDate]);
 
-  // ... (fetchData и другие функции остаются без изменений)
-
-  // Group rooms by floor
   const groupedByFloor = useMemo(() => {
     const map = new Map<number, Room[]>();
     rooms.forEach((r) => {
@@ -122,7 +110,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, GRID_DAYS);
+    const endDate = addDays(startDate, gridDays);
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -223,8 +211,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -GRID_DAYS));
-  const handleNext = () => setStartDate((prev) => addDays(prev, GRID_DAYS));
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -gridDays));
+  const handleNext = () => setStartDate((prev) => addDays(prev, gridDays));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
@@ -301,7 +289,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex flex-col h-[calc(100vh-140px)] space-y-3 overflow-hidden px-1">
-        {/* --- ЗАКРЕПЛЕННАЯ АНАЛИТИКА --- */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-sm text-white">
             <p className="text-[10px] font-bold uppercase opacity-80">Загрузка на {format(dailyStats.date, "dd.MM")}</p>
@@ -321,7 +308,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
-        {/* Панель управления */}
         <div className="flex items-center justify-between bg-slate-100/50 p-1.5 rounded-xl border shrink-0">
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm">
@@ -344,7 +330,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
-        {/* --- ОСНОВНАЯ СЕТКА (GOOGLE CALENDAR STYLE) --- */}
         <div className="flex-1 relative border rounded-2xl bg-white shadow-xl overflow-hidden min-h-0">
           <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
             <table className="w-full border-separate border-spacing-0 table-fixed">
