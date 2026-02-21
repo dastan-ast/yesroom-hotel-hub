@@ -106,7 +106,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   useEffect(() => {
     if (hotelId) fetchData();
-  }, [hotelId, startDate, showOnlyActive]);
+  }, [hotelId, startDate]);
 
   const fetchData = async () => {
     setLoading(true);
