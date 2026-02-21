@@ -200,7 +200,7 @@ export type Database = {
           guest_comment: string | null
           guest_count: number
           guest_name: string
-          guest_phone: string
+          guest_phone: string | null
           hotel_id: string | null
           id: string
           is_half_day: boolean
@@ -226,7 +226,7 @@ export type Database = {
           guest_comment?: string | null
           guest_count?: number
           guest_name: string
-          guest_phone: string
+          guest_phone?: string | null
           hotel_id?: string | null
           id?: string
           is_half_day?: boolean
@@ -252,7 +252,7 @@ export type Database = {
           guest_comment?: string | null
           guest_count?: number
           guest_name?: string
-          guest_phone?: string
+          guest_phone?: string | null
           hotel_id?: string | null
           id?: string
           is_half_day?: boolean
@@ -379,7 +379,7 @@ export type Database = {
           hotel_id: string | null
           id: string
           notes: string | null
-          phone: string
+          phone: string | null
           updated_at: string
         }
         Insert: {
@@ -390,7 +390,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           notes?: string | null
-          phone: string
+          phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -401,7 +401,7 @@ export type Database = {
           hotel_id?: string | null
           id?: string
           notes?: string | null
-          phone?: string
+          phone?: string | null
           updated_at?: string
         }
         Relationships: [

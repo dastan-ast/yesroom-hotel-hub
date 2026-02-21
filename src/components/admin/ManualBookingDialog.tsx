@@ -26,7 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { CalendarIcon, ChevronDown, BedDouble, User, AlertTriangle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { CalendarIcon, ChevronDown, BedDouble, User, AlertTriangle, UserX } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,6 +87,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
   const [loading, setLoading] = useState(false);
   const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
   const phoneMask = usePhoneMask();
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Client search state
   const [clientSuggestions, setClientSuggestions] = useState<{ id: string; full_name: string; phone: string }[]>([]);
@@ -148,6 +150,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
         is_half_day: false,
       });
       phoneMask.setValue('');
+      setIsAnonymous(false);
       setHalfDayCheckInHour(12);
       setSelectedRooms([]);
       setAvailableRooms([]);
@@ -290,11 +293,19 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
     );
   };
 
-  const handleSubmit = async (data: FormData) => {
-    if (!phoneMask.value) {
-      toast.error('Укажите телефон');
-      return;
+  const handleToggleAnonymous = (checked: boolean) => {
+    setIsAnonymous(checked);
+    if (checked) {
+      form.setValue('guest_name', 'Анонимный гость');
+      phoneMask.setValue('');
+      setShowSuggestions(false);
+      setClientSuggestions([]);
+    } else {
+      form.setValue('guest_name', '');
     }
+  };
+
+  const handleSubmit = async (data: FormData) => {
     if (!data.is_half_day && !data.check_out_date) {
       toast.error('Укажите дату выезда');
       return;
@@ -332,7 +343,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
     for (const roomId of roomsToCreate) {
       const { data: booking, error } = await supabase.from('bookings').insert({
         guest_name: data.guest_name,
-        guest_phone: phoneMask.value,
+        guest_phone: phoneMask.value || null,
         room_type_id: data.room_type_id,
         room_id: roomId,
         check_in_date: format(data.check_in_date, 'yyyy-MM-dd'),
@@ -374,7 +385,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       syncBookingToExternal(createdBookingIds[0]).catch(console.error);
     }
 
-    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_created', entityType: 'booking', entityId: createdBookingIds[0], details: { guest_name: data.guest_name, phone: phoneMask.value, rooms_count: roomsToCreate.length } });
+    logAdminAction({ hotelId, userId: user!.id, userName: profile?.full_name || '', action: 'booking_created', entityType: 'booking', entityId: createdBookingIds[0], details: { guest_name: data.guest_name, phone: phoneMask.value || null, rooms_count: roomsToCreate.length, anonymous: isAnonymous } });
 
     toast.success(selectedRooms.length > 1 
       ? `Создано ${selectedRooms.length} бронирований` 
@@ -395,6 +406,15 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {/* Anonymous toggle */}
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="flex items-center gap-2">
+                <UserX className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium cursor-pointer">Анонимный гость</Label>
+              </div>
+              <Switch checked={isAnonymous} onCheckedChange={handleToggleAnonymous} />
+            </div>
+
             <FormField
               control={form.control}
               name="guest_name"
@@ -405,12 +425,14 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
                     <Input
                       placeholder="Иванов Иван Иванович"
                       {...field}
-                      onChange={(e) => handleGuestNameChange(e.target.value, field.onChange)}
+                      readOnly={isAnonymous}
+                      className={isAnonymous ? 'bg-muted' : ''}
+                      onChange={(e) => !isAnonymous && handleGuestNameChange(e.target.value, field.onChange)}
                       onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                       autoComplete="off"
                     />
                   </FormControl>
-                  {showSuggestions && clientSuggestions.length > 0 && (
+                  {!isAnonymous && showSuggestions && clientSuggestions.length > 0 && (
                     <div
                       ref={suggestionsRef}
                       className="absolute z-50 top-full left-0 right-0 mt-1 border rounded-md bg-popover shadow-md max-h-[180px] overflow-y-auto"
@@ -434,14 +456,16 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
               )}
             />
 
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">{t('booking.phone')}</label>
-              <Input 
-                placeholder="+7 (777) 123-45-67" 
-                value={phoneMask.value}
-                onChange={(e) => phoneMask.handleChange(e.target.value)}
-              />
-            </div>
+            {!isAnonymous && (
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">{t('booking.phone')} <span className="text-muted-foreground text-xs">(необязательно)</span></label>
+                <Input 
+                  placeholder="+7 (777) 123-45-67" 
+                  value={phoneMask.value}
+                  onChange={(e) => phoneMask.handleChange(e.target.value)}
+                />
+              </div>
+            )}
 
             <FormField
               control={form.control}
