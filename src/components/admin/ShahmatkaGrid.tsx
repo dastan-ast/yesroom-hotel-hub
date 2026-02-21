@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
