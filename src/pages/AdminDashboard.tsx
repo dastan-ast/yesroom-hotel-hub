@@ -40,6 +40,7 @@ export default function AdminDashboard() {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLiveFeed, setShowLiveFeed] = useState(true);
+  const [pendingAdjustments, setPendingAdjustments] = useState(0);
 
   const handleSignOut = async () => {
     await signOut();
@@ -78,6 +79,17 @@ export default function AdminDashboard() {
       fetchHotelInfo();
     }
   }, [isAdmin, hotelId]);
+
+  // Fetch pending checkout adjustments count for owner
+  useEffect(() => {
+    if (isOwner && hotelId) {
+      supabase.from('checkout_adjustments')
+        .select('id', { count: 'exact', head: true })
+        .eq('hotel_id', hotelId)
+        .eq('status', 'pending')
+        .then(({ count }) => setPendingAdjustments(count || 0));
+    }
+  }, [isOwner, hotelId]);
 
   // If current tab is not accessible, switch to first available
   useEffect(() => {
@@ -180,6 +192,11 @@ export default function AdminDashboard() {
                     {item.id === 'bookings' && stats.pending > 0 && (
                       <span className="ml-auto bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
                         {stats.pending}
+                      </span>
+                    )}
+                    {item.id === 'dashboard' && pendingAdjustments > 0 && (
+                      <span className="ml-auto bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        {pendingAdjustments}
                       </span>
                     )}
                   </SidebarMenuButton>

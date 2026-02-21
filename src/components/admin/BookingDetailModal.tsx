@@ -51,7 +51,7 @@ interface BookingDetails {
   room_id: string | null;
   room_type_id: string | null;
   rooms: { room_number: string } | null;
-  room_types: { name: string; price_per_night: number } | null;
+  room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
   is_half_day?: boolean;
   // All assigned rooms (from booking_rooms + room_id)
   allRooms: { id: string; room_number: string; room_type_name: string }[];
@@ -127,7 +127,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         status, source, prepayment_amount, prepayment_received, daily_rate,
         guest_count, guest_comment, room_id, room_type_id, is_half_day,
         rooms(room_number),
-        room_types(name, price_per_night)
+        room_types(name, price_per_night, price_half_day)
       `)
       .in('id', bookingIds);
 
@@ -201,10 +201,11 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   // Calculate per-booking totals
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
-    const dailyRate = booking.daily_rate ?? booking.room_types?.price_per_night ?? 0;
-    // Multiply by room count for backward compat with old booking_rooms entries
+    const dailyRate = booking.is_half_day
+      ? (booking.room_types?.price_half_day ?? (booking.room_types?.price_per_night ?? 0) / 2)
+      : (booking.daily_rate ?? booking.room_types?.price_per_night ?? 0);
     const roomCount = Math.max(booking.allRooms.length, 1);
-    const stayTotal = nights * dailyRate * roomCount;
+    const stayTotal = booking.is_half_day ? dailyRate * roomCount : nights * dailyRate * roomCount;
     const servicesTotal = servicesTotals[booking.id] || 0;
     const total = stayTotal + servicesTotal;
     const prepayment = parseFloat(prepaymentValues[booking.id]) || 0;

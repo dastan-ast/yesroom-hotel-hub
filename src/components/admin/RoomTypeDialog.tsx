@@ -19,6 +19,7 @@ const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
   description: z.string().optional(),
   price_per_night: z.coerce.number().min(1, 'Укажите цену'),
+  price_half_day: z.coerce.number().optional().or(z.literal('')),
   capacity: z.coerce.number().min(1, 'Минимум 1 гость'),
   amenities: z.string().optional(),
 });
@@ -30,6 +31,7 @@ interface RoomType {
   name: string;
   description: string | null;
   price_per_night: number;
+  price_half_day: number | null;
   capacity: number;
   amenities: string[] | null;
   image_url: string | null;
@@ -53,6 +55,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
       name: '',
       description: '',
       price_per_night: 0,
+      price_half_day: '',
       capacity: 2,
       amenities: '',
     },
@@ -65,6 +68,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           name: roomType.name,
           description: roomType.description || '',
           price_per_night: roomType.price_per_night,
+          price_half_day: roomType.price_half_day ?? '',
           capacity: roomType.capacity,
           amenities: roomType.amenities?.join(', ') || '',
         });
@@ -80,6 +84,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           name: '',
           description: '',
           price_per_night: 0,
+          price_half_day: '',
           capacity: 2,
           amenities: '',
         });
@@ -89,13 +94,15 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
   }, [open, roomType, form]);
 
   const handleSubmit = (data: FormData) => {
+    const halfDay = typeof data.price_half_day === 'number' && data.price_half_day > 0 ? data.price_half_day : null;
     onSave({
       name: data.name,
       description: data.description || null,
       price_per_night: data.price_per_night,
+      price_half_day: halfDay,
       capacity: data.capacity,
       amenities: data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : null,
-      image_url: images[0] || null, // Keep first image as primary for backward compatibility
+      image_url: images[0] || null,
       images: images,
     });
   };
@@ -154,7 +161,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
                 )}
               />
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="price_per_night"
@@ -163,6 +170,20 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
                       <FormLabel>{t('admin.price')} (₸)</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price_half_day"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Полсутки (₸)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="50% от ночи" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

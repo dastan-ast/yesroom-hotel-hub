@@ -1,0 +1,1 @@
+ALTER TABLE public.room_types ADD COLUMN price_half_day numeric DEFAULT NULL;
