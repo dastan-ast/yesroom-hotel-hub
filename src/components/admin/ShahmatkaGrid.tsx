@@ -106,7 +106,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   useEffect(() => {
     if (hotelId) fetchData();
-  }, [hotelId, startDate]);
+  }, [hotelId, startDate, showOnlyActive]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -325,8 +325,20 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </Button>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-1 rounded-lg border text-[10px] font-bold text-slate-400">
-            ПОКАЗАНО: {gridDays} ДНЕЙ
+
+          {/* ВОЗВРАЩЕННАЯ КНОПКА АКТИВНОСТИ */}
+          <div className="flex items-center gap-3 bg-white px-3 py-1 rounded-lg border shadow-sm">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="active-filter"
+                checked={showOnlyActive}
+                onCheckedChange={setShowOnlyActive}
+                className="scale-75 data-[state=checked]:bg-green-500"
+              />
+              <Label htmlFor="active-filter" className="text-[10px] font-black text-slate-500 uppercase cursor-pointer">
+                Только активные
+              </Label>
+            </div>
           </div>
         </div>
 
@@ -383,6 +395,24 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
       </div>
+
+      {/* МОДАЛЬНЫЕ ОКНА ДЛЯ РАБОТЫ КАРТОЧЕК */}
+      <ManualBookingDialog
+        open={bookingDialogOpen}
+        onOpenChange={setBookingDialogOpen}
+        onSuccess={fetchData}
+        hotelId={hotelId}
+      />
+
+      {selectedBookingId && (
+        <BookingDetailModal
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          bookingIds={[selectedBookingId]}
+          hotelId={hotelId}
+          onUpdate={fetchData}
+        />
+      )}
     </TooltipProvider>
   );
 }
