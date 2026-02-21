@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -11,6 +11,8 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ManualBookingDialog } from "./ManualBookingDialog";
 import { BookingDetailModal } from "./BookingDetailModal";
+import React, { useState, useEffect, useMemo } from "react"; // Исправленный импорт
+// ... остальные импорты остаются прежними
 
 type BookingStatus = "pending" | "approved" | "checked_in" | "checked_out" | "cancelled";
 
@@ -66,24 +68,43 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
-
+  // Добавь в начало компонента определение ширины экрана для адаптивности
+  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 7);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 10);
+  const [hoveredDate, setHoveredDate] = useState<Date | null>(null); // Для аналитики по наведению
 
-  // Добавь в начало компонента определение ширины экрана для адаптивности
-  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 7);
-
+  // Адаптивность количества дней
   useEffect(() => {
     const handleResize = () => setGridDays(window.innerWidth < 768 ? 4 : 10);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Обнови useMemo для дней, используя gridDays
   const days = useMemo(() => {
     return Array.from({ length: gridDays }, (_, i) => addDays(startDate, i));
   }, [startDate, gridDays]);
+
+  // --- ЛОГИКА АНАЛИТИКИ ПО ДНЯМ ---
+  const dailyStats = useMemo(() => {
+    const targetDate = hoveredDate || new Date(); // Если не навели, берем "сегодня"
+
+    const dayBookings = bookings.filter((b) => {
+      const start = parseISO(b.check_in_date);
+      const end = parseISO(b.check_out_date);
+      return targetDate >= start && targetDate < end;
+    });
+
+    const checkIns = bookings.filter((b) => isSameDay(parseISO(b.check_in_date), targetDate)).length;
+    const checkOuts = bookings.filter((b) => isSameDay(parseISO(b.check_out_date), targetDate)).length;
+    const occupancy = rooms.length > 0 ? Math.round((dayBookings.length / rooms.length) * 100) : 0;
+
+    return { occupancy, checkIns, checkOuts, total: dayBookings.length, date: targetDate };
+  }, [bookings, rooms, hoveredDate]);
+
+  // ... (fetchData и другие функции остаются без изменений)
 
   // Group rooms by floor
   const groupedByFloor = useMemo(() => {
@@ -101,7 +122,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, gridDays);
+    const endDate = addDays(startDate, GRID_DAYS);
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -202,8 +223,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -gridDays));
-  const handleNext = () => setStartDate((prev) => addDays(prev, gridDays));
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -GRID_DAYS));
+  const handleNext = () => setStartDate((prev) => addDays(prev, GRID_DAYS));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
@@ -279,30 +300,38 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="flex flex-col h-[calc(100vh-120px)] space-y-2 overflow-hidden px-1">
-        {/* Аналитика (компактная версия) */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          <div className="min-w-[120px] bg-white p-2 rounded-lg border shadow-sm">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Загрузка</p>
-            <p className="text-lg font-black">
-              {Math.round((bookings.length / (rooms.length * gridDays || 1)) * 100)}%
-            </p>
+      <div className="flex flex-col h-[calc(100vh-140px)] space-y-3 overflow-hidden px-1">
+        {/* --- ЗАКРЕПЛЕННАЯ АНАЛИТИКА --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-sm text-white">
+            <p className="text-[10px] font-bold uppercase opacity-80">Загрузка на {format(dailyStats.date, "dd.MM")}</p>
+            <p className="text-2xl font-black">{dailyStats.occupancy}%</p>
           </div>
-          {/* Другие виджеты аналогично... */}
+          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-green-500">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Заезды</p>
+            <p className="text-2xl font-black text-slate-800">{dailyStats.checkIns}</p>
+          </div>
+          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-orange-400">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Выезды</p>
+            <p className="text-2xl font-black text-slate-800">{dailyStats.checkOuts}</p>
+          </div>
+          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-blue-400">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase">Проживают</p>
+            <p className="text-2xl font-black text-slate-800">{dailyStats.total}</p>
+          </div>
         </div>
 
         {/* Панель управления */}
-        <div className="flex items-center justify-between bg-white/50 backdrop-blur-md p-2 rounded-xl border border-slate-200 shadow-sm shrink-0">
+        <div className="flex items-center justify-between bg-slate-100/50 p-1.5 rounded-xl border shrink-0">
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 rounded-lg shadow-sm">
-              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Бронь</span>
+            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm">
+              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Бронировать</span>
             </Button>
-
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+            <div className="flex items-center bg-white rounded-lg p-0.5 shadow-sm border">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" className="h-7 px-2 text-[10px] font-bold uppercase" onClick={handleToday}>
+              <Button variant="ghost" className="h-7 px-3 text-[10px] font-black uppercase" onClick={handleToday}>
                 Сегодня
               </Button>
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNext}>
@@ -310,39 +339,29 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </Button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border shadow-sm h-8">
-            <Switch
-              id="active-filter"
-              checked={showOnlyActive}
-              onCheckedChange={setShowOnlyActive}
-              className="scale-75"
-            />
-            <Label htmlFor="active-filter" className="text-[9px] font-black text-slate-500 uppercase">
-              Активные
-            </Label>
+          <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-1 rounded-lg border text-[10px] font-bold text-slate-400">
+            ПОКАЗАНО: {gridDays} ДНЕЙ
           </div>
         </div>
 
-        {/* ТАБЛИЦА С КОНТРОЛИРУЕМЫМ СКРОЛЛОМ (Google Style) */}
-        <div className="flex-1 min-h-0 relative border rounded-2xl bg-white shadow-2xl overflow-hidden">
-          <div
-            className="absolute inset-0 overflow-auto scroll-smooth scrollbar-thin scrollbar-thumb-slate-300"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
+        {/* --- ОСНОВНАЯ СЕТКА (GOOGLE CALENDAR STYLE) --- */}
+        <div className="flex-1 relative border rounded-2xl bg-white shadow-xl overflow-hidden min-h-0">
+          <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
             <table className="w-full border-separate border-spacing-0 table-fixed">
-              <thead className="sticky top-0 z-50">
-                <tr className="bg-slate-50/95 backdrop-blur-md shadow-sm">
-                  {/* Фиксированный угол */}
-                  <th className="w-[60px] md:w-[100px] border-b border-r p-2 sticky left-0 z-[60] bg-slate-100/95 backdrop-blur-md">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">№</span>
+              <thead className="sticky top-0 z-[100]">
+                <tr className="bg-white/95 backdrop-blur-md">
+                  <th className="w-[60px] md:w-[90px] border-b border-r p-2 sticky left-0 z-[110] bg-slate-50">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Room</span>
                   </th>
                   {days.map((day) => (
                     <th
                       key={day.toISOString()}
+                      onMouseEnter={() => setHoveredDate(day)}
+                      onMouseLeave={() => setHoveredDate(null)}
                       className={cn(
-                        "border-b border-r p-2 text-center min-w-[90px] md:min-w-[150px] transition-all",
-                        isSameDay(day, new Date()) && "bg-blue-500/10 shadow-inner",
+                        "border-b border-r p-2 text-center transition-all cursor-pointer",
+                        isSameDay(day, new Date()) ? "bg-blue-50" : "hover:bg-slate-50",
+                        hoveredDate && isSameDay(day, hoveredDate) && "bg-blue-100/50",
                       )}
                     >
                       <div className="text-[9px] text-slate-400 font-bold uppercase">
@@ -363,10 +382,10 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               <tbody className="divide-y divide-slate-100">
                 {groupedByFloor.map(([floor, floorRooms]) => (
                   <React.Fragment key={`floor-${floor}`}>
-                    <tr className="sticky z-20">
+                    <tr>
                       <td
                         colSpan={gridDays + 1}
-                        className="bg-slate-50/90 backdrop-blur-sm text-[10px] font-black px-4 py-1 border-b text-slate-400 uppercase tracking-widest sticky left-0"
+                        className="bg-slate-50/80 text-[10px] font-black px-4 py-1.5 border-b text-slate-400 uppercase tracking-widest sticky left-0 z-20 backdrop-blur-sm"
                       >
                         Этаж {floor}
                       </td>
@@ -377,19 +396,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* Легенда (Компактная внизу) */}
-        <div className="flex justify-center gap-3 py-1 bg-slate-50/50 rounded-lg shrink-0">
-          {Object.entries(statusLabelsRu).map(([status, label]) => (
-            <div key={status} className="flex items-center gap-1">
-              <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: statusBgHex[status as BookingStatus] }}
-              />
-              <span className="text-[8px] font-bold text-slate-400 uppercase">{label}</span>
-            </div>
-          ))}
         </div>
       </div>
     </TooltipProvider>
