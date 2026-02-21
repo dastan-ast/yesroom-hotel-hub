@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -101,7 +101,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, GRID_DAYS);
+    const endDate = addDays(startDate, gridDays);
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -202,8 +202,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -GRID_DAYS));
-  const handleNext = () => setStartDate((prev) => addDays(prev, GRID_DAYS));
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -gridDays));
+  const handleNext = () => setStartDate((prev) => addDays(prev, gridDays));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
