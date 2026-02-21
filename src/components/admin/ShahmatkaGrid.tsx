@@ -342,12 +342,14 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
+        /* ... остальной код выше без изменений ... */
+
         <div className="flex-1 relative border rounded-2xl bg-white shadow-xl overflow-hidden min-h-0">
           <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
             <table className="w-full border-separate border-spacing-0 table-fixed">
-              <thead className="sticky top-0 z-[100]">
+              <thead className="sticky top-0 z-10"> {/* Понизили z-index до 10 */}
                 <tr className="bg-white/95 backdrop-blur-md">
-                  <th className="w-[60px] md:w-[90px] border-b border-r p-2 sticky left-0 z-[110] bg-slate-50">
+                  <th className="w-[60px] md:w-[90px] border-b border-r p-2 sticky left-0 z-20 bg-slate-50"> {/* Понизили z-index до 20 */}
                     <span className="text-[10px] font-black text-slate-400 uppercase">Room</span>
                   </th>
                   {days.map((day) => (
@@ -382,8 +384,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                     <tr>
                       <td
                         colSpan={gridDays + 1}
-                        className="bg-slate-50/80 text-[10px] font-black px-4 py-1.5 border-b text-slate-400 uppercase tracking-widest sticky left-0 z-20 backdrop-blur-sm"
-                      >
+                        className="bg-slate-50/80 text-[10px] font-black px-4 py-1.5 border-b text-slate-400 uppercase tracking-widest sticky left-0 z-[5] backdrop-blur-sm" 
+                      > {/* Понизили z-index этажа до 5 */}
                         Этаж {floor}
                       </td>
                     </tr>
@@ -394,7 +396,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
             </table>
           </div>
         </div>
-      </div>
+
+/* ... остальной код ниже без изменений ... */
 
       {/* МОДАЛЬНЫЕ ОКНА ДЛЯ РАБОТЫ КАРТОЧЕК */}
       <ManualBookingDialog
