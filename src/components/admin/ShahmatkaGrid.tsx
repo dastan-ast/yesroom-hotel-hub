@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { format, addDays, startOfDay, isSameDay, isWithinInterval, parseISO } from "date-fns";
+import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -71,10 +71,21 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
-  // Изменено на 10 дней для лучшего обзора
+  const GRID_DAYS = 7;
+
   const days = useMemo(() => {
-    return Array.from({ length: 10 }, (_, i) => addDays(startDate, i));
+    return Array.from({ length: GRID_DAYS }, (_, i) => addDays(startDate, i));
   }, [startDate]);
+
+  // Group rooms by floor
+  const groupedByFloor = useMemo(() => {
+    const map = new Map<number, Room[]>();
+    rooms.forEach(r => {
+      if (!map.has(r.floor)) map.set(r.floor, []);
+      map.get(r.floor)!.push(r);
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }, [rooms]);
 
   useEffect(() => {
     if (hotelId) fetchData();
@@ -82,7 +93,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   const fetchData = async () => {
     setLoading(true);
-    const endDate = addDays(startDate, 10);
+    const endDate = addDays(startDate, GRID_DAYS);
 
     const [roomsRes, bookingsRes, bookingRoomsRes] = await Promise.all([
       supabase
@@ -183,19 +194,95 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     }
   };
 
-  // Шаг навигации изменен на 10 для соответствия сетке
-  const handlePrev = () => setStartDate((prev) => addDays(prev, -10));
-  const handleNext = () => setStartDate((prev) => addDays(prev, 10));
+  const handlePrev = () => setStartDate((prev) => addDays(prev, -GRID_DAYS));
+  const handleNext = () => setStartDate((prev) => addDays(prev, GRID_DAYS));
   const handleToday = () => setStartDate(startOfDay(new Date()));
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
+
+  const renderRoomRow = (room: Room) => (
+    <tr key={room.id} className="h-12 hover:bg-slate-50/50 transition-colors">
+      <td className="border-b border-r p-2 text-xs font-black sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] w-20">
+        <div className="leading-tight">
+          <div>{room.room_number}</div>
+          <div className="text-[9px] font-normal text-muted-foreground truncate">
+            {room.room_types?.name}
+          </div>
+        </div>
+      </td>
+      {days.map((day) => {
+        const { left, right } = getCellBookings(room.id, day);
+        const isSame = left && right && left.id === right.id;
+
+        const renderTooltipBlock = (booking: Booking | null, side: "left" | "right") => {
+          const isFullWidth = isSame;
+          const baseClass = cn(
+            "h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all",
+            isFullWidth ? "w-full" : "w-1/2"
+          );
+
+          if (!booking) {
+            return (
+              <div
+                className={baseClass}
+                style={{ backgroundColor: "#f8fafc" }}
+              />
+            );
+          }
+
+          return (
+            <Tooltip key={`${booking.id}-${side}`}>
+              <TooltipTrigger asChild>
+                <div
+                  className={baseClass}
+                  style={{ backgroundColor: statusBgHex[booking.status] }}
+                  onClick={() => handleCellClick(booking)}
+                >
+                  <span className="text-[10px] font-bold text-white truncate px-1">
+                    {booking.guest_name.split(" ")[0]}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                <p className="font-semibold">{booking.guest_name}</p>
+                <p className="text-muted-foreground">{statusLabelsRu[booking.status]}</p>
+                <p className="text-muted-foreground">
+                  {format(parseISO(booking.check_in_date), "dd.MM")} — {format(parseISO(booking.check_out_date), "dd.MM.yy")}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          );
+        };
+
+        return (
+          <td
+            key={day.toISOString()}
+            className={cn(
+              "border-b border-r p-0 relative",
+              isSameDay(day, new Date()) && "bg-primary/[0.02]",
+            )}
+          >
+            <div className="flex h-full w-full gap-0.5 p-0.5">
+              {isSame ? (
+                renderTooltipBlock(left, "left")
+              ) : (
+                <>
+                  {renderTooltipBlock(left, "left")}
+                  {renderTooltipBlock(right, "right")}
+                </>
+              )}
+            </div>
+          </td>
+        );
+      })}
+    </tr>
+  );
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-3">
         {/* Control panel */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-1">
-          {/* Button is first / leftmost */}
           <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm shrink-0">
             <Plus className="h-4 w-4 mr-1" /> Новое бронирование
           </Button>
@@ -266,12 +353,12 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           <table className="w-full border-separate border-spacing-0">
             <thead className="sticky top-0 z-30 bg-slate-50 shadow-sm">
               <tr>
-                <th className="border-b border-r p-2 text-[10px] font-black w-16 sticky left-0 bg-slate-100 z-40">№</th>
+                <th className="border-b border-r p-2 text-[10px] font-black w-20 sticky left-0 bg-slate-100 z-40">№</th>
                 {days.map((day) => (
                   <th
                     key={day.toISOString()}
                     className={cn(
-                      "border-b border-r p-1 text-center min-w-[100px] sm:min-w-[120px]",
+                      "border-b border-r p-1 text-center min-w-[130px] sm:min-w-[150px]",
                       isSameDay(day, new Date()) && "bg-primary/5",
                     )}
                   >
@@ -284,77 +371,15 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               </tr>
             </thead>
             <tbody>
-              {rooms.map((room) => (
-                <tr key={room.id} className="h-12 hover:bg-slate-50/50 transition-colors">
-                  <td className="border-b border-r p-2 text-xs font-black sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
-                    {room.room_number}
-                  </td>
-                  {days.map((day) => {
-                    const { left, right } = getCellBookings(room.id, day);
-                    const isSame = left && right && left.id === right.id;
-
-                    const renderTooltipBlock = (booking: Booking | null, side: "left" | "right") => {
-                      const isFullWidth = isSame;
-                      const baseClass = cn(
-                        "h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all",
-                        isFullWidth ? "w-full" : "w-1/2"
-                      );
-
-                      if (!booking) {
-                        return (
-                          <div
-                            className={baseClass}
-                            style={{ backgroundColor: "#f8fafc" }}
-                          />
-                        );
-                      }
-
-                      return (
-                        <Tooltip key={`${booking.id}-${side}`}>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={baseClass}
-                              style={{ backgroundColor: statusBgHex[booking.status] }}
-                              onClick={() => handleCellClick(booking)}
-                            >
-                              <span className="text-[10px] font-bold text-white truncate px-1">
-                                {booking.guest_name.split(" ")[0]}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs">
-                            <p className="font-semibold">{booking.guest_name}</p>
-                            <p className="text-muted-foreground">{statusLabelsRu[booking.status]}</p>
-                            <p className="text-muted-foreground">
-                              {format(parseISO(booking.check_in_date), "dd.MM")} — {format(parseISO(booking.check_out_date), "dd.MM.yy")}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    };
-
-                    return (
-                      <td
-                        key={day.toISOString()}
-                        className={cn(
-                          "border-b border-r p-0 relative",
-                          isSameDay(day, new Date()) && "bg-primary/[0.02]",
-                        )}
-                      >
-                        <div className="flex h-full w-full gap-0.5 p-0.5">
-                          {isSame ? (
-                            renderTooltipBlock(left, "left")
-                          ) : (
-                            <>
-                              {renderTooltipBlock(left, "left")}
-                              {renderTooltipBlock(right, "right")}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
+              {groupedByFloor.map(([floor, floorRooms]) => (
+                <>
+                  <tr key={`floor-${floor}`}>
+                    <td colSpan={GRID_DAYS + 1} className="bg-slate-100 text-xs font-bold px-3 py-1 border-b">
+                      Этаж {floor}
+                    </td>
+                  </tr>
+                  {floorRooms.map(renderRoomRow)}
+                </>
               ))}
             </tbody>
           </table>
