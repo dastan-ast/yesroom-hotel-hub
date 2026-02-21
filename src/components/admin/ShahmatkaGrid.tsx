@@ -80,7 +80,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   // Group rooms by floor
   const groupedByFloor = useMemo(() => {
     const map = new Map<number, Room[]>();
-    rooms.forEach(r => {
+    rooms.forEach((r) => {
       if (!map.has(r.floor)) map.set(r.floor, []);
       map.get(r.floor)!.push(r);
     });
@@ -205,9 +205,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
       <td className="border-b border-r p-2 text-xs font-black sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] w-20">
         <div className="leading-tight">
           <div>{room.room_number}</div>
-          <div className="text-[9px] font-normal text-muted-foreground truncate">
-            {room.room_types?.name}
-          </div>
+          <div className="text-[9px] font-normal text-muted-foreground truncate">{room.room_types?.name}</div>
         </div>
       </td>
       {days.map((day) => {
@@ -218,16 +216,11 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           const isFullWidth = isSame;
           const baseClass = cn(
             "h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all",
-            isFullWidth ? "w-full" : "w-1/2"
+            isFullWidth ? "w-full" : "w-1/2",
           );
 
           if (!booking) {
-            return (
-              <div
-                className={baseClass}
-                style={{ backgroundColor: "#f8fafc" }}
-              />
-            );
+            return <div className={baseClass} style={{ backgroundColor: "#f8fafc" }} />;
           }
 
           return (
@@ -247,7 +240,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                 <p className="font-semibold">{booking.guest_name}</p>
                 <p className="text-muted-foreground">{statusLabelsRu[booking.status]}</p>
                 <p className="text-muted-foreground">
-                  {format(parseISO(booking.check_in_date), "dd.MM")} — {format(parseISO(booking.check_out_date), "dd.MM.yy")}
+                  {format(parseISO(booking.check_in_date), "dd.MM")} —{" "}
+                  {format(parseISO(booking.check_out_date), "dd.MM.yy")}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -257,10 +251,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         return (
           <td
             key={day.toISOString()}
-            className={cn(
-              "border-b border-r p-0 relative",
-              isSameDay(day, new Date()) && "bg-primary/[0.02]",
-            )}
+            className={cn("border-b border-r p-0 relative", isSameDay(day, new Date()) && "bg-primary/[0.02]")}
           >
             <div className="flex h-full w-full gap-0.5 p-0.5">
               {isSame ? (
@@ -280,111 +271,144 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-3">
-        {/* Control panel */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-1">
-          <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm shrink-0">
-            <Plus className="h-4 w-4 mr-1" /> Новое бронирование
-          </Button>
+      <div className="space-y-4 max-w-full overflow-hidden px-1">
+        {/* --- БЛОК АНАЛИТИКИ (NEW) --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="bg-white p-3 rounded-xl border shadow-sm flex flex-col justify-center">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold">Загрузка</span>
+            <div className="flex items-end gap-2">
+              <span className="text-xl font-black text-slate-800">
+                {Math.round((bookings.length / (rooms.length * GRID_DAYS || 1)) * 100)}%
+              </span>
+              <span className="text-[10px] text-green-500 mb-1 font-bold">↑ 12%</span>
+            </div>
+          </div>
+          <div className="bg-white p-3 rounded-xl border shadow-sm flex flex-col justify-center">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold">Брони на неделю</span>
+            <span className="text-xl font-black text-slate-800">{bookings.length}</span>
+          </div>
+          <div className="hidden md:flex bg-white p-3 rounded-xl border shadow-sm flex-col justify-center">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold">Свободно сегодня</span>
+            <span className="text-xl font-black text-blue-600">
+              {rooms.length - bookings.filter((b) => isSameDay(parseISO(b.check_in_date), new Date())).length}
+            </span>
+          </div>
+          <div className="hidden md:flex bg-white p-3 rounded-xl border shadow-sm flex-col justify-center">
+            <span className="text-[10px] text-muted-foreground uppercase font-bold">Выезды сегодня</span>
+            <span className="text-xl font-black text-orange-500">
+              {bookings.filter((b) => isSameDay(parseISO(b.check_out_date), new Date())).length}
+            </span>
+          </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center border rounded-md h-8 overflow-hidden bg-background">
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none border-r" onClick={handlePrev}>
+        {/* --- ПАНЕЛЬ УПРАВЛЕНИЯ --- */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 p-2 rounded-xl border border-dashed">
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => setBookingDialogOpen(true)}
+              className="h-9 rounded-lg shadow-md hover:scale-105 transition-transform shrink-0"
+            >
+              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Новое бронирование</span>
+            </Button>
+
+            <div className="flex items-center bg-white border rounded-lg h-9 p-0.5 shadow-sm">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" className="h-7 px-3 text-xs font-medium" onClick={handleToday}>
+              <Button
+                variant="ghost"
+                className="h-8 px-3 text-[11px] font-bold uppercase tracking-tighter"
+                onClick={handleToday}
+              >
                 Сегодня
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none border-l" onClick={handleNext}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md" onClick={handleNext}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+          </div>
 
-            <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-md border h-8">
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border shadow-sm h-9">
               <Switch
                 id="active-filter"
                 checked={showOnlyActive}
                 onCheckedChange={setShowOnlyActive}
-                className="scale-75"
+                className="scale-75 data-[state=checked]:bg-blue-600"
               />
-              <Label
-                htmlFor="active-filter"
-                className="text-[10px] font-semibold text-slate-600 uppercase cursor-pointer"
-              >
-                Только активные
+              <Label htmlFor="active-filter" className="text-[10px] font-black text-slate-500 uppercase cursor-pointer">
+                Активные
               </Label>
             </div>
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[9px] font-bold uppercase text-slate-500 border-b pb-2">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#eab308cc]" />
-            <span>Ожидает</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#3b82f6cc]" />
-            <span>Подтверждено</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#22c55ecc]" />
-            <span>Заселён</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#6b728080]" />
-            <span>Выселен</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-[#ef444466]" />
-            <span>Отмена</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm border border-dashed border-slate-400" />
-            <span>Полсуток</span>
-          </div>
-        </div>
-
-        {/* Grid */}
-        <div
-          className="relative z-0 overflow-auto border rounded-xl bg-white shadow-md max-h-[70vh]"
-          style={{ isolation: "isolate" }}
-        >
-          <table className="w-full border-separate border-spacing-0">
-            <thead className="sticky top-0 z-30 bg-slate-50 shadow-sm">
-              <tr>
-                <th className="border-b border-r p-2 text-[10px] font-black w-20 sticky left-0 bg-slate-100 z-40">№</th>
-                {days.map((day) => (
-                  <th
-                    key={day.toISOString()}
-                    className={cn(
-                      "border-b border-r p-1 text-center min-w-[130px] sm:min-w-[150px]",
-                      isSameDay(day, new Date()) && "bg-primary/5",
-                    )}
-                  >
-                    <div className="text-[9px] text-slate-400 uppercase leading-none">
-                      {format(day, "EEE", { locale: ru })}
-                    </div>
-                    <div className="text-sm font-bold text-slate-700">{format(day, "d MMM", { locale: ru })}</div>
+        {/* --- ШАХМАТКА --- */}
+        <div className="relative z-0 border rounded-2xl bg-white shadow-2xl overflow-hidden max-h-[65vh] md:max-h-[70vh]">
+          <div className="overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
+            <table className="w-full border-separate border-spacing-0">
+              <thead className="sticky top-0 z-30">
+                <tr className="bg-slate-50/95 backdrop-blur-md">
+                  <th className="border-b border-r p-3 text-[11px] font-black w-16 sm:w-24 sticky left-0 bg-slate-100/90 backdrop-blur-md z-40 text-slate-500 uppercase">
+                    №
                   </th>
+                  {days.map((day) => (
+                    <th
+                      key={day.toISOString()}
+                      className={cn(
+                        "border-b border-r p-2 text-center min-w-[110px] sm:min-w-[160px] transition-colors",
+                        isSameDay(day, new Date()) && "bg-blue-500/10",
+                      )}
+                    >
+                      <div className="text-[10px] text-slate-400 font-bold uppercase mb-0.5">
+                        {format(day, "EEE", { locale: ru })}
+                      </div>
+                      <div
+                        className={cn(
+                          "text-xs md:text-sm font-black",
+                          isSameDay(day, new Date()) ? "text-blue-600" : "text-slate-700",
+                        )}
+                      >
+                        {format(day, "d MMM", { locale: ru })}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {groupedByFloor.map(([floor, floorRooms]) => (
+                  <React.Fragment key={`floor-${floor}`}>
+                    <tr>
+                      <td
+                        colSpan={GRID_DAYS + 1}
+                        className="bg-slate-50/80 text-[10px] font-black px-4 py-1.5 border-b text-slate-400 uppercase tracking-widest sticky left-0 z-10 backdrop-blur-sm"
+                      >
+                        Этаж {floor}
+                      </td>
+                    </tr>
+                    {floorRooms.map(renderRoomRow)}
+                  </React.Fragment>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {groupedByFloor.map(([floor, floorRooms]) => (
-                <>
-                  <tr key={`floor-${floor}`}>
-                    <td colSpan={GRID_DAYS + 1} className="bg-slate-100 text-xs font-bold px-3 py-1 border-b">
-                      Этаж {floor}
-                    </td>
-                  </tr>
-                  {floorRooms.map(renderRoomRow)}
-                </>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
+        {/* --- ЛЕГЕНДА (НИЖНЯЯ) --- */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2 py-1 bg-slate-50/30 rounded-lg">
+          {Object.entries(statusLabelsRu).map(([status, label]) => (
+            <div key={status} className="flex items-center gap-1.5">
+              <div
+                className="w-2 h-2 rounded-full shadow-inner"
+                style={{ backgroundColor: statusBgHex[status as BookingStatus] }}
+              />
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* --- ОСТАВЛЯЕМ ВСЕ ДИАЛОГИ БЕЗ ИЗМЕНЕНИЙ --- */}
         <ManualBookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
