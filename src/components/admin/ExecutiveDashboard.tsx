@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, startOfMonth, endOfMonth, addDays, subDays, isSameDay, parseISO, differenceInDays, startOfDay, isWithinInterval, eachDayOfInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addDays, subDays, parseISO, differenceInDays, startOfDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -14,28 +14,23 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { 
   BedDouble, 
   DoorOpen, 
-  CalendarCheck, 
-  TrendingUp, 
   Clock, 
   Users,
-  Calendar,
+  TrendingUp, 
   BarChart3,
-  PieChart as PieChartIcon
+  PieChart as PieChartIcon,
+  Percent,
+  DollarSign,
+  Activity,
+  Globe
 } from 'lucide-react';
 
 interface Props {
   hotelId: string;
-}
-
-interface OccupancyData {
-  date: Date;
-  occupied: number;
-  total: number;
-  percentage: number;
 }
 
 interface DashboardStats {
@@ -43,11 +38,23 @@ interface DashboardStats {
   occupiedToday: number;
   freeToday: number;
   bookedToday: number;
-  bookingsNext7Days: number;
-  bookingsNext30Days: number;
   pendingRequests: number;
   monthlyRevenue: number;
-  occupancyData: OccupancyData[];
+}
+
+interface KpiData {
+  occupancyPercent: number;
+  adr: number;
+  revpar: number;
+  soldRoomNights: number;
+  totalRoomNights: number;
+}
+
+interface ChannelData {
+  source: string;
+  label: string;
+  count: number;
+  revenue: number;
 }
 
 interface RoomStatusDistribution {
@@ -63,23 +70,38 @@ const PIE_COLORS = {
   free: '#9ca3af',
 };
 
+const SOURCE_LABELS: Record<string, string> = {
+  web: 'Веб-сайт',
+  manual: 'Ручное',
+  booking: 'Booking',
+  telegram: 'Telegram',
+  whatsapp: 'WhatsApp',
+};
+
+const SOURCE_COLORS: Record<string, string> = {
+  web: '#3b82f6',
+  manual: '#8b5cf6',
+  booking: '#ef4444',
+  telegram: '#06b6d4',
+  whatsapp: '#22c55e',
+};
+
 export function ExecutiveDashboard({ hotelId }: Props) {
   const { t } = useTranslation();
   const [stats, setStats] = useState<DashboardStats>({
-    totalRooms: 0,
-    occupiedToday: 0,
-    freeToday: 0,
-    bookedToday: 0,
-    bookingsNext7Days: 0,
-    bookingsNext30Days: 0,
-    pendingRequests: 0,
-    monthlyRevenue: 0,
-    occupancyData: [],
+    totalRooms: 0, occupiedToday: 0, freeToday: 0, bookedToday: 0,
+    pendingRequests: 0, monthlyRevenue: 0,
   });
   const [loading, setLoading] = useState(true);
   const [piePeriod, setPiePeriod] = useState<string>('7days');
   const [pieData, setPieData] = useState<RoomStatusDistribution[]>([]);
   const [pieLoading, setPieLoading] = useState(false);
+
+  // KPI state
+  const [kpiPeriod, setKpiPeriod] = useState<string>('month');
+  const [kpiData, setKpiData] = useState<KpiData>({ occupancyPercent: 0, adr: 0, revpar: 0, soldRoomNights: 0, totalRoomNights: 0 });
+  const [channelData, setChannelData] = useState<ChannelData[]>([]);
+  const [kpiLoading, setKpiLoading] = useState(false);
 
   // Occupancy report state
   const [reportStart, setReportStart] = useState<Date>(startOfMonth(new Date()));
@@ -108,7 +130,6 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     const allBookings = bookingsRes.data || [];
     const brEntries = (bookingRoomsRes.data || []) as any[];
 
-    // Build room -> booking days map
     const roomDays = new Map<string, number>();
 
     const countDays = (roomId: string, checkIn: string, checkOut: string) => {
@@ -152,16 +173,16 @@ export function ExecutiveDashboard({ hotelId }: Props) {
   }, [hotelId, reportStart, reportEnd]);
 
   useEffect(() => {
-    if (hotelId) {
-      fetchDashboardData();
-    }
+    if (hotelId) fetchDashboardData();
   }, [hotelId]);
 
   useEffect(() => {
-    if (hotelId && stats.totalRooms > 0) {
-      fetchPieData();
-    }
+    if (hotelId && stats.totalRooms > 0) fetchPieData();
   }, [hotelId, piePeriod, stats.totalRooms]);
+
+  useEffect(() => {
+    if (hotelId && stats.totalRooms > 0) fetchKpiData();
+  }, [hotelId, kpiPeriod, stats.totalRooms]);
 
   const fetchPieData = async () => {
     setPieLoading(true);
@@ -193,10 +214,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     const totalRooms = stats.totalRooms;
     const numDays = differenceInDays(periodEnd, periodStart) + 1;
 
-    let totalCheckedIn = 0;
-    let totalApproved = 0;
-    let totalPending = 0;
-    let totalFree = 0;
+    let totalCheckedIn = 0, totalApproved = 0, totalPending = 0, totalFree = 0;
 
     for (let i = 0; i < numDays; i++) {
       const day = addDays(periodStart, i);
@@ -236,41 +254,93 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     setPieLoading(false);
   };
 
+  const fetchKpiData = async () => {
+    setKpiLoading(true);
+    const today = startOfDay(new Date());
+    const daysBack = kpiPeriod === '7days' ? 7 : differenceInDays(today, startOfMonth(today)) + 1;
+    const periodStart = kpiPeriod === '7days' ? subDays(today, 6) : startOfMonth(today);
+    const startStr = format(periodStart, 'yyyy-MM-dd');
+    const endStr = format(addDays(today, 1), 'yyyy-MM-dd');
+
+    // Fetch all non-cancelled bookings overlapping the period
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('source, final_total, daily_rate, check_in_date, check_out_date, status')
+      .eq('hotel_id', hotelId)
+      .in('status', ['approved', 'checked_in', 'checked_out'])
+      .lt('check_in_date', endStr)
+      .gt('check_out_date', startStr);
+
+    const totalRoomNights = stats.totalRooms * daysBack;
+    let soldRoomNights = 0;
+    let totalRevenue = 0;
+    const channelMap: Record<string, { count: number; revenue: number }> = {};
+
+    if (bookings) {
+      for (const b of bookings) {
+        const ci = parseISO(b.check_in_date) < periodStart ? periodStart : parseISO(b.check_in_date);
+        const co = parseISO(b.check_out_date) > addDays(today, 1) ? addDays(today, 1) : parseISO(b.check_out_date);
+        const nights = Math.max(0, differenceInDays(co, ci));
+        soldRoomNights += nights;
+
+        // Revenue for this booking (proportional to period)
+        const totalNights = differenceInDays(parseISO(b.check_out_date), parseISO(b.check_in_date));
+        let bookingRevenue = 0;
+        if (b.final_total && totalNights > 0) {
+          bookingRevenue = (Number(b.final_total) / totalNights) * nights;
+        } else if (b.daily_rate) {
+          bookingRevenue = Number(b.daily_rate) * nights;
+        }
+        totalRevenue += bookingRevenue;
+
+        // Channel breakdown
+        const src = b.source || 'manual';
+        if (!channelMap[src]) channelMap[src] = { count: 0, revenue: 0 };
+        channelMap[src].count += 1;
+        channelMap[src].revenue += bookingRevenue;
+      }
+    }
+
+    const occupancyPercent = totalRoomNights > 0 ? Math.round((soldRoomNights / totalRoomNights) * 100) : 0;
+    const adr = soldRoomNights > 0 ? Math.round(totalRevenue / soldRoomNights) : 0;
+    const revpar = totalRoomNights > 0 ? Math.round(totalRevenue / totalRoomNights) : 0;
+
+    setKpiData({ occupancyPercent, adr, revpar, soldRoomNights, totalRoomNights });
+
+    const channels: ChannelData[] = Object.entries(channelMap)
+      .map(([source, data]) => ({
+        source,
+        label: SOURCE_LABELS[source] || source,
+        count: data.count,
+        revenue: Math.round(data.revenue),
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    setChannelData(channels);
+    setKpiLoading(false);
+  };
+
   const fetchDashboardData = async () => {
     setLoading(true);
     const today = startOfDay(new Date());
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const next7Days = format(addDays(today, 7), 'yyyy-MM-dd');
-    const next30Days = format(addDays(today, 30), 'yyyy-MM-dd');
     const monthStart = format(startOfMonth(today), 'yyyy-MM-dd');
     const monthEnd = format(endOfMonth(today), 'yyyy-MM-dd');
 
-    const [
-      roomsRes,
-      occupiedRes,
-      bookedRes,
-      bookings7Res,
-      bookings30Res,
-      pendingRes,
-      revenueRes,
-      servicesRevenueRes,
-      allBookingsRes,
-    ] = await Promise.all([
+    const [roomsRes, occupiedRes, bookedRes, pendingRes, revenueRes, servicesRevenueRes] = await Promise.all([
       supabase.from('rooms').select('id', { count: 'exact' }).eq('hotel_id', hotelId),
       supabase.from('rooms').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'occupied'),
       supabase.from('rooms').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'booked'),
-      supabase.from('bookings').select('id', { count: 'exact' }).eq('hotel_id', hotelId).gte('check_in_date', todayStr).lte('check_in_date', next7Days).not('status', 'eq', 'cancelled'),
-      supabase.from('bookings').select('id', { count: 'exact' }).eq('hotel_id', hotelId).gte('check_in_date', todayStr).lte('check_in_date', next30Days).not('status', 'eq', 'cancelled'),
       supabase.from('bookings').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'pending'),
-      supabase.from('bookings').select('final_total, daily_rate, check_in_date, check_out_date').eq('hotel_id', hotelId).eq('status', 'checked_out').gte('check_out_date', monthStart).lte('check_out_date', monthEnd),
-      supabase.from('booking_services').select('total_price, unit_price, quantity, created_at').eq('hotel_id', hotelId).gte('created_at', monthStart).lte('created_at', monthEnd),
-      supabase.from('bookings').select('room_id, check_in_date, check_out_date, status').eq('hotel_id', hotelId).not('room_id', 'is', null).gte('check_out_date', format(subDays(today, 5), 'yyyy-MM-dd')).lte('check_in_date', next30Days).in('status', ['approved', 'checked_in', 'checked_out']),
+      supabase.from('bookings').select('final_total, daily_rate, check_in_date, check_out_date')
+        .eq('hotel_id', hotelId).eq('status', 'checked_out')
+        .gte('check_out_date', monthStart).lte('check_out_date', monthEnd),
+      supabase.from('booking_services').select('total_price, unit_price, quantity')
+        .eq('hotel_id', hotelId).gte('created_at', monthStart).lte('created_at', monthEnd),
     ]);
 
     const totalRooms = roomsRes.count || 0;
     const occupiedToday = occupiedRes.count || 0;
     const bookedToday = bookedRes.count || 0;
-    const freeToday = totalRooms - occupiedToday - bookedToday;
+    const freeToday = Math.max(0, totalRooms - occupiedToday - bookedToday);
 
     let monthlyRevenue = 0;
     if (revenueRes.data) {
@@ -289,28 +359,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
       }
     }
 
-    const occupancyData: OccupancyData[] = [];
-    for (let i = 0; i < 30; i++) {
-      const date = addDays(today, i);
-      let occupied = 0;
-      if (allBookingsRes.data) {
-        for (const booking of allBookingsRes.data) {
-          const checkIn = parseISO(booking.check_in_date);
-          const checkOut = parseISO(booking.check_out_date);
-          if (date >= checkIn && date < checkOut) occupied++;
-        }
-      }
-      occupancyData.push({
-        date, occupied, total: totalRooms,
-        percentage: totalRooms > 0 ? Math.round((occupied / totalRooms) * 100) : 0,
-      });
-    }
-
-    setStats({
-      totalRooms, occupiedToday, freeToday: Math.max(0, freeToday), bookedToday,
-      bookingsNext7Days: bookings7Res.count || 0, bookingsNext30Days: bookings30Res.count || 0,
-      pendingRequests: pendingRes.count || 0, monthlyRevenue, occupancyData,
-    });
+    setStats({ totalRooms, occupiedToday, freeToday, bookedToday, pendingRequests: pendingRes.count || 0, monthlyRevenue });
     setLoading(false);
   };
 
@@ -319,7 +368,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
 
   const pieTotal = pieData.reduce((sum, d) => sum + d.value, 0);
 
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, name }: any) => {
+  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) => {
     if (value === 0) return null;
     const RADIAN = Math.PI / 180;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -336,6 +385,8 @@ export function ExecutiveDashboard({ hotelId }: Props) {
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
   }
+
+  const kpiPeriodLabel = kpiPeriod === '7days' ? 'за 7 дней' : 'за месяц';
 
   return (
     <div className="space-y-6">
@@ -404,6 +455,56 @@ export function ExecutiveDashboard({ hotelId }: Props) {
         </Card>
       </div>
 
+      {/* KPI Row */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Ключевые показатели
+            </CardTitle>
+            <ToggleGroup type="single" value={kpiPeriod} onValueChange={(v) => v && setKpiPeriod(v)} size="sm">
+              <ToggleGroupItem value="7days" className="text-xs">7 дней</ToggleGroupItem>
+              <ToggleGroupItem value="month" className="text-xs">Месяц</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {kpiLoading ? (
+            <div className="h-[80px] flex items-center justify-center text-muted-foreground text-sm">Загрузка...</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-muted/50 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-primary" />
+                  <p className="text-xs text-muted-foreground">Загрузка (Occupancy)</p>
+                </div>
+                <p className="text-3xl font-bold text-primary">{kpiData.occupancyPercent}%</p>
+                <p className="text-xs text-muted-foreground">
+                  {kpiData.soldRoomNights} из {kpiData.totalRoomNights} ночей {kpiPeriodLabel}
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  <p className="text-xs text-muted-foreground">ADR (Ср. цена номера)</p>
+                </div>
+                <p className="text-3xl font-bold text-emerald-600">{kpiData.adr.toLocaleString()} ₸</p>
+                <p className="text-xs text-muted-foreground">{kpiPeriodLabel}</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg space-y-1">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                  <p className="text-xs text-muted-foreground">RevPAR (Доход на номер)</p>
+                </div>
+                <p className="text-3xl font-bold text-blue-600">{kpiData.revpar.toLocaleString()} ₸</p>
+                <p className="text-xs text-muted-foreground">{kpiPeriodLabel}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Room Status Pie Chart */}
       <Card>
         <CardHeader className="pb-2">
@@ -463,27 +564,45 @@ export function ExecutiveDashboard({ hotelId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Secondary Stats */}
+      {/* Channel Analysis + Today's Occupancy */}
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              Предстоящие заезды
+              <Globe className="h-4 w-4" />
+              Анализ каналов ({kpiPeriod === '7days' ? '7 дн' : 'месяц'})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-6">
-              <div>
-                <p className="text-3xl font-bold">{stats.bookingsNext7Days}</p>
-                <p className="text-sm text-muted-foreground">на 7 дней</p>
+            {kpiLoading ? (
+              <div className="h-[120px] flex items-center justify-center text-muted-foreground text-sm">Загрузка...</div>
+            ) : channelData.length === 0 ? (
+              <div className="py-4 text-center text-muted-foreground text-sm">Нет данных за этот период</div>
+            ) : (
+              <div className="space-y-3">
+                {channelData.map((ch) => {
+                  const maxRevenue = Math.max(...channelData.map(c => c.revenue), 1);
+                  const widthPercent = Math.max((ch.revenue / maxRevenue) * 100, 8);
+                  return (
+                    <div key={ch.source} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{ch.label}</span>
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                          <span>{ch.count} брон.</span>
+                          <span className="font-medium text-foreground">{ch.revenue.toLocaleString()} ₸</span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full transition-all"
+                          style={{ width: `${widthPercent}%`, backgroundColor: SOURCE_COLORS[ch.source] || '#6b7280' }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <Separator orientation="vertical" className="h-12" />
-              <div>
-                <p className="text-3xl font-bold">{stats.bookingsNext30Days}</p>
-                <p className="text-sm text-muted-foreground">на 30 дней</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -505,50 +624,6 @@ export function ExecutiveDashboard({ hotelId }: Props) {
           </CardContent>
         </Card>
       </div>
-
-      {/* 30-Day Occupancy Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Загрузка отеля на 30 дней
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <div className="flex gap-1 min-w-[800px] h-32 items-end pb-6 relative">
-              {stats.occupancyData.map((day, idx) => (
-                <div key={idx} className="flex-1 flex flex-col items-center group relative">
-                  <div 
-                    className={`w-full rounded-t transition-colors ${
-                      day.percentage >= 80 ? 'bg-green-500' : 
-                      day.percentage >= 50 ? 'bg-blue-500' : 
-                      day.percentage >= 20 ? 'bg-yellow-500' : 'bg-muted'
-                    }`}
-                    style={{ height: `${Math.max(day.percentage, 5)}%` }}
-                    title={`${format(day.date, 'd MMM', { locale: ru })}: ${day.occupied}/${day.total} (${day.percentage}%)`}
-                  />
-                  {(idx === 0 || idx === 29 || idx % 7 === 0) && (
-                    <span className="absolute -bottom-5 text-[10px] text-muted-foreground whitespace-nowrap">
-                      {format(day.date, 'd.MM', { locale: ru })}
-                    </span>
-                  )}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-popover border rounded px-2 py-1 text-xs shadow-lg z-10 whitespace-nowrap">
-                    <div className="font-medium">{format(day.date, 'd MMMM', { locale: ru })}</div>
-                    <div>{day.occupied} из {day.total} ({day.percentage}%)</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex gap-4 mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-green-500" /><span>80%+</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-500" /><span>50-79%</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-yellow-500" /><span>20-49%</span></div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-muted" /><span>0-19%</span></div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Occupancy Report */}
       <Card>
