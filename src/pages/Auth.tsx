@@ -240,6 +240,9 @@ export default function Auth() {
               <p className="text-sm text-muted-foreground">
                 Перейдите по ссылке в письме для подтверждения аккаунта. После этого вы сможете войти.
               </p>
+              <div className="p-3 bg-muted rounded-lg text-xs text-muted-foreground">
+                💡 Не нашли письмо? Проверьте папку «Спам» или «Нежелательная почта». Иногда письма попадают туда.
+              </div>
               <Button
                 variant="outline"
                 className="w-full"
