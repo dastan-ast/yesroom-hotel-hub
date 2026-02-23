@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Pagination,
   PaginationContent,
@@ -27,7 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search, AlertTriangle, BedDouble } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, LogIn, LogOut, Phone, MessageCircle, DoorOpen, RotateCcw, Eye, Trash2, Search, AlertTriangle, BedDouble, Merge } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { GuestHistoryModal } from './GuestHistoryModal';
 import { RoomAssignDialog } from './RoomAssignDialog';
@@ -50,6 +51,7 @@ interface Booking {
   room_id: string | null;
   room_type_id: string | null;
   additional_info: Record<string, any> | null;
+  group_id: string | null;
 }
 
 /** A grouped booking card representing 1+ bookings for same guest */
@@ -117,6 +119,10 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
 
+  // Multi-select merge state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, searchQuery]);
@@ -131,24 +137,71 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const { data } = await supabase
       .from('bookings')
-      .select('*, room_types(name), room_id, room_type_id, additional_info')
+      .select('*, room_types(name), room_id, room_type_id, additional_info, group_id')
       .eq('hotel_id', hotelId)
       .order('created_at', { ascending: false })
       .limit(50);
     
     if (data) setBookings(data as Booking[]);
+    setSelectedIds(new Set());
     setLoading(false);
   };
 
+  // --- Merge logic ---
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmMerge = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length < 2) return;
+
+    const groupId = ids[0]; // use first selected booking's ID as group_id
+    const primaryBooking = bookings.find(b => b.id === groupId);
+    if (!primaryBooking) return;
+
+    // Normalize guest_name and guest_phone across the group
+    const { error } = await supabase
+      .from('bookings')
+      .update({
+        group_id: groupId,
+        guest_name: primaryBooking.guest_name,
+        guest_phone: primaryBooking.guest_phone,
+      })
+      .in('id', ids);
+
+    if (error) {
+      toast.error(t('common.error'));
+      return;
+    }
+
+    toast.success(`${ids.length} бронирований объединены`);
+    logAdminAction({
+      hotelId,
+      userId: user!.id,
+      userName: profile?.full_name || '',
+      action: 'bookings_merged',
+      entityType: 'booking',
+      entityId: groupId,
+      details: { merged_ids: ids, guest_name: primaryBooking.guest_name },
+    });
+    setMergeDialogOpen(false);
+    setSelectedIds(new Set());
+    fetchBookings();
+  };
+
   const handleCheckIn = async (booking: Booking) => {
-    // Check both room_id and booking_rooms for assigned rooms
     const roomIdsToOccupy: string[] = [];
     
     if (booking.room_id) {
       roomIdsToOccupy.push(booking.room_id);
     }
     
-    // Also get rooms from booking_rooms table
     const { data: bookingRooms } = await supabase
       .from('booking_rooms')
       .select('room_id')
@@ -177,7 +230,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
-    // Mark ALL assigned rooms as occupied
     const { error: roomError } = await supabase
       .from('rooms')
       .update({ status: 'occupied' })
@@ -196,7 +248,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Check-in all bookings in a group
   const handleCheckInGroup = async (group: BookingGroup) => {
     let totalRooms = 0;
     for (const booking of group.bookings) {
@@ -227,10 +278,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Checkout state for group
   const [checkoutBookingIds, setCheckoutBookingIds] = useState<string[]>([]);
 
-  // Open checkout modal for a group of bookings
   const handleOpenCheckoutGroup = (group: BookingGroup) => {
     const checkedInIds = group.bookings
       .filter(b => b.status === 'checked_in')
@@ -239,19 +288,16 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     setCheckoutModalOpen(true);
   };
 
-  // Open detail modal
   const handleOpenDetail = (group: BookingGroup) => {
     setDetailBookingIds(group.bookings.map(b => b.id));
     setDetailModalOpen(true);
   };
 
-  // Availability warning state
   const [availabilityWarningOpen, setAvailabilityWarningOpen] = useState(false);
   const [availabilityWarningMsg, setAvailabilityWarningMsg] = useState('');
   const [pendingApproveAction, setPendingApproveAction] = useState<(() => Promise<void>) | null>(null);
 
   const handleQuickApprove = async (bookingId: string) => {
-    // Find the booking to check availability
     const booking = bookings.find(b => b.id === bookingId);
     if (booking && booking.room_type_id) {
       const result = await checkRoomAvailability(
@@ -291,7 +337,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Approve all bookings in group
   const handleQuickApproveGroup = async (group: BookingGroup) => {
     for (const booking of group.bookings) {
       if (booking.status === 'pending') {
@@ -302,7 +347,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Cancel booking with confirmation
   const handleCancelWithConfirm = (booking: Booking) => {
     setBookingToCancel(booking);
     setCancelReason('');
@@ -343,7 +387,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Undo check-in
   const handleUndoCheckInWithConfirm = (booking: Booking) => {
     setBookingToUndoCheckIn(booking);
     setUndoCheckInDialogOpen(true);
@@ -373,7 +416,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Delete booking with confirmation (owner only)
   const handleDeleteWithConfirm = (booking: Booking) => {
     if (booking.status === 'checked_in') {
       toast.error('Сначала выселите гостя');
@@ -407,7 +449,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     fetchBookings();
   };
 
-  // Check if booking is overdue
   const isOverdue = (booking: Booking) => {
     if (booking.status !== 'checked_in') return false;
     const today = new Date();
@@ -419,19 +460,17 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   const isGroupOverdue = (group: BookingGroup) => group.bookings.some(isOverdue);
 
-  // Group bookings by guest_phone + status for active statuses
+  // Group bookings ONLY by group_id (manual grouping). No auto-grouping.
   const groupedBookings = useMemo((): BookingGroup[] => {
     const groups: BookingGroup[] = [];
-    const grouped = new Map<string, Booking[]>();
+    const byGroupId = new Map<string, Booking[]>();
 
     for (const booking of bookings) {
-      // Only group active statuses
-      if (ACTIVE_STATUSES.includes(booking.status)) {
-        const key = `${booking.guest_phone}__${booking.status}`;
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(booking);
+      if (booking.group_id) {
+        if (!byGroupId.has(booking.group_id)) byGroupId.set(booking.group_id, []);
+        byGroupId.get(booking.group_id)!.push(booking);
       } else {
-        // Non-active bookings go as individual entries
+        // Individual booking — no grouping
         groups.push({
           key: booking.id,
           primary: booking,
@@ -443,12 +482,12 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       }
     }
 
-    for (const [key, bks] of grouped.entries()) {
+    for (const [gid, bks] of byGroupId.entries()) {
       const hasDifferentDates = bks.some(b => 
         b.check_in_date !== bks[0].check_in_date || b.check_out_date !== bks[0].check_out_date
       );
       groups.push({
-        key,
+        key: gid,
         primary: bks[0],
         bookings: bks,
         roomCount: bks.length,
@@ -515,7 +554,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
   const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
 
-  // Get room type names for a group
   const getRoomTypeNames = (group: BookingGroup) => {
     const names = group.bookings
       .map(b => b.room_types?.name)
@@ -525,7 +563,6 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     return unique.join(', ');
   };
 
-  // Get date range display for a group
   const getDateDisplay = (group: BookingGroup) => {
     if (!group.isGrouped || !group.hasDifferentDates) {
       return `${format(new Date(group.primary.check_in_date), 'dd.MM')} — ${format(new Date(group.primary.check_out_date), 'dd.MM.yyyy')}`;
@@ -610,6 +647,19 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
         </div>
       )}
 
+      {/* Floating merge button */}
+      {selectedIds.size >= 2 && (
+        <div className="sticky top-2 z-30 flex justify-center">
+          <Button 
+            onClick={() => setMergeDialogOpen(true)}
+            className="shadow-lg gap-2"
+          >
+            <Merge className="h-4 w-4" />
+            Объединить выбранные ({selectedIds.size})
+          </Button>
+        </div>
+      )}
+
       {filteredGroups.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {bookings.length === 0 ? t('admin.noBookings') : 'Нет бронирований по заданным фильтрам'}
@@ -627,9 +677,20 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   "flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border gap-4",
                   overdue
                     ? "bg-destructive/5 border-destructive/40 ring-1 ring-destructive/20"
-                    : "bg-card"
+                    : "bg-card",
+                  !group.isGrouped && selectedIds.has(primary.id) && "ring-2 ring-primary/50"
                 )}
               >
+                {/* Checkbox for non-grouped active bookings */}
+                {!group.isGrouped && ACTIVE_STATUSES.includes(primary.status) && (
+                  <div className="flex items-center shrink-0">
+                    <Checkbox
+                      checked={selectedIds.has(primary.id)}
+                      onCheckedChange={() => toggleSelect(primary.id)}
+                    />
+                  </div>
+                )}
+
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium">{primary.guest_name}</span>
@@ -873,6 +934,27 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
             <AlertDialogCancel>Назад</AlertDialogCancel>
             <AlertDialogAction onClick={confirmUndoCheckIn}>
               Отменить заселение
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Merge Confirmation Dialog */}
+      <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Merge className="h-5 w-5" />
+              Объединить бронирования?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы уверены, что хотите объединить {selectedIds.size} бронирований? Они будут сгруппированы для единого управления и выставления счетов. Имя и телефон будут нормализованы по первому выбранному бронированию.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmMerge}>
+              Объединить
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

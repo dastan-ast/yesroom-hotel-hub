@@ -197,6 +197,7 @@ export type Database = {
           external_id: string | null
           external_source_data: Json | null
           final_total: number | null
+          group_id: string | null
           guest_comment: string | null
           guest_count: number
           guest_name: string
@@ -223,6 +224,7 @@ export type Database = {
           external_id?: string | null
           external_source_data?: Json | null
           final_total?: number | null
+          group_id?: string | null
           guest_comment?: string | null
           guest_count?: number
           guest_name: string
@@ -249,6 +251,7 @@ export type Database = {
           external_id?: string | null
           external_source_data?: Json | null
           final_total?: number | null
+          group_id?: string | null
           guest_comment?: string | null
           guest_count?: number
           guest_name?: string
