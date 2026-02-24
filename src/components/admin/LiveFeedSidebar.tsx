@@ -24,12 +24,13 @@ import { RoomAssignDialog } from './RoomAssignDialog';
 interface PendingBooking {
   id: string;
   guest_name: string;
-  guest_phone: string;
+  guest_phone: string | null;
   check_in_date: string;
   check_out_date: string;
   created_at: string;
   room_type_id: string | null;
   room_types: { name: string } | null;
+  status: 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 }
 
 interface Props {
@@ -85,11 +86,11 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     setLoading(true);
     const { data } = await supabase
       .from('bookings')
-      .select('id, guest_name, guest_phone, check_in_date, check_out_date, created_at, room_type_id, room_types(name)')
+      .select('id, guest_name, guest_phone, check_in_date, check_out_date, created_at, room_type_id, room_types(name), status')
       .eq('hotel_id', hotelId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'approved', 'checked_in'])
       .order('created_at', { ascending: false })
-      .limit(30);
+      .limit(200);
 
     if (data) setBookings(data as PendingBooking[]);
     setLoading(false);
@@ -177,30 +178,49 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
     onBookingUpdated?.();
   };
 
-  const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+  const formatPhone = (phone?: string | null) => (phone ?? '').replace(/[^\d+]/g, '');
+
+  const getStatusLabel = (status: PendingBooking['status']) => {
+    if (status === 'pending') return 'Ожидает';
+    if (status === 'approved') return 'Подтверждено';
+    if (status === 'checked_in') return 'Заселён';
+    if (status === 'checked_out') return 'Выселен';
+    return 'Отменено';
+  };
 
   const isOverdue = (booking: PendingBooking) => {
+    if (booking.status === 'cancelled' || booking.status === 'checked_out') return false;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    if (booking.status === 'checked_in') {
+      const checkOut = new Date(booking.check_out_date);
+      checkOut.setHours(0, 0, 0, 0);
+      return checkOut < today;
+    }
+
     const checkIn = new Date(booking.check_in_date);
     checkIn.setHours(0, 0, 0, 0);
     return checkIn < today;
   };
 
-  // Sort: overdue first
+  // Sort: overdue first, then newest first
   const sortedBookings = [...bookings].sort((a, b) => {
     const aOverdue = isOverdue(a);
     const bOverdue = isOverdue(b);
+
     if (aOverdue && !bOverdue) return -1;
     if (!aOverdue && bOverdue) return 1;
-    return 0;
+
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   return (
     <div className="bg-card border rounded-lg h-full flex flex-col">
       <div className="p-4 border-b flex items-center gap-2">
         <Bell className="h-5 w-5 text-primary" />
-        <h3 className="font-semibold">Новые заявки</h3>
+        <h3 className="font-semibold">Активные заявки</h3>
         {bookings.length > 0 && (
           <Badge variant="destructive" className="ml-auto">
             {bookings.length}
@@ -215,7 +235,7 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
           </div>
         ) : bookings.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground text-sm">
-            Нет новых заявок
+            Нет активных заявок
           </div>
         ) : (
           <div className="p-2 space-y-2">
@@ -236,60 +256,77 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
                       {overdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                       <p className={`font-medium text-sm truncate ${overdue ? 'text-destructive' : ''}`}>{booking.guest_name}</p>
                     </div>
-                    <a
-                      href={`tel:${formatPhone(booking.guest_phone)}`}
-                      className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {booking.guest_phone}
-                    </a>
+                    {booking.guest_phone ? (
+                      <a
+                        href={`tel:${formatPhone(booking.guest_phone)}`}
+                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                      >
+                        <Phone className="h-3 w-3" />
+                        {booking.guest_phone}
+                      </a>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Телефон не указан</p>
+                    )}
                   </div>
-                  <a
-                    href={`https://wa.me/${formatPhone(booking.guest_phone).replace('+', '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-green-600 hover:text-green-700"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                  </a>
+                  {booking.guest_phone && (
+                    <a
+                      href={`https://wa.me/${formatPhone(booking.guest_phone).replace('+', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                    </a>
+                  )}
                 </div>
 
-                <div className="text-xs text-muted-foreground">
-                  <p>{booking.room_types?.name}</p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                      {getStatusLabel(booking.status)}
+                    </Badge>
+                    <p>{booking.room_types?.name || 'Без типа номера'}</p>
+                  </div>
                   <p>
                     {format(new Date(booking.check_in_date), 'dd.MM')} –{' '}
                     {format(new Date(booking.check_out_date), 'dd.MM.yy')}
                   </p>
                 </div>
 
-                <div className="flex gap-1.5">
-                  <Button
-                    size="sm"
-                    className="flex-1 h-7 text-xs"
-                    onClick={() => handleOpenAssignDialog(booking)}
-                  >
-                    <DoorOpen className="h-3 w-3 mr-1" />
-                    Назначить номер
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="h-7 text-xs px-2"
-                    onClick={() => handleRejectWithConfirm(booking)}
-                  >
-                    <XCircle className="h-3 w-3" />
-                  </Button>
-                  {isOwner && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 text-xs px-2 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteWithConfirm(booking)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
+                {(booking.status === 'pending' || booking.status === 'approved' || isOwner) && (
+                  <div className="flex gap-1.5">
+                    {(booking.status === 'pending' || booking.status === 'approved') && (
+                      <>
+                        <Button
+                          size="sm"
+                          className="flex-1 h-7 text-xs"
+                          onClick={() => handleOpenAssignDialog(booking)}
+                        >
+                          <DoorOpen className="h-3 w-3 mr-1" />
+                          Назначить номер
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 text-xs px-2"
+                          onClick={() => handleRejectWithConfirm(booking)}
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </Button>
+                      </>
+                    )}
+                    {isOwner && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs px-2 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteWithConfirm(booking)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
               );
             })}
