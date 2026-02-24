@@ -147,6 +147,15 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     setLoading(false);
   };
 
+  const handleManualBookingSuccess = async (createdBookingIds: string[]) => {
+    await fetchBookings();
+
+    if (createdBookingIds.length > 0) {
+      setDetailBookingIds(createdBookingIds);
+      setDetailModalOpen(true);
+    }
+  };
+
   // --- Merge logic ---
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -866,7 +875,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       <ManualBookingDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onSuccess={fetchBookings}
+        onSuccess={handleManualBookingSuccess}
         hotelId={hotelId}
       />
 
@@ -978,7 +987,10 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       {detailBookingIds.length > 0 && (
         <BookingDetailModal
           open={detailModalOpen}
-          onOpenChange={setDetailModalOpen}
+          onOpenChange={(open) => {
+            setDetailModalOpen(open);
+            if (!open) setDetailBookingIds([]);
+          }}
           bookingIds={detailBookingIds}
           hotelId={hotelId}
           onUpdate={fetchBookings}

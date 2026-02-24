@@ -72,7 +72,7 @@ interface AvailableRoom {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (createdBookingIds: string[]) => void | Promise<void>;
   hotelId: string;
 }
 
@@ -391,8 +391,8 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
       ? `Создано ${selectedRooms.length} бронирований` 
       : t('common.success')
     );
+    await onSuccess(createdBookingIds);
     onOpenChange(false);
-    onSuccess();
   };
 
   const selectedRoomDetails = availableRooms.filter(r => selectedRooms.includes(r.id));
