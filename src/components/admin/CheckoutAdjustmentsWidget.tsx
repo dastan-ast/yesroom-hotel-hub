@@ -42,7 +42,7 @@ export function CheckoutAdjustmentsWidget({ hotelId }: { hotelId: string }) {
     setLoading(false);
   };
 
-  const handleReview = async (id: string, newStatus: 'approved' | 'rejected') => {
+  const handleReview = async (adj: Adjustment, newStatus: 'approved' | 'rejected') => {
     const { error } = await supabase
       .from('checkout_adjustments' as any)
       .update({
@@ -50,14 +50,23 @@ export function CheckoutAdjustmentsWidget({ hotelId }: { hotelId: string }) {
         reviewed_by: user?.id,
         reviewed_at: new Date().toISOString(),
       })
-      .eq('id', id);
+      .eq('id', adj.id);
 
     if (error) {
       toast.error('Ошибка');
-    } else {
-      toast.success(newStatus === 'approved' ? 'Одобрено' : 'Отклонено');
-      fetchAdjustments();
+      return;
     }
+
+    // If approved, update booking's final_total so analytics use the correct amount
+    if (newStatus === 'approved') {
+      await supabase
+        .from('bookings')
+        .update({ final_total: adj.adjusted_total })
+        .eq('id', adj.booking_id);
+    }
+
+    toast.success(newStatus === 'approved' ? 'Одобрено — сумма обновлена' : 'Отклонено');
+    fetchAdjustments();
   };
 
   if (loading || adjustments.length === 0) return null;
@@ -98,11 +107,11 @@ export function CheckoutAdjustmentsWidget({ hotelId }: { hotelId: string }) {
               <p className="text-xs text-muted-foreground">Причина: {adj.reason}</p>
             )}
             <div className="flex gap-2 pt-1">
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleReview(adj.id, 'approved')}>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleReview(adj, 'approved')}>
                 <Check className="h-3 w-3 mr-1" />
                 Одобрить
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => handleReview(adj.id, 'rejected')}>
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => handleReview(adj, 'rejected')}>
                 <X className="h-3 w-3 mr-1" />
                 Отклонить
               </Button>
