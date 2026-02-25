@@ -29,9 +29,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft } from 'lucide-react';
+import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft, LogIn, Clock, CheckCircle } from 'lucide-react';
 import { BookingServicesTab } from './BookingServicesTab';
-import { RoomAssignDialog } from './RoomAssignDialog';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -53,8 +52,15 @@ interface BookingDetails {
   rooms: { room_number: string } | null;
   room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
   is_half_day?: boolean;
-  // All assigned rooms (from booking_rooms + room_id)
   allRooms: { id: string; room_number: string; room_type_name: string }[];
+}
+
+interface InlineRoom {
+  id: string;
+  room_number: string;
+  floor: number;
+  room_types: { name: string } | null;
+  hasConflict?: boolean;
 }
 
 interface Props {
@@ -104,8 +110,14 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   const [newCheckoutDate, setNewCheckoutDate] = useState('');
   const [processingExtend, setProcessingExtend] = useState(false);
 
-  // Room change state
-  const [roomChangeDialogOpen, setRoomChangeDialogOpen] = useState(false);
+  // Inline room assignment state
+  const [inlineRooms, setInlineRooms] = useState<InlineRoom[]>([]);
+  const [inlineSelectedRoom, setInlineSelectedRoom] = useState<string | null>(null);
+  const [loadingInlineRooms, setLoadingInlineRooms] = useState(false);
+  const [assigningRoom, setAssigningRoom] = useState(false);
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  // Room change mode - which booking is changing rooms
   const [roomChangeBookingId, setRoomChangeBookingId] = useState<string | null>(null);
 
   const isMulti = bookingIds.length > 1;
@@ -114,6 +126,11 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   useEffect(() => {
     if (open && bookingIds.length > 0) {
       fetchBookings();
+    }
+    if (!open) {
+      setRoomChangeBookingId(null);
+      setInlineSelectedRoom(null);
+      setInlineRooms([]);
     }
   }, [open, bookingIds]);
 
@@ -132,7 +149,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       .in('id', bookingIds);
 
     if (data) {
-      // Fetch all booking_rooms for these bookings
       const { data: allBookingRooms } = await supabase
         .from('booking_rooms')
         .select('booking_id, room_id, rooms:room_id(id, room_number, room_type_id, room_types(name))')
@@ -153,7 +169,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
       const enriched = data.map((b: any) => {
         const multiRooms = bookingRoomsMap.get(b.id) || [];
-        // If no booking_rooms but has room_id, use that
         if (multiRooms.length === 0 && b.room_id && b.rooms) {
           multiRooms.push({
             id: b.room_id,
@@ -170,9 +185,202 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         prepVals[b.id] = (b.prepayment_amount ?? 0).toString();
       });
       setPrepaymentValues(prepVals);
+
+      // Auto-load rooms for bookings needing assignment
+      const needsRoom = enriched.find(b => 
+        ['pending', 'approved'].includes(b.status) && b.allRooms.length === 0
+      );
+      if (needsRoom) {
+        fetchInlineRooms(needsRoom);
+      }
     }
     if (error) console.error('Error fetching bookings:', error);
     setLoading(false);
+  };
+
+  // Fetch available rooms inline
+  const fetchInlineRooms = async (booking: BookingDetails) => {
+    setLoadingInlineRooms(true);
+    setInlineSelectedRoom(null);
+
+    let query = supabase
+      .from('rooms')
+      .select('id, room_number, floor, room_types(name), status')
+      .eq('hotel_id', hotelId)
+      .neq('status', 'maintenance')
+      .order('floor')
+      .order('room_number');
+
+    if (booking.room_type_id) {
+      query = query.eq('room_type_id', booking.room_type_id);
+    }
+
+    const { data: allRooms } = await query;
+
+    if (!allRooms) {
+      setInlineRooms([]);
+      setLoadingInlineRooms(false);
+      return;
+    }
+
+    const { data: conflictingBookings } = await supabase
+      .from('bookings')
+      .select('room_id')
+      .eq('hotel_id', hotelId)
+      .neq('id', booking.id)
+      .not('room_id', 'is', null)
+      .in('status', ['approved', 'checked_in'])
+      .lt('check_in_date', booking.check_out_date)
+      .gt('check_out_date', booking.check_in_date);
+
+    const { data: conflictingBookingRooms } = await supabase
+      .from('booking_rooms')
+      .select('room_id, bookings!inner(check_in_date, check_out_date, status)')
+      .eq('hotel_id', hotelId)
+      .neq('booking_id', booking.id);
+
+    const conflictingRoomIds = new Set<string>();
+    (conflictingBookings || []).forEach((b: any) => {
+      if (b.room_id) conflictingRoomIds.add(b.room_id);
+    });
+    (conflictingBookingRooms || []).forEach((br: any) => {
+      const b = br.bookings;
+      if (!b) return;
+      if (!['approved', 'checked_in'].includes(b.status)) return;
+      if (b.check_in_date < booking.check_out_date && b.check_out_date > booking.check_in_date) {
+        conflictingRoomIds.add(br.room_id);
+      }
+    });
+
+    const roomsWithStatus: InlineRoom[] = allRooms.map(room => ({
+      ...room,
+      hasConflict: conflictingRoomIds.has(room.id),
+    }));
+
+    roomsWithStatus.sort((a, b) => {
+      if (a.hasConflict && !b.hasConflict) return 1;
+      if (!a.hasConflict && b.hasConflict) return -1;
+      return 0;
+    });
+
+    setInlineRooms(roomsWithStatus);
+    setLoadingInlineRooms(false);
+  };
+
+  // Inline room assignment + auto-approve
+  const handleInlineAssignRoom = async (booking: BookingDetails) => {
+    if (!inlineSelectedRoom) {
+      toast.error('Выберите номер');
+      return;
+    }
+    setAssigningRoom(true);
+
+    // Clear existing booking_rooms
+    await supabase.from('booking_rooms').delete().eq('booking_id', booking.id);
+
+    // Insert new room assignment
+    const { error: brError } = await supabase.from('booking_rooms').insert({
+      booking_id: booking.id,
+      room_id: inlineSelectedRoom,
+      hotel_id: hotelId,
+    });
+
+    if (brError) {
+      toast.error(t('common.error'));
+      setAssigningRoom(false);
+      return;
+    }
+
+    // Update booking: set room_id and auto-approve if pending
+    const newStatus = booking.status === 'pending' ? 'approved' : booking.status;
+    const { error: bookingError } = await supabase
+      .from('bookings')
+      .update({ room_id: inlineSelectedRoom, status: newStatus })
+      .eq('id', booking.id);
+
+    if (bookingError) {
+      toast.error(t('common.error'));
+      setAssigningRoom(false);
+      return;
+    }
+
+    // Mark room as booked
+    await supabase.from('rooms').update({ status: 'booked' }).eq('id', inlineSelectedRoom);
+
+    if (user) {
+      logAdminAction({
+        hotelId,
+        userId: user.id,
+        userName: profile?.full_name || '',
+        action: booking.status === 'pending' ? 'booking_approved_with_room' : 'room_assigned',
+        entityType: 'booking',
+        entityId: booking.id,
+        details: { guest_name: booking.guest_name },
+      });
+    }
+
+    toast.success('Номер назначен');
+    setInlineSelectedRoom(null);
+    setInlineRooms([]);
+    setRoomChangeBookingId(null);
+    await fetchBookings();
+    onUpdate?.();
+    setAssigningRoom(false);
+  };
+
+  // Inline check-in
+  const handleInlineCheckIn = async (booking: BookingDetails) => {
+    setCheckingIn(true);
+    const roomIdsToOccupy: string[] = [];
+    
+    if (booking.room_id) roomIdsToOccupy.push(booking.room_id);
+    
+    const { data: bookingRooms } = await supabase
+      .from('booking_rooms')
+      .select('room_id')
+      .eq('booking_id', booking.id);
+    
+    if (bookingRooms) {
+      for (const br of bookingRooms) {
+        if (!roomIdsToOccupy.includes(br.room_id)) roomIdsToOccupy.push(br.room_id);
+      }
+    }
+
+    if (roomIdsToOccupy.length === 0) {
+      toast.error('Номер не назначен');
+      setCheckingIn(false);
+      return;
+    }
+
+    const { error: bookingError } = await supabase
+      .from('bookings')
+      .update({ status: 'checked_in' })
+      .eq('id', booking.id);
+
+    if (bookingError) {
+      toast.error(t('common.error'));
+      setCheckingIn(false);
+      return;
+    }
+
+    await supabase.from('rooms').update({ status: 'occupied' }).in('id', roomIdsToOccupy);
+
+    if (user) {
+      logAdminAction({
+        hotelId,
+        userId: user.id,
+        userName: profile?.full_name || '',
+        action: 'booking_checked_in',
+        entityType: 'booking',
+        entityId: booking.id,
+        details: { guest_name: booking.guest_name, rooms_count: roomIdsToOccupy.length },
+      });
+    }
+
+    toast.success('Гость заселён');
+    await fetchBookings();
+    onUpdate?.();
+    setCheckingIn(false);
   };
 
   const handleSavePrepayment = async (bookingId: string) => {
@@ -198,7 +406,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     setSavingPrepayment(false);
   };
 
-  // Calculate per-booking totals
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
     const dailyRate = booking.is_half_day
@@ -212,7 +419,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     return { nights, dailyRate, roomCount, stayTotal, servicesTotal, total, prepayment };
   };
 
-  // Grand totals across all bookings
   const grandCalc = allBookings.reduce(
     (acc, b) => {
       const c = getBookingCalc(b);
@@ -226,24 +432,20 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   );
   const balanceDue = grandCalc.total - grandCalc.prepayment;
 
-  // Check if any booking is overdue
   const hasOverdue = allBookings.some(
     b => b.status === 'checked_in' && isBefore(parseISO(b.check_out_date), startOfDay(new Date()))
   );
 
-  // Check if dates differ across bookings
   const hasDifferentDates = allBookings.length > 1 && allBookings.some(
     b => b.check_in_date !== allBookings[0].check_in_date || b.check_out_date !== allBookings[0].check_out_date
   );
 
-  // Open checkout dialog
   const handleStartCheckout = () => {
     setCheckoutAmount(grandCalc.total.toString());
     setCheckoutReason('');
     setCheckoutDialogOpen(true);
   };
 
-  // Confirm checkout for ALL bookings in group
   const handleConfirmCheckout = async () => {
     if (!primary || !user) return;
     setProcessingCheckout(true);
@@ -280,7 +482,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       });
     }
 
-    // Update all bookings and release all rooms
     for (const booking of allBookings) {
       if (booking.status !== 'checked_in') continue;
 
@@ -298,7 +499,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         await supabase.from('rooms').update({ status: 'available' }).eq('id', booking.room_id);
       }
 
-      // Release multi-rooms
       const { data: bookingRooms } = await supabase
         .from('booking_rooms')
         .select('room_id')
@@ -329,7 +529,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     onUpdate?.();
   };
 
-  // Extend stay for a specific booking
   const handleExtendStay = async () => {
     if (!extendBookingId || !user || !newCheckoutDate) return;
     setProcessingExtend(true);
@@ -366,6 +565,15 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     setProcessingExtend(false);
   };
 
+  // Determine the current step for each booking
+  const getBookingStep = (booking: BookingDetails): 'assign_room' | 'check_in' | 'active' | 'done' => {
+    if (['checked_out', 'cancelled'].includes(booking.status)) return 'done';
+    if (booking.status === 'checked_in') return 'active';
+    if (['pending', 'approved'].includes(booking.status) && booking.allRooms.length === 0) return 'assign_room';
+    if (booking.status === 'approved' && booking.allRooms.length > 0) return 'check_in';
+    return 'done';
+  };
+
   if (loading || allBookings.length === 0) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -375,6 +583,9 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       </Dialog>
     );
   }
+
+  // Check if any booking needs the linear flow (room assignment or check-in)
+  const needsLinearFlow = allBookings.some(b => ['assign_room', 'check_in'].includes(getBookingStep(b)));
 
   return (
     <>
@@ -407,6 +618,31 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
             </DialogTitle>
           </DialogHeader>
 
+          {/* Step indicator for linear flow */}
+          {needsLinearFlow && (
+            <div className="flex items-center gap-2 px-1">
+              {['Назначить номер', 'Заселить'].map((stepLabel, i) => {
+                const currentBooking = allBookings.find(b => ['assign_room', 'check_in'].includes(getBookingStep(b))) || allBookings[0];
+                const step = getBookingStep(currentBooking);
+                const stepIndex = step === 'assign_room' ? 0 : step === 'check_in' ? 1 : 2;
+                const isActive = i === stepIndex;
+                const isDone = i < stepIndex;
+
+                return (
+                  <div key={i} className="flex items-center gap-2">
+                    {i > 0 && <div className={`h-0.5 w-6 ${isDone ? 'bg-primary' : 'bg-muted'}`} />}
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      isActive ? 'bg-primary text-primary-foreground' : isDone ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {isDone ? <CheckCircle className="h-3 w-3" /> : <span className="w-4 h-4 flex items-center justify-center rounded-full border text-[10px]">{i + 1}</span>}
+                      {stepLabel}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <Tabs defaultValue="info" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="info">Информация</TabsTrigger>
@@ -438,16 +674,18 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
               <Separator />
 
-              {/* Per-room details */}
+              {/* Per-booking details */}
               {allBookings.map((booking, idx) => {
                 const bOverdue = booking.status === 'checked_in' && 
                   isBefore(parseISO(booking.check_out_date), startOfDay(new Date()));
                 const calc = getBookingCalc(booking);
+                const step = getBookingStep(booking);
                 const roomsToShow = booking.allRooms.length > 0 ? booking.allRooms : [null];
+                const isChangingRoom = roomChangeBookingId === booking.id;
 
                 return (
                   <div key={booking.id} className="space-y-3">
-                    {/* Each room as a separate block */}
+                    {/* Room info blocks */}
                     {roomsToShow.map((room, rIdx) => (
                       <div key={room?.id || `unassigned-${rIdx}`} className="p-3 border rounded-lg space-y-3 bg-muted/20">
                         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -472,12 +710,18 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                               variant="ghost"
                               className="h-7 text-xs"
                               onClick={() => {
-                                setRoomChangeBookingId(booking.id);
-                                setRoomChangeDialogOpen(true);
+                                if (isChangingRoom) {
+                                  setRoomChangeBookingId(null);
+                                  setInlineRooms([]);
+                                  setInlineSelectedRoom(null);
+                                } else {
+                                  setRoomChangeBookingId(booking.id);
+                                  fetchInlineRooms(booking);
+                                }
                               }}
                             >
                               <ArrowRightLeft className="h-3 w-3 mr-1" />
-                              Сменить номер
+                              {isChangingRoom ? 'Отмена' : 'Сменить номер'}
                             </Button>
                           )}
                         </div>
@@ -508,7 +752,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                           </div>
                         </div>
 
-                        {/* Extend button per room for checked_in - only show once per booking on first room */}
+                        {/* Extend button for checked_in */}
                         {rIdx === 0 && booking.status === 'checked_in' && (
                           <Button
                             size="sm"
@@ -525,6 +769,105 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                         )}
                       </div>
                     ))}
+
+                    {/* ===== INLINE ROOM ASSIGNMENT ===== */}
+                    {(step === 'assign_room' || isChangingRoom) && (
+                      <div className="p-4 border-2 border-primary/30 rounded-lg bg-primary/5 space-y-3">
+                        <Label className="font-medium flex items-center gap-2">
+                          <BedDouble className="h-4 w-4 text-primary" />
+                          {isChangingRoom ? 'Сменить номер' : 'Назначить номер'}
+                        </Label>
+                        
+                        {loadingInlineRooms ? (
+                          <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+                        ) : inlineRooms.length === 0 ? (
+                          <>
+                            <p className="text-sm text-muted-foreground">Нет подходящих номеров</p>
+                            {!loadingInlineRooms && step === 'assign_room' && (
+                              <Button size="sm" variant="outline" onClick={() => fetchInlineRooms(booking)}>
+                                Обновить список
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-3 gap-2">
+                              {inlineRooms.filter(r => !r.hasConflict).map(room => (
+                                <div
+                                  key={room.id}
+                                  onClick={() => setInlineSelectedRoom(room.id === inlineSelectedRoom ? null : room.id)}
+                                  className={`p-2.5 rounded-lg border-2 cursor-pointer transition-all text-center ${
+                                    inlineSelectedRoom === room.id
+                                      ? 'border-primary bg-primary/10'
+                                      : 'border-muted hover:border-primary/50'
+                                  }`}
+                                >
+                                  <div className="font-medium text-sm">{room.room_number}</div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {room.room_types?.name} • эт. {room.floor}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Button
+                                className="flex-1"
+                                disabled={!inlineSelectedRoom || assigningRoom}
+                                onClick={() => {
+                                  if (isChangingRoom) {
+                                    handleRoomChange(booking);
+                                  } else {
+                                    handleInlineAssignRoom(booking);
+                                  }
+                                }}
+                              >
+                                {assigningRoom ? '...' : isChangingRoom ? 'Сменить' : 'Назначить номер'}
+                              </Button>
+                              {isChangingRoom && (
+                                <Button variant="outline" onClick={() => {
+                                  setRoomChangeBookingId(null);
+                                  setInlineRooms([]);
+                                  setInlineSelectedRoom(null);
+                                }}>
+                                  Отмена
+                                </Button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ===== INLINE CHECK-IN ACTIONS ===== */}
+                    {step === 'check_in' && !isChangingRoom && (
+                      <div className="p-4 border-2 border-green-500/30 rounded-lg bg-green-500/5 space-y-3">
+                        <p className="text-sm font-medium text-green-700">
+                          Номер назначен. Заселить гостя?
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            disabled={checkingIn}
+                            onClick={() => handleInlineCheckIn(booking)}
+                          >
+                            <LogIn className="h-4 w-4 mr-1" />
+                            {checkingIn ? '...' : 'Заселить'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                              toast.info('Статус: Подтверждено. Заселить можно позже.');
+                              onOpenChange(false);
+                            }}
+                          >
+                            <Clock className="h-4 w-4 mr-1" />
+                            Заселить позже
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {booking.guest_comment && (
                       <div className="space-y-1">
@@ -614,7 +957,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
             {/* Bill Tab */}
             <TabsContent value="bill" className="space-y-4 mt-4">
               <div className="p-4 border rounded-lg space-y-4">
-                {/* Per-room breakdown */}
                 {allBookings.map((booking, idx) => {
                   const calc = getBookingCalc(booking);
                   return (
@@ -657,7 +999,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
                 <Separator />
 
-                {/* Grand totals */}
                 <div className="flex justify-between">
                   <span>Проживание:</span>
                   <span className="font-medium">{grandCalc.stayTotal.toLocaleString()} ₸</span>
@@ -686,7 +1027,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                 </div>
               </div>
 
-              {/* Checkout from bill tab */}
               {allBookings.some(b => b.status === 'checked_in') && (
                 <Button
                   className="w-full"
@@ -789,57 +1129,60 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Room Change Dialog */}
-      {roomChangeBookingId && (() => {
-        const changingBooking = allBookings.find(b => b.id === roomChangeBookingId);
-        return (
-          <RoomAssignDialog
-            open={roomChangeDialogOpen}
-            onOpenChange={setRoomChangeDialogOpen}
-            bookingId={roomChangeBookingId}
-            hotelId={hotelId}
-            roomTypeId={changingBooking?.room_type_id}
-            checkInDate={changingBooking?.check_in_date}
-            checkOutDate={changingBooking?.check_out_date}
-            multiRoom={true}
-            onSuccess={async () => {
-              // Get old room info for logging
-              const oldRooms = changingBooking?.allRooms.map(r => r.room_number).join(', ') || 'не назначен';
-              
-              // Release old rooms
-              if (changingBooking?.allRooms && changingBooking.allRooms.length > 0) {
-                const oldStatus = changingBooking.status === 'checked_in' ? 'available' : 'available';
-                await supabase
-                  .from('rooms')
-                  .update({ status: oldStatus as any })
-                  .in('id', changingBooking.allRooms.map(r => r.id));
-              }
-
-              // Log room change for owner notification
-              if (user) {
-                logAdminAction({
-                  hotelId,
-                  userId: user.id,
-                  userName: profile?.full_name || '',
-                  action: 'room_changed',
-                  entityType: 'booking',
-                  entityId: roomChangeBookingId,
-                  details: {
-                    guest_name: changingBooking?.guest_name,
-                    old_rooms: oldRooms,
-                    status: changingBooking?.status,
-                  },
-                });
-              }
-
-              fetchBookings();
-              onUpdate?.();
-              setRoomChangeBookingId(null);
-            }}
-          />
-        );
-      })()}
     </>
   );
+
+  // Room change handler (reusing inline room picker)
+  async function handleRoomChange(booking: BookingDetails) {
+    if (!inlineSelectedRoom || !user) return;
+    setAssigningRoom(true);
+
+    // Release old rooms
+    if (booking.allRooms.length > 0) {
+      const oldStatus = booking.status === 'checked_in' ? 'available' : 'available';
+      await supabase
+        .from('rooms')
+        .update({ status: oldStatus as any })
+        .in('id', booking.allRooms.map(r => r.id));
+    }
+
+    // Clear existing booking_rooms
+    await supabase.from('booking_rooms').delete().eq('booking_id', booking.id);
+
+    // Insert new
+    await supabase.from('booking_rooms').insert({
+      booking_id: booking.id,
+      room_id: inlineSelectedRoom,
+      hotel_id: hotelId,
+    });
+
+    // Update booking room_id
+    await supabase
+      .from('bookings')
+      .update({ room_id: inlineSelectedRoom })
+      .eq('id', booking.id);
+
+    // Mark new room
+    const newRoomStatus = booking.status === 'checked_in' ? 'occupied' : 'booked';
+    await supabase.from('rooms').update({ status: newRoomStatus }).eq('id', inlineSelectedRoom);
+
+    const oldRooms = booking.allRooms.map(r => r.room_number).join(', ') || 'не назначен';
+    logAdminAction({
+      hotelId,
+      userId: user.id,
+      userName: profile?.full_name || '',
+      action: 'room_changed',
+      entityType: 'booking',
+      entityId: booking.id,
+      details: { guest_name: booking.guest_name, old_rooms: oldRooms, status: booking.status },
+    });
+
+    toast.success('Номер изменён');
+    setRoomChangeBookingId(null);
+    setInlineSelectedRoom(null);
+    setInlineRooms([]);
+    await fetchBookings();
+    onUpdate?.();
+    setAssigningRoom(false);
+  }
 }
