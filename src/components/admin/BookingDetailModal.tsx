@@ -18,16 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft, LogIn, Clock, CheckCircle } from 'lucide-react';
 import { BookingServicesTab } from './BookingServicesTab';
@@ -588,7 +578,6 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   const needsLinearFlow = allBookings.some(b => ['assign_room', 'check_in'].includes(getBookingStep(b)));
 
   return (
-    <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -907,11 +896,11 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                 );
               })}
 
-              {/* Checkout button for checked_in bookings */}
+              {/* Checkout section for checked_in bookings — inline */}
               {allBookings.some(b => b.status === 'checked_in') && (
                 <>
                   <Separator />
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {hasOverdue && (
                       <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
@@ -920,14 +909,102 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                         </p>
                       </div>
                     )}
-                    <Button
-                      className="w-full"
-                      variant={hasOverdue ? 'destructive' : 'default'}
-                      onClick={handleStartCheckout}
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Выселить{isMulti ? ' (все номера)' : ''}
-                    </Button>
+
+                    {/* Inline checkout form */}
+                    {checkoutDialogOpen ? (
+                      <div className="p-4 border-2 border-destructive/30 rounded-lg bg-destructive/5 space-y-3">
+                        <p className="font-medium text-sm flex items-center gap-2">
+                          <LogOut className="h-4 w-4" />
+                          Выселение гостя
+                        </p>
+                        <div className="space-y-1">
+                          <Label className="text-sm">Итоговая сумма (₸)</Label>
+                          <Input
+                            type="number"
+                            value={checkoutAmount}
+                            onChange={(e) => setCheckoutAmount(e.target.value)}
+                          />
+                          {parseFloat(checkoutAmount) !== grandCalc.total && (
+                            <p className="text-xs text-amber-600 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Сумма изменена (было: {grandCalc.total.toLocaleString()} ₸). Изменение будет отправлено владельцу.
+                            </p>
+                          )}
+                        </div>
+                        {parseFloat(checkoutAmount) !== grandCalc.total && (
+                          <div className="space-y-1">
+                            <Label className="text-sm">Причина изменения</Label>
+                            <Textarea
+                              value={checkoutReason}
+                              onChange={(e) => setCheckoutReason(e.target.value)}
+                              placeholder="Укажите причину изменения суммы..."
+                              rows={2}
+                            />
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            variant="destructive"
+                            onClick={handleConfirmCheckout}
+                            disabled={processingCheckout}
+                          >
+                            {processingCheckout ? '...' : 'Подтвердить выселение'}
+                          </Button>
+                          <Button variant="outline" onClick={() => setCheckoutDialogOpen(false)}>
+                            Отмена
+                          </Button>
+                        </div>
+                      </div>
+                    ) : extendDialogOpen ? (
+                      <div className="p-4 border-2 border-primary/30 rounded-lg bg-primary/5 space-y-3">
+                        <p className="font-medium text-sm flex items-center gap-2">
+                          <CalendarPlus className="h-4 w-4" />
+                          Продление проживания
+                        </p>
+                        {extendBookingId && (() => {
+                          const b = allBookings.find(x => x.id === extendBookingId);
+                          return b ? (
+                            <p className="text-sm text-muted-foreground">
+                              {b.rooms?.room_number && `Номер: ${b.rooms.room_number} · `}
+                              Текущий выезд: {format(parseISO(b.check_out_date), 'dd MMMM yyyy', { locale: ru })}
+                            </p>
+                          ) : null;
+                        })()}
+                        <div className="space-y-1">
+                          <Label className="text-sm">Новая дата выезда</Label>
+                          <Input
+                            type="date"
+                            value={newCheckoutDate}
+                            onChange={(e) => setNewCheckoutDate(e.target.value)}
+                            min={format(new Date(), 'yyyy-MM-dd')}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1"
+                            onClick={handleExtendStay}
+                            disabled={processingExtend || !newCheckoutDate}
+                          >
+                            {processingExtend ? '...' : 'Подтвердить продление'}
+                          </Button>
+                          <Button variant="outline" onClick={() => setExtendDialogOpen(false)}>
+                            Отмена
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1"
+                          variant={hasOverdue ? 'destructive' : 'default'}
+                          onClick={handleStartCheckout}
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          Выселить{isMulti ? ' (все номера)' : ''}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1027,7 +1104,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                 </div>
               </div>
 
-              {allBookings.some(b => b.status === 'checked_in') && (
+              {allBookings.some(b => b.status === 'checked_in') && !checkoutDialogOpen && !extendDialogOpen && (
                 <Button
                   className="w-full"
                   variant={hasOverdue ? 'destructive' : 'default'}
@@ -1040,96 +1117,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
             </TabsContent>
           </Tabs>
         </DialogContent>
-      </Dialog>
-
-      {/* Checkout Confirmation Dialog */}
-      <AlertDialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Выселение гостя</AlertDialogTitle>
-            <AlertDialogDescription>
-              Гость: <strong>{primary?.guest_name}</strong>
-              {isMulti && <><br />Номеров: <strong>{allBookings.length}</strong></>}
-              <br />
-              {isMulti ? 'Все номера будут освобождены.' : 'Номер будет освобождён.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label className="text-sm">Итоговая сумма (₸)</Label>
-              <Input
-                type="number"
-                value={checkoutAmount}
-                onChange={(e) => setCheckoutAmount(e.target.value)}
-              />
-              {parseFloat(checkoutAmount) !== grandCalc.total && (
-                <p className="text-xs text-amber-600 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Сумма изменена (было: {grandCalc.total.toLocaleString()} ₸). Изменение будет отправлено владельцу.
-                </p>
-              )}
-            </div>
-            {parseFloat(checkoutAmount) !== grandCalc.total && (
-              <div className="space-y-1">
-                <Label className="text-sm">Причина изменения</Label>
-                <Textarea
-                  value={checkoutReason}
-                  onChange={(e) => setCheckoutReason(e.target.value)}
-                  placeholder="Укажите причину изменения суммы..."
-                  rows={2}
-                />
-              </div>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmCheckout} disabled={processingCheckout}>
-              {processingCheckout ? '...' : 'Подтвердить выселение'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Extend Stay Dialog */}
-      <AlertDialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Продление проживания</AlertDialogTitle>
-            <AlertDialogDescription>
-              Гость: <strong>{primary?.guest_name}</strong>
-              {extendBookingId && (() => {
-                const b = allBookings.find(x => x.id === extendBookingId);
-                return b ? (
-                  <>
-                    <br />
-                    {b.rooms?.room_number && `Номер: ${b.rooms.room_number}`}
-                    <br />
-                    Текущая дата выезда: {format(parseISO(b.check_out_date), 'dd MMMM yyyy', { locale: ru })}
-                  </>
-                ) : null;
-              })()}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label className="text-sm">Новая дата выезда</Label>
-              <Input
-                type="date"
-                value={newCheckoutDate}
-                onChange={(e) => setNewCheckoutDate(e.target.value)}
-                min={format(new Date(), 'yyyy-MM-dd')}
-              />
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExtendStay} disabled={processingExtend || !newCheckoutDate}>
-              {processingExtend ? '...' : 'Подтвердить продление'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    </Dialog>
   );
 
   // Room change handler (reusing inline room picker)

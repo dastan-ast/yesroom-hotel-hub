@@ -406,14 +406,14 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {/* Anonymous toggle */}
-            <div className="flex items-center justify-between rounded-md border p-3">
+            {/* Anonymous toggle — temporarily disabled due to stability issues */}
+            {/* <div className="flex items-center justify-between rounded-md border p-3">
               <div className="flex items-center gap-2">
                 <UserX className="h-4 w-4 text-muted-foreground" />
                 <Label className="text-sm font-medium cursor-pointer">Анонимный гость</Label>
               </div>
               <Switch checked={isAnonymous} onCheckedChange={handleToggleAnonymous} />
-            </div>
+            </div> */}
 
             <FormField
               control={form.control}
