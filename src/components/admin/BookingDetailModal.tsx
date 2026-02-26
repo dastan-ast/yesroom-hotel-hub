@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -93,6 +94,11 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   const [checkoutAmount, setCheckoutAmount] = useState('');
   const [checkoutReason, setCheckoutReason] = useState('');
   const [processingCheckout, setProcessingCheckout] = useState(false);
+
+  // Discount state
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [discountValue, setDiscountValue] = useState('');
 
   // Extend stay state
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
@@ -430,14 +436,36 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     b => b.check_in_date !== allBookings[0].check_in_date || b.check_out_date !== allBookings[0].check_out_date
   );
 
+  // Calculate discount
+  const parsedDiscountValue = parseFloat(discountValue) || 0;
+  let discountAmount = 0;
+  if (discountEnabled && parsedDiscountValue > 0) {
+    if (discountType === 'percent') {
+      discountAmount = Math.round(grandCalc.total * (Math.min(parsedDiscountValue, 100) / 100));
+    } else {
+      discountAmount = Math.min(parsedDiscountValue, grandCalc.total);
+    }
+  }
+  const totalAfterDiscount = grandCalc.total - discountAmount;
+
   const handleStartCheckout = () => {
-    setCheckoutAmount(grandCalc.total.toString());
+    setCheckoutAmount(totalAfterDiscount.toString());
     setCheckoutReason('');
+    setDiscountEnabled(false);
+    setDiscountValue('');
+    setDiscountType('percent');
     setCheckoutDialogOpen(true);
   };
 
   const handleConfirmCheckout = async () => {
     if (!primary || !user) return;
+
+    // If discount applied, require a reason
+    if (discountEnabled && discountAmount > 0 && !checkoutReason.trim()) {
+      toast.error('Укажите причину скидки');
+      return;
+    }
+
     setProcessingCheckout(true);
 
     const finalAmount = parseFloat(checkoutAmount) || 0;
@@ -917,6 +945,82 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                           <LogOut className="h-4 w-4" />
                           Выселение гостя
                         </p>
+
+                        {/* Discount Section */}
+                        <div className="space-y-2 p-3 border rounded-lg bg-background">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="discount-toggle-inline" className="text-sm font-medium cursor-pointer">
+                              Применить скидку
+                            </Label>
+                            <Switch
+                              id="discount-toggle-inline"
+                              checked={discountEnabled}
+                              onCheckedChange={setDiscountEnabled}
+                            />
+                          </div>
+                          {discountEnabled && (
+                            <div className="space-y-2">
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={discountType === 'percent' ? 'default' : 'outline'}
+                                  onClick={() => setDiscountType('percent')}
+                                  className="flex-1"
+                                >
+                                  %
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={discountType === 'fixed' ? 'default' : 'outline'}
+                                  onClick={() => setDiscountType('fixed')}
+                                  className="flex-1"
+                                >
+                                  ₸
+                                </Button>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={discountType === 'percent' ? '100' : String(grandCalc.total)}
+                                  placeholder={discountType === 'percent' ? 'Введите %' : 'Введите сумму'}
+                                  value={discountValue}
+                                  onChange={(e) => {
+                                    setDiscountValue(e.target.value);
+                                    // Recalculate checkout amount
+                                    const v = parseFloat(e.target.value) || 0;
+                                    let disc = 0;
+                                    if (v > 0) {
+                                      disc = discountType === 'percent'
+                                        ? Math.round(grandCalc.total * (Math.min(v, 100) / 100))
+                                        : Math.min(v, grandCalc.total);
+                                    }
+                                    setCheckoutAmount((grandCalc.total - disc).toString());
+                                  }}
+                                  className="flex-1"
+                                />
+                                <span className="text-sm text-muted-foreground w-8 text-right">
+                                  {discountType === 'percent' ? '%' : '₸'}
+                                </span>
+                              </div>
+                              {discountAmount > 0 && (
+                                <div className="flex justify-between text-sm text-destructive">
+                                  <span>Скидка:</span>
+                                  <span>−{discountAmount.toLocaleString()} ₸</span>
+                                </div>
+                              )}
+                              <Textarea
+                                placeholder="Причина скидки (обязательно)..."
+                                value={checkoutReason}
+                                onChange={(e) => setCheckoutReason(e.target.value)}
+                                rows={2}
+                              />
+                            </div>
+                          )}
+                        </div>
+
                         <div className="space-y-1">
                           <Label className="text-sm">Итоговая сумма (₸)</Label>
                           <Input
@@ -924,14 +1028,14 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                             value={checkoutAmount}
                             onChange={(e) => setCheckoutAmount(e.target.value)}
                           />
-                          {parseFloat(checkoutAmount) !== grandCalc.total && (
+                          {parseFloat(checkoutAmount) !== grandCalc.total && !discountEnabled && (
                             <p className="text-xs text-amber-600 flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Сумма изменена (было: {grandCalc.total.toLocaleString()} ₸). Изменение будет отправлено владельцу.
                             </p>
                           )}
                         </div>
-                        {parseFloat(checkoutAmount) !== grandCalc.total && (
+                        {parseFloat(checkoutAmount) !== grandCalc.total && !discountEnabled && (
                           <div className="space-y-1">
                             <Label className="text-sm">Причина изменения</Label>
                             <Textarea
