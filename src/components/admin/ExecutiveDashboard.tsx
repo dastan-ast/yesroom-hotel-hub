@@ -265,7 +265,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     // Fetch all non-cancelled bookings overlapping the period
     const { data: bookings } = await supabase
       .from('bookings')
-      .select('source, total_price, daily_rate, check_in_date, check_out_date, status')
+      .select('source, final_total, total_price, daily_rate, check_in_date, check_out_date, status')
       .eq('hotel_id', hotelId)
       .in('status', ['approved', 'checked_in', 'checked_out'])
       .lt('check_in_date', endStr)
@@ -286,8 +286,9 @@ export function ExecutiveDashboard({ hotelId }: Props) {
         // Revenue for this booking (proportional to period)
         const totalNights = differenceInDays(parseISO(b.check_out_date), parseISO(b.check_in_date));
         let bookingRevenue = 0;
-        if (b.total_price && totalNights > 0) {
-          bookingRevenue = (Number(b.total_price) / totalNights) * nights;
+        const revenueBase = b.final_total ?? b.total_price;
+        if (revenueBase && totalNights > 0) {
+          bookingRevenue = (Number(revenueBase) / totalNights) * nights;
         } else if (b.daily_rate) {
           bookingRevenue = Number(b.daily_rate) * nights;
         }
@@ -330,7 +331,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
       supabase.from('rooms').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'occupied'),
       supabase.from('rooms').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'booked'),
       supabase.from('bookings').select('id', { count: 'exact' }).eq('hotel_id', hotelId).eq('status', 'pending'),
-      supabase.from('bookings').select('total_price, daily_rate, check_in_date, check_out_date')
+      supabase.from('bookings').select('final_total, total_price, daily_rate, check_in_date, check_out_date')
         .eq('hotel_id', hotelId).eq('status', 'checked_out')
         .gte('check_out_date', monthStart).lte('check_out_date', monthEnd),
       supabase.from('booking_services').select('total_price, unit_price, quantity')
@@ -345,8 +346,9 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     let monthlyRevenue = 0;
     if (revenueRes.data) {
       for (const booking of revenueRes.data) {
-        if (booking.total_price) {
-          monthlyRevenue += Number(booking.total_price);
+        const base = booking.final_total ?? booking.total_price;
+        if (base) {
+          monthlyRevenue += Number(base);
         } else if (booking.daily_rate) {
           const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
           monthlyRevenue += Number(booking.daily_rate) * nights;
