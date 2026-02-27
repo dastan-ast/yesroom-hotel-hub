@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard, ScrollText } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard, ScrollText, MessageCircle } from 'lucide-react';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -26,6 +26,8 @@ import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
 import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
 import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
+import { LeadsTab } from '@/components/admin/LeadsTab';
+import { AdminKpiTab } from '@/components/admin/AdminKpiTab';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -51,6 +53,7 @@ export default function AdminDashboard() {
   const allMenuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard'), permission: 'dashboard' },
     { id: 'analytics', icon: BarChart3, label: 'Аналитика', permission: 'dashboard' },
+    { id: 'leads', icon: MessageCircle, label: 'Лиды', permission: 'bookings' },
     { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
     { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
     { id: 'rooms', icon: DoorOpen, label: t('admin.rooms'), permission: 'rooms' },
@@ -63,6 +66,7 @@ export default function AdminDashboard() {
     { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
     { id: 'subscription', icon: CreditCard, label: 'Подписка', permission: null, ownerOnly: true },
     { id: 'activity-log', icon: ScrollText, label: 'Журнал действий', permission: null, ownerOnly: true },
+    { id: 'admin-kpi', icon: BarChart3, label: 'KPI Админов', permission: null, ownerOnly: true },
     { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
   ];
 
@@ -356,6 +360,9 @@ export default function AdminDashboard() {
                   <ExecutiveDashboard hotelId={hotelId} />
                 )}
 
+                {activeTab === 'leads' && (
+                  <LeadsTab hotelId={hotelId} />
+                )}
                 {activeTab === 'bookings' && (
                   <Card>
                     <CardContent className="pt-6">
@@ -438,6 +445,10 @@ export default function AdminDashboard() {
                       <ActivityLogTab hotelId={hotelId} />
                     </CardContent>
                   </Card>
+                )}
+
+                {activeTab === 'admin-kpi' && (
+                  <AdminKpiTab hotelId={hotelId} />
                 )}
 
                 {activeTab === 'help' && (

@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft, LogIn, Clock, CheckCircle } from 'lucide-react';
+import { User, Calendar, Phone, BedDouble, CreditCard, Receipt, ShoppingCart, LogOut, AlertTriangle, CalendarPlus, ArrowRightLeft, LogIn, Clock, CheckCircle, MessageSquare, Send } from 'lucide-react';
 import { BookingServicesTab } from './BookingServicesTab';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
@@ -40,6 +40,7 @@ interface BookingDetails {
   guest_comment: string | null;
   room_id: string | null;
   room_type_id: string | null;
+  client_id: string | null;
   rooms: { room_number: string } | null;
   room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
   is_half_day?: boolean;
@@ -116,8 +117,37 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
   // Room change mode - which booking is changing rooms
   const [roomChangeBookingId, setRoomChangeBookingId] = useState<string | null>(null);
 
+  // History (crm_comments)
+  const [historyComments, setHistoryComments] = useState<{ id: string; created_at: string; author_name: string; content: string }[]>([]);
+  const [newHistoryComment, setNewHistoryComment] = useState('');
+  const [sendingHistoryComment, setSendingHistoryComment] = useState(false);
+
   const isMulti = bookingIds.length > 1;
   const primary = allBookings[0] || null;
+
+  const fetchHistoryComments = async (clientId: string | null) => {
+    if (!clientId) { setHistoryComments([]); return; }
+    const { data } = await supabase
+      .from('crm_comments' as any)
+      .select('id, created_at, author_name, content')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: true });
+    setHistoryComments((data as unknown as typeof historyComments) || []);
+  };
+
+  const handleAddHistoryComment = async (clientId: string | null) => {
+    if (!clientId || !newHistoryComment.trim() || !user) return;
+    setSendingHistoryComment(true);
+    await supabase.from('crm_comments' as any).insert({
+      client_id: clientId,
+      author_id: user.id,
+      author_name: profile?.full_name || 'Администратор',
+      content: newHistoryComment.trim(),
+    });
+    setNewHistoryComment('');
+    await fetchHistoryComments(clientId);
+    setSendingHistoryComment(false);
+  };
 
   useEffect(() => {
     if (open && bookingIds.length > 0) {
@@ -127,6 +157,8 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       setRoomChangeBookingId(null);
       setInlineSelectedRoom(null);
       setInlineRooms([]);
+      setHistoryComments([]);
+      setNewHistoryComment('');
     }
   }, [open, bookingIds]);
 
@@ -138,7 +170,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       .select(`
         id, guest_name, guest_phone, check_in_date, check_out_date,
         status, source, prepayment_amount, prepayment_received, daily_rate,
-        guest_count, guest_comment, room_id, room_type_id, is_half_day,
+        guest_count, guest_comment, room_id, room_type_id, is_half_day, client_id,
         rooms(room_number),
         room_types(name, price_per_night, price_half_day)
       `)
@@ -348,9 +380,13 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       return;
     }
 
+    const checkedInAt = new Date().toISOString();
     const { error: bookingError } = await supabase
       .from('bookings')
-      .update({ status: 'checked_in' })
+      .update({ 
+        status: 'checked_in',
+        additional_info: { checked_in_at: checkedInAt },
+      } as any)
       .eq('id', booking.id);
 
     if (bookingError) {
@@ -504,13 +540,15 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       if (booking.status !== 'checked_in') continue;
 
       const bCalc = getBookingCalc(booking);
+      const checkedOutAt = new Date().toISOString();
       await supabase
         .from('bookings')
         .update({
           status: 'checked_out',
           final_total: amountChanged ? undefined : bCalc.total,
           daily_rate: bCalc.dailyRate,
-        })
+          additional_info: { checked_out_at: checkedOutAt },
+        } as any)
         .eq('id', booking.id);
 
       if (booking.room_id) {
@@ -562,6 +600,24 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     if (error) {
       toast.error(t('common.error'));
     } else {
+      // Audit log for date changes on checked_in/checked_out bookings
+      if (['checked_in', 'checked_out'].includes(booking.status)) {
+        await supabase.from('audit_logs' as any).insert({
+          hotel_id: hotelId,
+          user_id: user.id,
+          user_name: profile?.full_name || '',
+          action: 'manual_time_edit_attempt',
+          entity_type: 'booking',
+          entity_id: extendBookingId,
+          details: {
+            guest_name: booking.guest_name,
+            old_checkout: booking.check_out_date,
+            new_checkout: newCheckoutDate,
+            booking_status: booking.status,
+          },
+        });
+      }
+
       logAdminAction({
         hotelId,
         userId: user.id,
@@ -661,11 +717,15 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
           )}
 
           <Tabs defaultValue="info" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="info">Информация</TabsTrigger>
               <TabsTrigger value="services">
                 <ShoppingCart className="h-4 w-4 mr-1" />
                 Услуги
+              </TabsTrigger>
+              <TabsTrigger value="history" onClick={() => fetchHistoryComments(primary.client_id)}>
+                <MessageSquare className="h-4 w-4 mr-1" />
+                История
               </TabsTrigger>
               <TabsTrigger value="bill">
                 <Receipt className="h-4 w-4 mr-1" />
@@ -1133,6 +1193,39 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                   {idx < allBookings.length - 1 && <Separator className="mt-4" />}
                 </div>
               ))}
+            </TabsContent>
+
+            {/* History Tab */}
+            <TabsContent value="history" className="space-y-4 mt-4">
+              <div className="space-y-3">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {historyComments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">Нет комментариев</p>
+                  ) : (
+                    historyComments.map(c => (
+                      <div key={c.id} className="p-2 bg-muted/50 rounded text-sm">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                          <span className="font-medium">{c.author_name}</span>
+                          <span>{format(new Date(c.created_at), 'dd.MM HH:mm')}</span>
+                        </div>
+                        <p>{c.content}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Textarea
+                    placeholder="Добавить комментарий..."
+                    value={newHistoryComment}
+                    onChange={e => setNewHistoryComment(e.target.value)}
+                    className="min-h-[60px]"
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddHistoryComment(primary.client_id); } }}
+                  />
+                  <Button size="icon" onClick={() => handleAddHistoryComment(primary.client_id)} disabled={sendingHistoryComment || !newHistoryComment.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Bill Tab */}
