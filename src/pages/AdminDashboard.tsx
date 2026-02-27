@@ -4,7 +4,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
-import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard, ScrollText, MessageCircle } from 'lucide-react';
@@ -168,8 +168,44 @@ export default function AdminDashboard() {
   }
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+    <SidebarProvider defaultOpen={false}>
+      <AdminDashboardContent
+        hotelName={hotelName}
+        profile={profile}
+        menuItems={menuItems}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        stats={stats}
+        pendingAdjustments={pendingAdjustments}
+        handleSignOut={handleSignOut}
+        isOwner={isOwner}
+        hotelId={hotelId}
+        showLiveFeed={showLiveFeed}
+        setShowLiveFeed={setShowLiveFeed}
+        subscriptionStatus={subscriptionStatus}
+        trialEndsAt={trialEndsAt}
+        canAccessModule={canAccessModule}
+        fetchStats={fetchStats}
+        t={t}
+      />
+    </SidebarProvider>
+  );
+}
+
+function AdminDashboardContent({
+  hotelName, profile, menuItems, activeTab, setActiveTab, stats, pendingAdjustments,
+  handleSignOut, isOwner, hotelId, showLiveFeed, setShowLiveFeed,
+  subscriptionStatus, trialEndsAt, canAccessModule, fetchStats, t,
+}: any) {
+  const { setOpen } = useSidebar();
+
+  const handleMenuClick = (id: string) => {
+    setActiveTab(id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen flex w-full">
         <Sidebar className="border-r">
           <SidebarHeader className="p-4 border-b">
             <div className="flex items-center gap-2">
@@ -185,11 +221,11 @@ export default function AdminDashboard() {
           
           <SidebarContent className="p-2">
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems.map((item: any) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton 
                     isActive={activeTab === item.id}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => handleMenuClick(item.id)}
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.label}</span>
@@ -269,7 +305,7 @@ export default function AdminDashboard() {
               </div>
             </header>
 
-            <main className="flex-1 flex">
+            <main className="flex-1 flex" onClick={() => setOpen(false)}>
               <div className="flex-1 p-6 overflow-auto">
                 {isOwner && (
                   <SubscriptionBanner
@@ -465,6 +501,5 @@ export default function AdminDashboard() {
           </div>
         </SidebarInset>
       </div>
-    </SidebarProvider>
   );
 }

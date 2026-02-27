@@ -13,6 +13,7 @@ import { MessageCircle, Phone, Clock, UserCheck, X, Plus, Send, Eye, EyeOff } fr
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { usePhoneMask } from '@/hooks/usePhoneMask';
 
 interface Lead {
   id: string;
@@ -206,6 +207,22 @@ export function LeadsTab({ hotelId }: Props) {
 
   const isPhoneVisible = (lead: Lead) => lead.admin_id !== null;
 
+  const formatPhoneDisplay = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length === 0) return phone;
+    let d = digits;
+    if (d.startsWith('8') && d.length > 1) d = '7' + d.slice(1);
+    else if (!d.startsWith('7') && d.length > 0) d = '7' + d;
+    let f = '';
+    if (d.length >= 1) f = '+' + d.charAt(0);
+    if (d.length >= 2) f += ' (' + d.substring(1, Math.min(4, d.length));
+    if (d.length >= 4) f += ')';
+    if (d.length >= 5) f += ' ' + d.substring(4, Math.min(7, d.length));
+    if (d.length >= 8) f += '-' + d.substring(7, Math.min(9, d.length));
+    if (d.length >= 10) f += '-' + d.substring(9, Math.min(11, d.length));
+    return f;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -299,7 +316,7 @@ export function LeadsTab({ hotelId }: Props) {
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                     <Phone className="h-3 w-3" />
                     <span className={!isPhoneVisible(lead) ? 'blur-sm select-none' : ''}>
-                      {lead.phone}
+                      {formatPhoneDisplay(lead.phone)}
                     </span>
                     <span className="ml-auto">
                       {format(new Date(lead.created_at), 'dd.MM HH:mm', { locale: ru })}
@@ -338,9 +355,9 @@ export function LeadsTab({ hotelId }: Props) {
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     {isPhoneVisible(selectedLead) ? (
-                      <span className="font-mono">{selectedLead.phone}</span>
+                      <span className="font-mono">{formatPhoneDisplay(selectedLead.phone)}</span>
                     ) : (
-                      <span className="blur-sm select-none font-mono">{selectedLead.phone}</span>
+                      <span className="blur-sm select-none font-mono">{formatPhoneDisplay(selectedLead.phone)}</span>
                     )}
                     {!isPhoneVisible(selectedLead) && (
                       <EyeOff className="h-3 w-3 text-muted-foreground" />

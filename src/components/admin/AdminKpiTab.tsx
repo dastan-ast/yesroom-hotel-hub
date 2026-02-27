@@ -16,6 +16,7 @@ interface AdminMetrics {
   totalConverted: number;
   avgResponseMinutes: number;
   conversionRate: number;
+  avgBookingProcessMinutes: number;
 }
 
 interface AuditEntry {
@@ -56,8 +57,28 @@ export function AdminKpiTab({ hotelId }: Props) {
       .select('user_id, full_name')
       .eq('hotel_id', hotelId);
 
+    // Fetch bookings with additional_info for processing time calculation
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('id, created_at, status, additional_info')
+      .eq('hotel_id', hotelId)
+      .in('status', ['checked_in', 'checked_out']);
+
     const profileMap = new Map<string, string>();
     (profiles || []).forEach(p => profileMap.set(p.user_id, p.full_name || 'Неизвестный'));
+
+    // Calculate avg booking processing time (created -> checked_in)
+    const bookingProcessTimes: number[] = [];
+    ((bookings as any[]) || []).forEach(b => {
+      const info = b.additional_info as any;
+      if (info?.checked_in_at && b.created_at) {
+        const diff = (new Date(info.checked_in_at).getTime() - new Date(b.created_at).getTime()) / 60000;
+        if (diff >= 0) bookingProcessTimes.push(diff);
+      }
+    });
+    const avgBookingProcess = bookingProcessTimes.length > 0
+      ? bookingProcessTimes.reduce((a, b) => a + b, 0) / bookingProcessTimes.length
+      : 0;
 
     // Calculate metrics per admin
     const adminMap = new Map<string, { claimed: number; converted: number; responseTimes: number[] }>();
@@ -88,6 +109,7 @@ export function AdminKpiTab({ hotelId }: Props) {
         totalConverted: val.converted,
         avgResponseMinutes: Math.round(avg * 10) / 10,
         conversionRate: val.claimed > 0 ? Math.round((val.converted / val.claimed) * 100) : 0,
+        avgBookingProcessMinutes: Math.round(avgBookingProcess * 10) / 10,
       });
     });
 
@@ -123,6 +145,32 @@ export function AdminKpiTab({ hotelId }: Props) {
       <h2 className="text-2xl font-display font-bold flex items-center gap-2">
         <BarChart3 className="h-6 w-6" /> KPI Администраторов
       </h2>
+
+      {/* Overall metrics */}
+      {metrics.length > 0 && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Card>
+            <CardContent className="pt-6 flex items-center gap-4">
+              <Clock className="h-8 w-8 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Ср. обработка бронирования</p>
+                <p className="text-2xl font-bold">{formatMinutes(metrics[0]?.avgBookingProcessMinutes || 0)}</p>
+                <p className="text-xs text-muted-foreground">от создания до заселения</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6 flex items-center gap-4">
+              <TrendingUp className="h-8 w-8 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Ср. время ответа на лид</p>
+                <p className="text-2xl font-bold">{formatMinutes(metrics.reduce((s, m) => s + m.avgResponseMinutes, 0) / metrics.length)}</p>
+                <p className="text-xs text-muted-foreground">от создания до взятия в работу</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Metrics table */}
       <Card>
