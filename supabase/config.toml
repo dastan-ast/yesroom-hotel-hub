@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.sync-to-external]
 verify_jwt = false
+
+[functions.leads-webhook]
+verify_jwt = false

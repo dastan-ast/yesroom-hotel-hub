@@ -44,6 +44,7 @@ interface BookingDetails {
   rooms: { room_number: string } | null;
   room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
   is_half_day?: boolean;
+  additional_info?: { checked_in_at?: string; checked_out_at?: string } | null;
   allRooms: { id: string; room_number: string; room_type_name: string }[];
 }
 
@@ -171,6 +172,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         id, guest_name, guest_phone, check_in_date, check_out_date,
         status, source, prepayment_amount, prepayment_received, daily_rate,
         guest_count, guest_comment, room_id, room_type_id, is_half_day, client_id,
+        additional_info,
         rooms(room_number),
         room_types(name, price_per_night, price_half_day)
       `)
@@ -547,7 +549,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
           status: 'checked_out',
           final_total: amountChanged ? undefined : bCalc.total,
           daily_rate: bCalc.dailyRate,
-          additional_info: { checked_out_at: checkedOutAt },
+          additional_info: { ...(booking.additional_info as any || {}), checked_out_at: checkedOutAt },
         } as any)
         .eq('id', booking.id);
 
@@ -828,6 +830,32 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                             </div>
                           </div>
                         </div>
+
+                        {/* Check-in/out timestamps */}
+                        {((booking.additional_info as any)?.checked_in_at || (booking.additional_info as any)?.checked_out_at) && (
+                          <div className="grid grid-cols-2 gap-4">
+                            {(booking.additional_info as any)?.checked_in_at && (
+                              <div className="space-y-1">
+                                <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                                  <LogIn className="h-3 w-3" /> Время заселения
+                                </Label>
+                                <span className="text-sm font-medium text-green-600">
+                                  {format(new Date((booking.additional_info as any).checked_in_at), 'dd MMM yyyy, HH:mm', { locale: ru })}
+                                </span>
+                              </div>
+                            )}
+                            {(booking.additional_info as any)?.checked_out_at && (
+                              <div className="space-y-1">
+                                <Label className="text-muted-foreground text-xs flex items-center gap-1">
+                                  <LogOut className="h-3 w-3" /> Время выселения
+                                </Label>
+                                <span className="text-sm font-medium">
+                                  {format(new Date((booking.additional_info as any).checked_out_at), 'dd MMM yyyy, HH:mm', { locale: ru })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Extend button for checked_in */}
                         {rIdx === 0 && booking.status === 'checked_in' && (
