@@ -74,9 +74,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSuccess: (createdBookingIds: string[]) => void | Promise<void>;
   hotelId: string;
+  prefillPhone?: string;
 }
 
-export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: Props) {
+export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, prefillPhone }: Props) {
   const { t } = useTranslation();
   const { user, profile } = useAuth();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
@@ -149,7 +150,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId }: 
         guest_count: 1,
         is_half_day: false,
       });
-      phoneMask.setValue('');
+      phoneMask.setValue(prefillPhone || '');
       setIsAnonymous(false);
       setHalfDayCheckInHour(12);
       setSelectedRooms([]);

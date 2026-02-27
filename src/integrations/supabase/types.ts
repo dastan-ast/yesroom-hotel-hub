@@ -65,6 +65,57 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          hotel_id: string
+          id: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          hotel_id: string
+          id?: string
+          user_id: string
+          user_name?: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          hotel_id?: string
+          id?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_rooms: {
         Row: {
           booking_id: string
@@ -424,6 +475,51 @@ export type Database = {
           },
         ]
       }
+      crm_comments: {
+        Row: {
+          author_id: string
+          author_name: string
+          client_id: string | null
+          content: string
+          created_at: string
+          id: string
+          lead_id: string | null
+        }
+        Insert: {
+          author_id: string
+          author_name?: string
+          client_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+        }
+        Update: {
+          author_id?: string
+          author_name?: string
+          client_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_comments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_comments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hotel_api_keys: {
         Row: {
           api_key_hash: string
@@ -522,6 +618,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      leads: {
+        Row: {
+          admin_id: string | null
+          booking_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          hotel_id: string
+          id: string
+          name: string | null
+          notes: string | null
+          phone: string
+          source: string
+          status: string
+        }
+        Insert: {
+          admin_id?: string | null
+          booking_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          hotel_id: string
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone: string
+          source?: string
+          status?: string
+        }
+        Update: {
+          admin_id?: string | null
+          booking_id?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          hotel_id?: string
+          id?: string
+          name?: string | null
+          notes?: string | null
+          phone?: string
+          source?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_hotel_id_fkey"
+            columns: ["hotel_id"]
+            isOneToOne: false
+            referencedRelation: "hotels_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_settings: {
         Row: {
