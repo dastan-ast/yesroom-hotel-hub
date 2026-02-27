@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
       .insert({
         hotel_id: hotel.id,
         phone: body.phone.trim(),
-        name: body.name?.trim() || null,
+        name: body.name?.trim() || 'Новый лид',
         source,
         notes: body.notes?.trim() || null,
         status: "new",
