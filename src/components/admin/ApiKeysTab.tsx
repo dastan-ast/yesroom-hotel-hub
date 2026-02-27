@@ -100,6 +100,7 @@ export function ApiKeysTab({ hotelId }: ApiKeysTabProps) {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'wzbnxtyygxenmxnwnmoj';
   const webhookUrl = `https://${projectId}.supabase.co/functions/v1/booking-webhook`;
   const roomTypesUrl = `https://${projectId}.supabase.co/functions/v1/room-types`;
+  const leadsWebhookUrl = `https://${projectId}.supabase.co/functions/v1/leads-webhook`;
 
   useEffect(() => {
     fetchApiKeys();
@@ -336,6 +337,23 @@ export function ApiKeysTab({ hotelId }: ApiKeysTabProps) {
               </Button>
             </div>
           </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">
+              Создание лида (POST)
+            </Label>
+            <div className="flex items-center gap-2 mt-1">
+              <code className="flex-1 text-xs bg-muted p-2 rounded break-all">
+                {leadsWebhookUrl}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => copyToClipboard(leadsWebhookUrl, 'URL')}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           <div className="text-xs text-muted-foreground">
             Передайте API ключ в заголовке: <code>X-API-Key: your_key</code>
           </div>
@@ -449,6 +467,44 @@ export function ApiKeysTab({ hotelId }: ApiKeysTabProps) {
     "external_id": "tg_msg_12345"
   }'`}
               </pre>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium">POST /leads-webhook - Создать лид</Label>
+              <p className="text-xs text-muted-foreground mt-1 mb-2">
+                Только поле <code>phone</code> обязательно. Если <code>name</code> не передан, будет записано «Новый лид».
+              </p>
+              <pre className="mt-2 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
+{`curl -X POST "${leadsWebhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: hk_your_api_key" \\
+  -d '{
+    "phone": "+77771234567"
+  }'`}
+              </pre>
+              <p className="text-xs text-muted-foreground mt-2">Полный пример со всеми полями:</p>
+              <pre className="mt-1 p-3 bg-muted rounded-lg text-xs overflow-x-auto">
+{`curl -X POST "${leadsWebhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: hk_your_api_key" \\
+  -d '{
+    "phone": "+77771234567",
+    "name": "Иван Иванов",
+    "source": "whatsapp",
+    "notes": "Интересуется люксом на выходные"
+  }'`}
+              </pre>
+              <div className="mt-3 p-3 bg-muted rounded-lg text-xs space-y-1">
+                <p className="font-medium">Допустимые значения source:</p>
+                <p><code>whatsapp</code> (по умолчанию), <code>telegram</code>, <code>phone</code>, <code>walk_in</code>, <code>website</code>, <code>other</code></p>
+              </div>
+              <div className="mt-3 p-3 bg-muted rounded-lg text-xs space-y-1">
+                <p className="font-medium">Коды ответов:</p>
+                <p><code>201</code> — лид создан успешно</p>
+                <p><code>400</code> — невалидный телефон или отсутствует phone</p>
+                <p><code>401</code> — неверный или отсутствующий API ключ</p>
+                <p><code>403</code> — отель неактивен</p>
+              </div>
             </div>
           </div>
         </CardContent>
