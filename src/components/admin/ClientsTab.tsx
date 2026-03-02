@@ -100,10 +100,15 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
   };
 
   const filteredClients = clients.filter(
-    (c) =>
-      c.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search) ||
-      c.email?.toLowerCase().includes(search.toLowerCase())
+    (c) => {
+      const s = search.toLowerCase();
+      return (
+        c.full_name.toLowerCase().includes(s) ||
+        (c.phone || '').toLowerCase().includes(s) ||
+        (c.email || '').toLowerCase().includes(s) ||
+        (c.document_number || '').toLowerCase().includes(s)
+      );
+    }
   );
 
   if (loading) {

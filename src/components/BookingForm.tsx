@@ -96,10 +96,10 @@ export function BookingForm({ hotelId }: BookingFormProps) {
       // Fetch hotel settings if hotelId exists
       if (hotelId) {
         const { data: hotelData } = await supabase
-          .from('hotels')
+          .from('hotels_public')
           .select('name, settings')
           .eq('id', hotelId)
-          .single();
+          .maybeSingle() as any;
         if (hotelData) {
           setHotelName(hotelData.name);
           setHotelSettings(hotelData.settings as HotelSettings | null);
