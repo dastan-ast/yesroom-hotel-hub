@@ -186,14 +186,26 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
       setShowSuggestions(false);
       return;
     }
-    const { data } = await supabase
-      .from('clients')
-      .select('id, full_name, phone')
-      .eq('hotel_id', hotelId)
-      .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
-      .limit(5);
-    setClientSuggestions(data || []);
-    setShowSuggestions((data || []).length > 0);
+    // Sanitize query: remove special chars that break PostgREST filters
+    const sanitized = query.replace(/[(),%\\]/g, '').trim();
+    if (sanitized.length < 2) {
+      setClientSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('id, full_name, phone')
+        .eq('hotel_id', hotelId)
+        .or(`full_name.ilike.%${sanitized}%,phone.ilike.%${sanitized}%`)
+        .limit(5);
+      setClientSuggestions(data || []);
+      setShowSuggestions((data || []).length > 0);
+    } catch {
+      setClientSuggestions([]);
+      setShowSuggestions(false);
+    }
   }, [hotelId]);
 
   const handleGuestNameChange = (value: string, onChange: (v: string) => void) => {
