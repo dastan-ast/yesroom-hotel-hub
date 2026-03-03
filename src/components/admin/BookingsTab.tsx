@@ -41,7 +41,7 @@ type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'ca
 interface Booking {
   id: string;
   guest_name: string;
-  guest_phone: string;
+  guest_phone: string | null;
   check_in_date: string;
   check_out_date: string;
   status: BookingStatus;
@@ -520,7 +520,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       const query = searchQuery.toLowerCase();
       result = result.filter(g => 
         g.primary.guest_name.toLowerCase().includes(query) ||
-        g.primary.guest_phone.includes(query)
+        (g.primary.guest_phone || '').includes(query)
       );
     }
 
@@ -561,7 +561,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
     return labels[source] || source;
   };
 
-  const formatPhone = (phone: string) => phone.replace(/[^\d+]/g, '');
+  const formatPhone = (phone: string | null | undefined) => (phone || '').replace(/[^\d+]/g, '');
 
   const getRoomTypeNames = (group: BookingGroup) => {
     const names = group.bookings
@@ -733,21 +733,27 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                    <button
-                      onClick={() => setHistoryPhone(primary.guest_phone)}
-                      className="hover:text-primary flex items-center gap-1"
-                    >
-                      <Phone className="h-3 w-3" />
-                      {primary.guest_phone}
-                    </button>
-                    <a
-                      href={`https://wa.me/${formatPhone(primary.guest_phone).replace('+', '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-700"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                    </a>
+                    {primary.guest_phone ? (
+                      <>
+                        <button
+                          onClick={() => setHistoryPhone(primary.guest_phone)}
+                          className="hover:text-primary flex items-center gap-1"
+                        >
+                          <Phone className="h-3 w-3" />
+                          {primary.guest_phone}
+                        </button>
+                        <a
+                          href={`https://wa.me/${formatPhone(primary.guest_phone).replace('+', '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground/50 text-xs">Без телефона</span>
+                    )}
                     {getRoomTypeNames(group) && (
                       <span>• {getRoomTypeNames(group)}</span>
                     )}

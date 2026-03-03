@@ -275,7 +275,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
                     <SelectContent>
                       {roomTypes.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
-                          {type.name} - {type.price_per_night.toLocaleString()} ₸
+                          {type.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

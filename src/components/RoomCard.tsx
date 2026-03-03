@@ -15,12 +15,13 @@ interface RoomCardProps {
   id: string;
   name: string;
   description: string | null;
-  price: number;
+  price?: number;
   capacity: number;
   amenities: string[] | null;
   images: string[] | null;
   imageUrl: string | null;
   onBook?: (roomTypeId: string) => void;
+  showPrice?: boolean;
 }
 
 const amenityIcons: Record<string, React.ElementType> = {
@@ -31,7 +32,7 @@ const amenityIcons: Record<string, React.ElementType> = {
   ac: Wind,
 };
 
-export function RoomCard({ id, name, description, price, capacity, amenities, images, imageUrl, onBook }: RoomCardProps) {
+export function RoomCard({ id, name, description, price, capacity, amenities, images, imageUrl, onBook, showPrice = true }: RoomCardProps) {
   const { t } = useTranslation();
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
@@ -138,11 +139,13 @@ export function RoomCard({ id, name, description, price, capacity, amenities, im
     <Card className="overflow-hidden card-hover group">
       <div className="relative">
         {renderImage()}
-        <div className="absolute top-4 right-4 z-10">
-          <Badge className="bg-accent text-accent-foreground font-semibold shadow-gold">
-            {price.toLocaleString()} ₸ / {t('rooms.perNight')}
-          </Badge>
-        </div>
+        {showPrice && price !== undefined && (
+          <div className="absolute top-4 right-4 z-10">
+            <Badge className="bg-accent text-accent-foreground font-semibold shadow-gold">
+              {price.toLocaleString()} ₸ / {t('rooms.perNight')}
+            </Badge>
+          </div>
+        )}
       </div>
       <CardContent className="p-6">
         <h3 className="text-xl font-display font-semibold mb-2">{name}</h3>
