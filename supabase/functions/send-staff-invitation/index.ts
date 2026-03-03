@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -16,29 +17,63 @@ interface InvitationRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // --- Authentication & Authorization ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Check role: only owner or superadmin can send invitations
+    const { data: roleData } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!roleData || !["owner", "superadmin"].includes(roleData.role)) {
+      return new Response(
+        JSON.stringify({ error: "Insufficient permissions" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // --- Business Logic ---
     const { email, hotelName, inviteUrl, invitedByName }: InvitationRequest = await req.json();
 
-    // Validate required fields
     if (!email || !hotelName || !inviteUrl) {
       throw new Error("Missing required fields: email, hotelName, or inviteUrl");
     }
 
-    console.log(`Sending invitation to ${email} for hotel ${hotelName}`);
+    console.log(`Sending invitation to ${email} for hotel ${hotelName} by user ${user.id}`);
 
     if (!RESEND_API_KEY) {
       console.warn("RESEND_API_KEY not configured, skipping email send");
       return new Response(
         JSON.stringify({ success: false, error: "Email service not configured" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -97,13 +132,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!response.ok) {
       console.error("Resend API error:", result);
-      // Return 200 with success: false so the frontend fallback (clipboard copy) works
       return new Response(
         JSON.stringify({ success: false, error: result.message || "Failed to send email" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -111,20 +142,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ success: true, id: result.id }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: any) {
     console.error("Error in send-staff-invitation function:", error);
-    // Return 200 with error info so frontend fallback works
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 };
