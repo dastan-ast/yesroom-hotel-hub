@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { differenceInDays, parseISO, format, isBefore, startOfDay } from 'date-fns';
+import { differenceInDays, parseISO, format, isBefore, startOfDay, addHours } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -816,18 +816,41 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-muted-foreground text-xs">
-                              {booking.is_half_day ? 'Выезд (до 00:00)' : 'Выезд (до 12:00)'}
-                            </Label>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
-                                {booking.is_half_day
-                                  ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
-                                  : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
-                                }
-                              </span>
-                            </div>
+                            {(() => {
+                              const checkedInAt = (booking.additional_info as any)?.checked_in_at;
+                              if (booking.is_half_day && checkedInAt) {
+                                const checkoutTime = addHours(new Date(checkedInAt), 12);
+                                return (
+                                  <>
+                                    <Label className="text-muted-foreground text-xs">
+                                      Выезд (полсуток)
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-amber-600" />
+                                      <span className="font-medium text-amber-600">
+                                        {format(checkoutTime, 'dd MMMM yyyy, HH:mm', { locale: ru })}
+                                      </span>
+                                    </div>
+                                  </>
+                                );
+                              }
+                              return (
+                                <>
+                                  <Label className="text-muted-foreground text-xs">
+                                    {booking.is_half_day ? 'Выезд (полсуток)' : 'Выезд (до 12:00)'}
+                                  </Label>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <span className={hasDifferentDates ? 'font-medium text-amber-600' : ''}>
+                                      {booking.is_half_day
+                                        ? format(parseISO(booking.check_in_date), 'dd MMMM yyyy', { locale: ru }) + ' (полсуток)'
+                                        : format(parseISO(booking.check_out_date), 'dd MMMM yyyy', { locale: ru })
+                                      }
+                                    </span>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
 
