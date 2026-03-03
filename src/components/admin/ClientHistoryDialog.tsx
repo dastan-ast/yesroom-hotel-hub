@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
+import { format, addHours } from 'date-fns';
+import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -9,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { LogIn, LogOut, Clock } from 'lucide-react';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
 
@@ -19,6 +21,8 @@ interface Booking {
   status: BookingStatus;
   room_types: { name: string } | null;
   total_price: number | null;
+  is_half_day: boolean;
+  additional_info: { checked_in_at?: string; checked_out_at?: string } | null;
 }
 
 interface Client {
@@ -58,7 +62,7 @@ export function ClientHistoryDialog({ open, onOpenChange, client }: Props) {
     
     const { data } = await supabase
       .from('bookings')
-      .select('id, check_in_date, check_out_date, status, total_price, room_types(name)')
+      .select('id, check_in_date, check_out_date, status, total_price, room_types(name), is_half_day, additional_info')
       .eq('client_id', client.id)
       .order('check_in_date', { ascending: false });
     
@@ -77,6 +81,13 @@ export function ClientHistoryDialog({ open, onOpenChange, client }: Props) {
     return labels[status];
   };
 
+  const getHalfDayCheckout = (booking: Booking): string | null => {
+    const checkedInAt = (booking.additional_info as any)?.checked_in_at;
+    if (!booking.is_half_day || !checkedInAt) return null;
+    const checkoutTime = addHours(new Date(checkedInAt), 12);
+    return format(checkoutTime, 'dd MMM yyyy, HH:mm', { locale: ru });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -92,25 +103,67 @@ export function ClientHistoryDialog({ open, onOpenChange, client }: Props) {
           </div>
         ) : (
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {bookings.map((booking) => (
-              <div key={booking.id} className="p-3 rounded-lg border bg-card">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium">{booking.room_types?.name}</span>
-                  <Badge className={statusColors[booking.status]} variant="secondary">
-                    {getStatusLabel(booking.status)}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(booking.check_in_date), 'dd.MM.yyyy')} —{' '}
-                  {format(new Date(booking.check_out_date), 'dd.MM.yyyy')}
-                </p>
-                {booking.total_price && (
-                  <p className="text-sm font-medium mt-1">
-                    {booking.total_price.toLocaleString()} ₸
+            {bookings.map((booking) => {
+              const checkedInAt = (booking.additional_info as any)?.checked_in_at;
+              const checkedOutAt = (booking.additional_info as any)?.checked_out_at;
+              const halfDayCheckout = getHalfDayCheckout(booking);
+
+              return (
+                <div key={booking.id} className="p-3 rounded-lg border bg-card space-y-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{booking.room_types?.name}</span>
+                      {booking.is_half_day && (
+                        <Badge variant="secondary" className="text-[10px] h-5">Полсуток</Badge>
+                      )}
+                    </div>
+                    <Badge className={statusColors[booking.status]} variant="secondary">
+                      {getStatusLabel(booking.status)}
+                    </Badge>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(booking.check_in_date), 'dd.MM.yyyy')} —{' '}
+                    {booking.is_half_day && halfDayCheckout
+                      ? halfDayCheckout
+                      : format(new Date(booking.check_out_date), 'dd.MM.yyyy')
+                    }
                   </p>
-                )}
-              </div>
-            ))}
+
+                  {/* Actual check-in/out timestamps */}
+                  {(checkedInAt || checkedOutAt) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {checkedInAt && (
+                        <div className="flex items-center gap-1 text-xs text-green-600">
+                          <LogIn className="h-3 w-3" />
+                          <span>Заселён: {format(new Date(checkedInAt), 'dd MMM, HH:mm', { locale: ru })}</span>
+                        </div>
+                      )}
+                      {checkedOutAt && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <LogOut className="h-3 w-3" />
+                          <span>Выселен: {format(new Date(checkedOutAt), 'dd MMM, HH:mm', { locale: ru })}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Half-day: show expected checkout if still checked in */}
+                  {booking.is_half_day && booking.status === 'checked_in' && halfDayCheckout && !checkedOutAt && (
+                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                      <Clock className="h-3 w-3" />
+                      <span>Выезд до: {halfDayCheckout}</span>
+                    </div>
+                  )}
+
+                  {booking.total_price && (
+                    <p className="text-sm font-medium">
+                      {booking.total_price.toLocaleString()} ₸
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </DialogContent>
