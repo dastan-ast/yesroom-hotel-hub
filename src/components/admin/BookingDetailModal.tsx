@@ -323,9 +323,13 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
     // Update booking: set room_id and auto-approve if pending
     const newStatus = booking.status === 'pending' ? 'approved' : booking.status;
+    const updatePayload: any = { room_id: inlineSelectedRoom, status: newStatus };
+    if (newStatus === 'approved' && booking.status === 'pending') {
+      updatePayload.approved_at = new Date().toISOString();
+    }
     const { error: bookingError } = await supabase
       .from('bookings')
-      .update({ room_id: inlineSelectedRoom, status: newStatus })
+      .update(updatePayload)
       .eq('id', booking.id);
 
     if (bookingError) {
@@ -543,10 +547,30 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
       const bCalc = getBookingCalc(booking);
       const checkedOutAt = new Date().toISOString();
+
+      // Audit: if actual_check_out_at was already set (system-recorded), log the manual override
+      const existingCheckOutAt = (booking.additional_info as any)?.actual_check_out_at;
+      if (existingCheckOutAt) {
+        await supabase.from('audit_logs' as any).insert({
+          hotel_id: hotelId,
+          user_id: user.id,
+          user_name: profile?.full_name || '',
+          action: 'manual_checkout_time_override',
+          entity_type: 'booking',
+          entity_id: booking.id,
+          details: {
+            guest_name: booking.guest_name,
+            previous_checkout_at: existingCheckOutAt,
+            new_checkout_at: checkedOutAt,
+          },
+        });
+      }
+
       await supabase
         .from('bookings')
         .update({
           status: 'checked_out',
+          actual_check_out_at: checkedOutAt,
           final_total: amountChanged ? undefined : bCalc.total,
           daily_rate: bCalc.dailyRate,
           additional_info: { ...(booking.additional_info as any || {}), checked_out_at: checkedOutAt },

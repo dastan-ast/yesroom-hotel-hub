@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, addDays } from 'date-fns';
+import { format, addDays, differenceInDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
 import { syncBookingToExternal } from '@/lib/syncBooking';
@@ -59,6 +59,7 @@ interface RoomType {
   id: string;
   name: string;
   price_per_night: number;
+  price_half_day: number | null;
 }
 
 interface AvailableRoom {
@@ -174,7 +175,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
   const fetchRoomTypes = async () => {
     const { data } = await supabase
       .from('room_types')
-      .select('id, name, price_per_night')
+      .select('id, name, price_per_night, price_half_day')
       .eq('hotel_id', hotelId);
     if (data) setRoomTypes(data);
   };
@@ -353,6 +354,18 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
     const roomsToCreate = hasRoomsSelected ? selectedRooms : [null];
     const createdBookingIds: string[] = [];
 
+    // Calculate total_price based on half-day or standard logic
+    const selectedType = roomTypes.find(rt => rt.id === data.room_type_id);
+    let totalPrice: number | null = null;
+    if (selectedType) {
+      if (data.is_half_day) {
+        totalPrice = selectedType.price_half_day ?? Math.round(selectedType.price_per_night / 2);
+      } else if (data.check_out_date) {
+        const nights = Math.max(1, differenceInDays(data.check_out_date, data.check_in_date));
+        totalPrice = nights * selectedType.price_per_night;
+      }
+    }
+
     for (const roomId of roomsToCreate) {
       const { data: booking, error } = await supabase.from('bookings').insert({
         guest_name: data.guest_name,
@@ -368,6 +381,12 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
         guest_count: data.guest_count || 1,
         status: status,
         hotel_id: hotelId,
+        total_price: totalPrice,
+        daily_rate: data.is_half_day
+          ? (selectedType?.price_half_day ?? (selectedType ? Math.round(selectedType.price_per_night / 2) : null))
+          : (selectedType?.price_per_night ?? null),
+        created_by: user?.id || null,
+        approved_at: status === 'approved' ? new Date().toISOString() : null,
         additional_info: {
           ...(data.is_half_day ? { half_day_check_in_hour: halfDayCheckInHour } : {}),
         },

@@ -239,11 +239,14 @@ export type Database = {
       }
       bookings: {
         Row: {
+          actual_check_out_at: string | null
           additional_info: Json | null
+          approved_at: string | null
           check_in_date: string
           check_out_date: string
           client_id: string | null
           created_at: string
+          created_by: string | null
           daily_rate: number | null
           external_id: string | null
           external_source_data: Json | null
@@ -266,11 +269,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_check_out_at?: string | null
           additional_info?: Json | null
+          approved_at?: string | null
           check_in_date: string
           check_out_date: string
           client_id?: string | null
           created_at?: string
+          created_by?: string | null
           daily_rate?: number | null
           external_id?: string | null
           external_source_data?: Json | null
@@ -293,11 +299,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_check_out_at?: string | null
           additional_info?: Json | null
+          approved_at?: string | null
           check_in_date?: string
           check_out_date?: string
           client_id?: string | null
           created_at?: string
+          created_by?: string | null
           daily_rate?: number | null
           external_id?: string | null
           external_source_data?: Json | null
