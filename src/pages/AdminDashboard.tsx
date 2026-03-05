@@ -28,7 +28,7 @@ import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
 import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
 import { LeadsTab } from '@/components/admin/LeadsTab';
 import { AdminKpiTab } from '@/components/admin/AdminKpiTab';
-import { MonthlyReportTab } from '@/components/admin/MonthlyReportTab';
+
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -54,7 +54,7 @@ export default function AdminDashboard() {
   const allMenuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: t('admin.dashboard'), permission: 'dashboard' },
     { id: 'analytics', icon: BarChart3, label: 'Аналитика', permission: 'dashboard' },
-    { id: 'monthly-report', icon: CalendarDays, label: 'Отчёт за месяц', permission: 'dashboard' },
+    
     { id: 'leads', icon: MessageCircle, label: 'Лиды', permission: 'bookings' },
     { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
     { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
@@ -398,9 +398,6 @@ function AdminDashboardContent({
                   <ExecutiveDashboard hotelId={hotelId} />
                 )}
 
-                {activeTab === 'monthly-report' && (
-                  <MonthlyReportTab hotelId={hotelId} />
-                )}
 
                 {activeTab === 'leads' && (
                   <LeadsTab hotelId={hotelId} />
