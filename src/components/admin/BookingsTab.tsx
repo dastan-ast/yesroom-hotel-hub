@@ -140,7 +140,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       .select('*, room_types(name), room_id, room_type_id, additional_info, group_id')
       .eq('hotel_id', hotelId)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(500);
     
     if (data) setBookings(data as Booking[]);
     setSelectedIds(new Set());
@@ -229,9 +229,13 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       return;
     }
 
+    const checkedInAt = new Date().toISOString();
     const { error: bookingError } = await supabase
       .from('bookings')
-      .update({ status: 'checked_in' })
+      .update({ 
+        status: 'checked_in',
+        additional_info: { ...(booking.additional_info || {}), checked_in_at: checkedInAt },
+      } as any)
       .eq('id', booking.id);
 
     if (bookingError) {
@@ -278,7 +282,11 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
 
       if (roomIdsToOccupy.length === 0) continue;
 
-      await supabase.from('bookings').update({ status: 'checked_in' }).eq('id', booking.id);
+      const groupCheckedInAt = new Date().toISOString();
+      await supabase.from('bookings').update({ 
+        status: 'checked_in',
+        additional_info: { ...(booking.additional_info || {}), checked_in_at: groupCheckedInAt },
+      } as any).eq('id', booking.id);
       await supabase.from('rooms').update({ status: 'occupied' }).in('id', roomIdsToOccupy);
       totalRooms += roomIdsToOccupy.length;
     }
@@ -333,7 +341,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const doApprove = async (bookingId: string) => {
     const { error } = await supabase
       .from('bookings')
-      .update({ status: 'approved' })
+      .update({ status: 'approved', approved_at: new Date().toISOString() } as any)
       .eq('id', bookingId);
 
     if (error) {
@@ -349,7 +357,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const handleQuickApproveGroup = async (group: BookingGroup) => {
     for (const booking of group.bookings) {
       if (booking.status === 'pending') {
-        await supabase.from('bookings').update({ status: 'approved' }).eq('id', booking.id);
+        await supabase.from('bookings').update({ status: 'approved', approved_at: new Date().toISOString() } as any).eq('id', booking.id);
       }
     }
     toast.success('Все бронирования подтверждены');
@@ -814,7 +822,10 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
                   )}
                   {primary.status === 'checked_in' && (
                     <>
-                      <Button size="sm" variant="secondary" onClick={() => handleOpenCheckoutGroup(group)}>
+                      <Button size="sm" variant="secondary" onClick={() => {
+                        setDetailBookingIds(group.bookings.map(b => b.id));
+                        setDetailModalOpen(true);
+                      }}>
                         <LogOut className="h-4 w-4 mr-1" />
                         {t('admin.checkOut')}
                       </Button>
