@@ -100,6 +100,24 @@ Deno.serve(async (req) => {
     const validSources = ["whatsapp", "telegram", "phone", "walk_in", "website", "other"];
     const source = validSources.includes(body.source || "") ? body.source : "whatsapp";
 
+    // Deduplication: check for existing lead with same hotel_id + phone in last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: existingLead } = await supabase
+      .from("leads")
+      .select("id, status")
+      .eq("hotel_id", hotel.id)
+      .eq("phone", body.phone.trim())
+      .gte("created_at", fiveMinutesAgo)
+      .limit(1)
+      .single();
+
+    if (existingLead) {
+      return new Response(
+        JSON.stringify({ success: true, lead_id: existingLead.id, status: existingLead.status, message: "Лид уже существует (дедупликация)", deduplicated: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: lead, error: leadError } = await supabase
       .from("leads")
       .insert({
