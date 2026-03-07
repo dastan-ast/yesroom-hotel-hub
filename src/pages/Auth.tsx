@@ -136,6 +136,30 @@ export default function Auth() {
     setIsLoading(false);
   };
 
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+      toast.error('Введите email');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Ссылка для сброса пароля отправлена на вашу почту');
+        setIsForgotPassword(false);
+        setForgotEmail('');
+      }
+    } catch {
+      toast.error('Произошла ошибка');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const handleSignup = async (data: SignupFormData) => {
     setIsLoading(true);
     const { error } = await signUp(data.email, data.password, data.fullName);
