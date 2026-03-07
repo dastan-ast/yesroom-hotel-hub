@@ -100,10 +100,12 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
 
   const handleSubmit = (data: FormData) => {
     const halfDay = typeof data.price_half_day === 'number' && data.price_half_day > 0 ? data.price_half_day : null;
+    const weekend = typeof data.price_weekend === 'number' && data.price_weekend > 0 ? data.price_weekend : null;
     onSave({
       name: data.name,
       description: data.description || null,
       price_per_night: data.price_per_night,
+      price_weekend: weekend,
       price_half_day: halfDay,
       capacity: data.capacity,
       amenities: data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : null,
