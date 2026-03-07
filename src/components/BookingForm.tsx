@@ -53,6 +53,7 @@ interface RoomType {
   id: string;
   name: string;
   price_per_night: number;
+  price_weekend: number | null;
 }
 
 interface HotelSettings {
