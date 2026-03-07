@@ -158,8 +158,9 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
             <TableRow>
               <TableHead className="w-[60px]">Фото</TableHead>
               <TableHead>Название</TableHead>
-              <TableHead>Цена/ночь</TableHead>
-              <TableHead>Цена/полсутки</TableHead>
+              <TableHead>Будни</TableHead>
+              <TableHead>Выходные</TableHead>
+              <TableHead>Полсутки</TableHead>
               <TableHead>Вместимость</TableHead>
               <TableHead>Удобства</TableHead>
               <TableHead className="w-[100px]">Действия</TableHead>
