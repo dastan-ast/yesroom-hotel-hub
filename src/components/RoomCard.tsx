@@ -143,7 +143,10 @@ export function RoomCard({ id, name, description, price, priceWeekend, capacity,
         {showPrice && price !== undefined && (
           <div className="absolute top-4 right-4 z-10">
             <Badge className="bg-accent text-accent-foreground font-semibold shadow-gold">
-              {price.toLocaleString()} ₸ / {t('rooms.perNight')}
+              {priceWeekend && priceWeekend !== price
+                ? `${Math.min(price, priceWeekend).toLocaleString()} — ${Math.max(price, priceWeekend).toLocaleString()} ₸`
+                : `${price.toLocaleString()} ₸ / ${t('rooms.perNight')}`
+              }
             </Badge>
           </div>
         )}

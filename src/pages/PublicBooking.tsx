@@ -141,11 +141,13 @@ export default function PublicBooking() {
                     id={room.id}
                     name={room.name}
                     description={room.description}
+                    price={room.price_per_night}
+                    priceWeekend={room.price_weekend}
                     capacity={room.capacity}
                     amenities={room.amenities}
                     images={room.images}
                     imageUrl={room.image_url}
-                    showPrice={false}
+                    showPrice={true}
                   />
                 ))}
               </div>
