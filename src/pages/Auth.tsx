@@ -56,6 +56,9 @@ export default function Auth() {
   const [emailSent, setEmailSent] = useState<string | null>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isNewPasswordLoading, setIsNewPasswordLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const handleToggleMode = () => {
     loginForm.reset();
