@@ -392,7 +392,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
         total_price: totalPrice,
         daily_rate: data.is_half_day
           ? (selectedType?.price_half_day ?? (selectedType ? Math.round(selectedType.price_per_night / 2) : null))
-          : (selectedType?.price_per_night ?? null),
+          : (avgDailyRate ?? null),
         created_by: user?.id || null,
         approved_at: status === 'approved' ? new Date().toISOString() : null,
         additional_info: {
