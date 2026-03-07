@@ -287,6 +287,48 @@ export default function Auth() {
     );
   }
 
+  if (isForgotPassword) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12 flex items-center justify-center">
+          <Card className="w-full max-w-md animate-scale-in">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4">
+                <Mail className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <CardTitle className="font-display text-2xl">Восстановление пароля</CardTitle>
+              <CardDescription>Введите email, на который зарегистрирован аккаунт</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <Button className="w-full" onClick={handleForgotPassword} disabled={forgotLoading}>
+                {forgotLoading ? 'Отправка...' : 'Отправить ссылку для сброса'}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setIsForgotPassword(false)}
+              >
+                Вернуться ко входу
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <Navbar />
