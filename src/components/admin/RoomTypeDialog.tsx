@@ -19,6 +19,7 @@ const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
   description: z.string().optional(),
   price_per_night: z.coerce.number().min(1, 'Укажите цену'),
+  price_weekend: z.coerce.number().optional().or(z.literal('')),
   price_half_day: z.coerce.number().optional().or(z.literal('')),
   capacity: z.coerce.number().min(1, 'Минимум 1 гость'),
   amenities: z.string().optional(),
