@@ -159,6 +159,8 @@ export default function Auth() {
         toast.error(error.message);
       } else {
         toast.success('Ссылка для сброса пароля отправлена на вашу почту');
+        setLastResetRequestAt(Date.now());
+        setResetCooldown(60);
         setIsForgotPassword(false);
         setForgotEmail('');
       }
