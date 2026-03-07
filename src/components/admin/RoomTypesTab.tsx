@@ -96,6 +96,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
       const insertData = {
         name: data.name!,
         price_per_night: data.price_per_night!,
+        price_weekend: data.price_weekend ?? null,
         price_half_day: data.price_half_day ?? null,
         description: data.description,
         capacity: data.capacity,
