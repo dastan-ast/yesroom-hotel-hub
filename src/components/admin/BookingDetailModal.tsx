@@ -43,7 +43,7 @@ interface BookingDetails {
   room_type_id: string | null;
   client_id: string | null;
   rooms: { room_number: string } | null;
-  room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
+  room_types: { name: string; price_per_night: number; price_weekend?: number | null; price_half_day?: number | null } | null;
   is_half_day?: boolean;
   additional_info?: { checked_in_at?: string; checked_out_at?: string } | null;
   allRooms: { id: string; room_number: string; room_type_name: string }[];
