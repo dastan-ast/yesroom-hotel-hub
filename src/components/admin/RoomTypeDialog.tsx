@@ -168,21 +168,37 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
                 )}
               />
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="price_per_night"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('admin.price')} (₸)</FormLabel>
+                      <FormLabel>Будни (₸/ночь)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" placeholder="Пн-Пт" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="price_weekend"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Выходные (₸/ночь)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Сб-Вс (если отличается)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="price_half_day"
