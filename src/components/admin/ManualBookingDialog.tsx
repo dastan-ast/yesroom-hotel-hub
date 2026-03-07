@@ -356,15 +356,21 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
     const roomsToCreate = hasRoomsSelected ? selectedRooms : [null];
     const createdBookingIds: string[] = [];
 
-    // Calculate total_price based on half-day or standard logic
+    // Calculate total_price based on half-day or standard logic with weekday/weekend pricing
     const selectedType = roomTypes.find(rt => rt.id === data.room_type_id);
     let totalPrice: number | null = null;
+    let avgDailyRate: number | null = null;
     if (selectedType) {
       if (data.is_half_day) {
         totalPrice = selectedType.price_half_day ?? Math.round(selectedType.price_per_night / 2);
+        avgDailyRate = totalPrice;
       } else if (data.check_out_date) {
+        const { totalPrice: calcTotal } = calculateStayPrice(
+          data.check_in_date, data.check_out_date, selectedType, false
+        );
+        totalPrice = calcTotal;
         const nights = Math.max(1, differenceInDays(data.check_out_date, data.check_in_date));
-        totalPrice = nights * selectedType.price_per_night;
+        avgDailyRate = Math.round(calcTotal / nights);
       }
     }
 
