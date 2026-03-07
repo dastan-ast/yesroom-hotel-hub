@@ -188,6 +188,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                   </TableCell>
                   <TableCell className="font-medium">{type.name}</TableCell>
                 <TableCell>{type.price_per_night?.toLocaleString()} ₸</TableCell>
+                <TableCell>{type.price_weekend ? `${type.price_weekend.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">= будни</span>}</TableCell>
                 <TableCell>{type.price_half_day ? `${type.price_half_day.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">50%</span>}</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
                 <TableCell className="max-w-[200px] truncate">
