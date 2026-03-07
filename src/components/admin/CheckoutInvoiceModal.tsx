@@ -88,7 +88,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingIds, hotelId, 
           id, guest_name, guest_phone, check_in_date, check_out_date,
           prepayment_amount, daily_rate, room_id, room_type_id,
           rooms(room_number),
-          room_types(name, price_per_night)
+          room_types(name, price_per_night, price_weekend)
         `)
         .in('id', bookingIds),
       supabase
