@@ -88,6 +88,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           name: '',
           description: '',
           price_per_night: 0,
+          price_weekend: '',
           price_half_day: '',
           capacity: 2,
           amenities: '',
