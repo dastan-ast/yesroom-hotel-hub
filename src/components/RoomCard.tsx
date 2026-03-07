@@ -33,7 +33,7 @@ const amenityIcons: Record<string, React.ElementType> = {
   ac: Wind,
 };
 
-export function RoomCard({ id, name, description, price, capacity, amenities, images, imageUrl, onBook, showPrice = true }: RoomCardProps) {
+export function RoomCard({ id, name, description, price, priceWeekend, capacity, amenities, images, imageUrl, onBook, showPrice = true }: RoomCardProps) {
   const { t } = useTranslation();
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
