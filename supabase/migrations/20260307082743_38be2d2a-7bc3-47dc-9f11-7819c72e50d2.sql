@@ -1,0 +1,1 @@
+ALTER TABLE public.room_types ADD COLUMN price_weekend numeric NULL;
