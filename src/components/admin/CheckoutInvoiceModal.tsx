@@ -42,7 +42,7 @@ interface BookingDetails {
   room_id: string | null;
   room_type_id: string | null;
   rooms: { room_number: string } | null;
-  room_types: { name: string; price_per_night: number } | null;
+  room_types: { name: string; price_per_night: number; price_weekend?: number | null } | null;
 }
 
 interface Props {
