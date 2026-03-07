@@ -88,7 +88,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   useEffect(() => {
     const fetchData = async () => {
       // Fetch room types
-      let query = supabase.from('room_types').select('id, name, price_per_night');
+      let query = supabase.from('room_types').select('id, name, price_per_night, price_weekend');
       if (hotelId) {
         query = query.eq('hotel_id', hotelId);
       }
