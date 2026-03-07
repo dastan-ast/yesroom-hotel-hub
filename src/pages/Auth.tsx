@@ -143,6 +143,13 @@ export default function Auth() {
       toast.error('Введите email');
       return;
     }
+    const now = Date.now();
+    const elapsed = Math.floor((now - lastResetRequestAt) / 1000);
+    if (lastResetRequestAt && elapsed < 60) {
+      const remaining = 60 - elapsed;
+      toast.error(`Подождите ${remaining} сек. перед повторной отправкой`);
+      return;
+    }
     setForgotLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
