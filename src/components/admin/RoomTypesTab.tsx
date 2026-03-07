@@ -14,6 +14,7 @@ interface RoomType {
   name: string;
   description: string | null;
   price_per_night: number;
+  price_weekend: number | null;
   price_half_day: number | null;
   capacity: number;
   amenities: string[] | null;
