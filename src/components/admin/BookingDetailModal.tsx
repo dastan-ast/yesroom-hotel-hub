@@ -447,11 +447,25 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
-    const dailyRate = booking.is_half_day
-      ? (booking.room_types?.price_half_day ?? (booking.room_types?.price_per_night ?? 0) / 2)
-      : (booking.daily_rate ?? booking.room_types?.price_per_night ?? 0);
     const roomCount = Math.max(booking.allRooms.length, 1);
-    const stayTotal = booking.is_half_day ? dailyRate * roomCount : nights * dailyRate * roomCount;
+    
+    let stayTotal: number;
+    let dailyRate: number;
+    
+    if (booking.is_half_day) {
+      dailyRate = booking.room_types?.price_half_day ?? (booking.room_types?.price_per_night ?? 0) / 2;
+      stayTotal = dailyRate * roomCount;
+    } else if (booking.room_types) {
+      const { totalPrice } = calculateStayPrice(
+        booking.check_in_date, booking.check_out_date, booking.room_types, false
+      );
+      stayTotal = totalPrice * roomCount;
+      dailyRate = nights > 0 ? Math.round(totalPrice / nights) : booking.room_types.price_per_night;
+    } else {
+      dailyRate = booking.daily_rate ?? 0;
+      stayTotal = nights * dailyRate * roomCount;
+    }
+    
     const servicesTotal = servicesTotals[booking.id] || 0;
     const total = stayTotal + servicesTotal;
     const prepayment = parseFloat(prepaymentValues[booking.id]) || 0;
