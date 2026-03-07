@@ -56,6 +56,9 @@ export default function Auth() {
   const [emailSent, setEmailSent] = useState<string | null>(null);
   const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   const [isNewPasswordLoading, setIsNewPasswordLoading] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   const handleToggleMode = () => {
     loginForm.reset();
@@ -131,6 +134,30 @@ export default function Auth() {
       }
     }
     setIsLoading(false);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+      toast.error('Введите email');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Ссылка для сброса пароля отправлена на вашу почту');
+        setIsForgotPassword(false);
+        setForgotEmail('');
+      }
+    } catch {
+      toast.error('Произошла ошибка');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleSignup = async (data: SignupFormData) => {
@@ -260,6 +287,48 @@ export default function Auth() {
     );
   }
 
+  if (isForgotPassword) {
+    return (
+      <div className="min-h-screen bg-muted/30">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12 flex items-center justify-center">
+          <Card className="w-full max-w-md animate-scale-in">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4">
+                <Mail className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <CardTitle className="font-display text-2xl">Восстановление пароля</CardTitle>
+              <CardDescription>Введите email, на который зарегистрирован аккаунт</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <Button className="w-full" onClick={handleForgotPassword} disabled={forgotLoading}>
+                {forgotLoading ? 'Отправка...' : 'Отправить ссылку для сброса'}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setIsForgotPassword(false)}
+              >
+                Вернуться ко входу
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <Navbar />
@@ -308,6 +377,17 @@ export default function Auth() {
                   />
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? t('common.loading') : t('auth.loginButton')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-sm text-muted-foreground"
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setForgotEmail(loginForm.getValues('email'));
+                    }}
+                  >
+                    Забыли пароль?
                   </Button>
                 </form>
               </Form>
