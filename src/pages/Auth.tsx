@@ -78,6 +78,14 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResetCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetCooldown]);
+
+  useEffect(() => {
     if (isRecoveryMode) return; // don't redirect during password recovery
     if (user && !loading && !roleLoading && role !== null) {
       if (isSuperAdmin) {
