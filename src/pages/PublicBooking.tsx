@@ -21,6 +21,7 @@ interface RoomType {
   name: string;
   description: string | null;
   price_per_night: number;
+  price_weekend: number | null;
   capacity: number;
   amenities: string[] | null;
   image_url: string | null;
