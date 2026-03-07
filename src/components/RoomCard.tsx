@@ -16,6 +16,7 @@ interface RoomCardProps {
   name: string;
   description: string | null;
   price?: number;
+  priceWeekend?: number | null;
   capacity: number;
   amenities: string[] | null;
   images: string[] | null;
@@ -32,7 +33,7 @@ const amenityIcons: Record<string, React.ElementType> = {
   ac: Wind,
 };
 
-export function RoomCard({ id, name, description, price, capacity, amenities, images, imageUrl, onBook, showPrice = true }: RoomCardProps) {
+export function RoomCard({ id, name, description, price, priceWeekend, capacity, amenities, images, imageUrl, onBook, showPrice = true }: RoomCardProps) {
   const { t } = useTranslation();
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
@@ -142,7 +143,10 @@ export function RoomCard({ id, name, description, price, capacity, amenities, im
         {showPrice && price !== undefined && (
           <div className="absolute top-4 right-4 z-10">
             <Badge className="bg-accent text-accent-foreground font-semibold shadow-gold">
-              {price.toLocaleString()} ₸ / {t('rooms.perNight')}
+              {priceWeekend && priceWeekend !== price
+                ? `${Math.min(price, priceWeekend).toLocaleString()} — ${Math.max(price, priceWeekend).toLocaleString()} ₸`
+                : `${price.toLocaleString()} ₸ / ${t('rooms.perNight')}`
+              }
             </Badge>
           </div>
         )}

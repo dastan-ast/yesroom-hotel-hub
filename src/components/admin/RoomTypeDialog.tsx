@@ -19,6 +19,7 @@ const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
   description: z.string().optional(),
   price_per_night: z.coerce.number().min(1, 'Укажите цену'),
+  price_weekend: z.coerce.number().optional().or(z.literal('')),
   price_half_day: z.coerce.number().optional().or(z.literal('')),
   capacity: z.coerce.number().min(1, 'Минимум 1 гость'),
   amenities: z.string().optional(),
@@ -31,6 +32,7 @@ interface RoomType {
   name: string;
   description: string | null;
   price_per_night: number;
+  price_weekend: number | null;
   price_half_day: number | null;
   capacity: number;
   amenities: string[] | null;
@@ -55,6 +57,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
       name: '',
       description: '',
       price_per_night: 0,
+      price_weekend: '',
       price_half_day: '',
       capacity: 2,
       amenities: '',
@@ -68,6 +71,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           name: roomType.name,
           description: roomType.description || '',
           price_per_night: roomType.price_per_night,
+          price_weekend: roomType.price_weekend ?? '',
           price_half_day: roomType.price_half_day ?? '',
           capacity: roomType.capacity,
           amenities: roomType.amenities?.join(', ') || '',
@@ -84,6 +88,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
           name: '',
           description: '',
           price_per_night: 0,
+          price_weekend: '',
           price_half_day: '',
           capacity: 2,
           amenities: '',
@@ -95,10 +100,12 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
 
   const handleSubmit = (data: FormData) => {
     const halfDay = typeof data.price_half_day === 'number' && data.price_half_day > 0 ? data.price_half_day : null;
+    const weekend = typeof data.price_weekend === 'number' && data.price_weekend > 0 ? data.price_weekend : null;
     onSave({
       name: data.name,
       description: data.description || null,
       price_per_night: data.price_per_night,
+      price_weekend: weekend,
       price_half_day: halfDay,
       capacity: data.capacity,
       amenities: data.amenities ? data.amenities.split(',').map(s => s.trim()).filter(Boolean) : null,
@@ -161,21 +168,37 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
                 )}
               />
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="price_per_night"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('admin.price')} (₸)</FormLabel>
+                      <FormLabel>Будни (₸/ночь)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} />
+                        <Input type="number" placeholder="Пн-Пт" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="price_weekend"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Выходные (₸/ночь)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Сб-Вс (если отличается)" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="price_half_day"

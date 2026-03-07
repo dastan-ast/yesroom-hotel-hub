@@ -4,8 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
+import { calculateStayPrice, formatPriceRange } from '@/lib/pricingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { BookingSuccess } from '@/components/BookingSuccess';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ interface RoomType {
   id: string;
   name: string;
   price_per_night: number;
+  price_weekend: number | null;
 }
 
 interface HotelSettings {
@@ -86,12 +88,12 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   useEffect(() => {
     const fetchData = async () => {
       // Fetch room types
-      let query = supabase.from('room_types').select('id, name, price_per_night');
+      let query = supabase.from('room_types').select('id, name, price_per_night, price_weekend');
       if (hotelId) {
         query = query.eq('hotel_id', hotelId);
       }
       const { data } = await query;
-      if (data) setRoomTypes(data);
+      if (data) setRoomTypes(data as RoomType[]);
 
       // Fetch hotel settings if hotelId exists
       if (hotelId) {
@@ -112,6 +114,16 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
     try {
+      // Calculate total price with weekday/weekend pricing
+      const selectedType = roomTypes.find(rt => rt.id === data.roomTypeId);
+      let totalPrice: number | null = null;
+      if (selectedType) {
+        const { totalPrice: calcTotal } = calculateStayPrice(
+          data.checkInDate, data.checkOutDate, selectedType
+        );
+        totalPrice = calcTotal;
+      }
+
       const { error } = await supabase.from('bookings').insert({
         guest_name: data.guestName,
         guest_phone: data.guestPhone,
@@ -123,6 +135,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
         source: 'web',
         status: 'pending',
         hotel_id: hotelId || null,
+        total_price: totalPrice,
       });
 
       if (error) throw error;
@@ -275,7 +288,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
                     <SelectContent>
                       {roomTypes.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
-                          {type.name}
+                          {type.name} — {formatPriceRange(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>

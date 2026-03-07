@@ -14,6 +14,7 @@ interface RoomType {
   name: string;
   description: string | null;
   price_per_night: number;
+  price_weekend: number | null;
   price_half_day: number | null;
   capacity: number;
   amenities: string[] | null;
@@ -79,6 +80,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
           name: data.name,
           description: data.description,
           price_per_night: data.price_per_night,
+          price_weekend: data.price_weekend ?? null,
           price_half_day: data.price_half_day ?? null,
           capacity: data.capacity,
           amenities: data.amenities,
@@ -94,6 +96,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
       const insertData = {
         name: data.name!,
         price_per_night: data.price_per_night!,
+        price_weekend: data.price_weekend ?? null,
         price_half_day: data.price_half_day ?? null,
         description: data.description,
         capacity: data.capacity,
@@ -155,8 +158,9 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
             <TableRow>
               <TableHead className="w-[60px]">Фото</TableHead>
               <TableHead>Название</TableHead>
-              <TableHead>Цена/ночь</TableHead>
-              <TableHead>Цена/полсутки</TableHead>
+              <TableHead>Будни</TableHead>
+              <TableHead>Выходные</TableHead>
+              <TableHead>Полсутки</TableHead>
               <TableHead>Вместимость</TableHead>
               <TableHead>Удобства</TableHead>
               <TableHead className="w-[100px]">Действия</TableHead>
@@ -184,6 +188,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                   </TableCell>
                   <TableCell className="font-medium">{type.name}</TableCell>
                 <TableCell>{type.price_per_night?.toLocaleString()} ₸</TableCell>
+                <TableCell>{type.price_weekend ? `${type.price_weekend.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">= будни</span>}</TableCell>
                 <TableCell>{type.price_half_day ? `${type.price_half_day.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">50%</span>}</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
                 <TableCell className="max-w-[200px] truncate">

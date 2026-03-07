@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { differenceInDays, parseISO, format, isBefore, startOfDay, addHours } from 'date-fns';
+import { calculateStayPrice } from '@/lib/pricingUtils';
 import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,7 +43,7 @@ interface BookingDetails {
   room_type_id: string | null;
   client_id: string | null;
   rooms: { room_number: string } | null;
-  room_types: { name: string; price_per_night: number; price_half_day?: number | null } | null;
+  room_types: { name: string; price_per_night: number; price_weekend?: number | null; price_half_day?: number | null } | null;
   is_half_day?: boolean;
   additional_info?: { checked_in_at?: string; checked_out_at?: string } | null;
   allRooms: { id: string; room_number: string; room_type_name: string }[];
@@ -174,7 +175,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         guest_count, guest_comment, room_id, room_type_id, is_half_day, client_id,
         additional_info,
         rooms(room_number),
-        room_types(name, price_per_night, price_half_day)
+        room_types(name, price_per_night, price_weekend, price_half_day)
       `)
       .in('id', bookingIds);
 
@@ -446,11 +447,25 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
 
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
-    const dailyRate = booking.is_half_day
-      ? (booking.room_types?.price_half_day ?? (booking.room_types?.price_per_night ?? 0) / 2)
-      : (booking.daily_rate ?? booking.room_types?.price_per_night ?? 0);
     const roomCount = Math.max(booking.allRooms.length, 1);
-    const stayTotal = booking.is_half_day ? dailyRate * roomCount : nights * dailyRate * roomCount;
+    
+    let stayTotal: number;
+    let dailyRate: number;
+    
+    if (booking.is_half_day) {
+      dailyRate = booking.room_types?.price_half_day ?? (booking.room_types?.price_per_night ?? 0) / 2;
+      stayTotal = dailyRate * roomCount;
+    } else if (booking.room_types) {
+      const { totalPrice } = calculateStayPrice(
+        booking.check_in_date, booking.check_out_date, booking.room_types, false
+      );
+      stayTotal = totalPrice * roomCount;
+      dailyRate = nights > 0 ? Math.round(totalPrice / nights) : booking.room_types.price_per_night;
+    } else {
+      dailyRate = booking.daily_rate ?? 0;
+      stayTotal = nights * dailyRate * roomCount;
+    }
+    
     const servicesTotal = servicesTotals[booking.id] || 0;
     const total = stayTotal + servicesTotal;
     const prepayment = parseFloat(prepaymentValues[booking.id]) || 0;

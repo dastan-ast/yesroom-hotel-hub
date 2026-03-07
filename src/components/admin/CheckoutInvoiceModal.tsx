@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { differenceInDays, parseISO, format } from 'date-fns';
+import { calculateStayPrice } from '@/lib/pricingUtils';
 import { ru } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,7 +42,7 @@ interface BookingDetails {
   room_id: string | null;
   room_type_id: string | null;
   rooms: { room_number: string } | null;
-  room_types: { name: string; price_per_night: number } | null;
+  room_types: { name: string; price_per_night: number; price_weekend?: number | null } | null;
 }
 
 interface Props {
@@ -87,7 +88,7 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingIds, hotelId, 
           id, guest_name, guest_phone, check_in_date, check_out_date,
           prepayment_amount, daily_rate, room_id, room_type_id,
           rooms(room_number),
-          room_types(name, price_per_night)
+          room_types(name, price_per_night, price_weekend)
         `)
         .in('id', bookingIds),
       supabase
@@ -103,8 +104,20 @@ export function CheckoutInvoiceModal({ open, onOpenChange, bookingIds, hotelId, 
 
   const getBookingCalc = (booking: BookingDetails) => {
     const nights = differenceInDays(parseISO(booking.check_out_date), parseISO(booking.check_in_date));
-    const dailyRate = booking.daily_rate ?? booking.room_types?.price_per_night ?? 0;
-    const stayTotal = nights * dailyRate;
+    let stayTotal: number;
+    let dailyRate: number;
+    
+    if (booking.room_types) {
+      const { totalPrice } = calculateStayPrice(
+        booking.check_in_date, booking.check_out_date, booking.room_types, false
+      );
+      stayTotal = totalPrice;
+      dailyRate = nights > 0 ? Math.round(totalPrice / nights) : booking.room_types.price_per_night;
+    } else {
+      dailyRate = booking.daily_rate ?? 0;
+      stayTotal = nights * dailyRate;
+    }
+    
     const bookingServices = allServices.filter(s => s.booking_id === booking.id);
     const servicesTotal = bookingServices.reduce((sum, s) => sum + (s.total_price || 0), 0);
     return { nights, dailyRate, stayTotal, servicesTotal, total: stayTotal + servicesTotal };

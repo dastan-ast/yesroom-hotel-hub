@@ -776,6 +776,7 @@ export type Database = {
           name: string
           price_half_day: number | null
           price_per_night: number
+          price_weekend: number | null
           updated_at: string
         }
         Insert: {
@@ -790,6 +791,7 @@ export type Database = {
           name: string
           price_half_day?: number | null
           price_per_night: number
+          price_weekend?: number | null
           updated_at?: string
         }
         Update: {
@@ -804,6 +806,7 @@ export type Database = {
           name?: string
           price_half_day?: number | null
           price_per_night?: number
+          price_weekend?: number | null
           updated_at?: string
         }
         Relationships: [
