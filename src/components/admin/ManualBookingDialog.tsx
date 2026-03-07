@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addDays, differenceInDays } from 'date-fns';
+import { calculateStayPrice } from '@/lib/pricingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
 import { syncBookingToExternal } from '@/lib/syncBooking';
