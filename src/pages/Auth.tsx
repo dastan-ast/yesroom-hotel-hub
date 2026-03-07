@@ -59,6 +59,8 @@ export default function Auth() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [lastResetRequestAt, setLastResetRequestAt] = useState<number>(0);
+  const [resetCooldown, setResetCooldown] = useState(0);
 
   const handleToggleMode = () => {
     loginForm.reset();
@@ -74,6 +76,14 @@ export default function Auth() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResetCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetCooldown]);
 
   useEffect(() => {
     if (isRecoveryMode) return; // don't redirect during password recovery
@@ -141,6 +151,13 @@ export default function Auth() {
       toast.error('Введите email');
       return;
     }
+    const now = Date.now();
+    const elapsed = Math.floor((now - lastResetRequestAt) / 1000);
+    if (lastResetRequestAt && elapsed < 60) {
+      const remaining = 60 - elapsed;
+      toast.error(`Подождите ${remaining} сек. перед повторной отправкой`);
+      return;
+    }
     setForgotLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
@@ -150,6 +167,8 @@ export default function Auth() {
         toast.error(error.message);
       } else {
         toast.success('Ссылка для сброса пароля отправлена на вашу почту');
+        setLastResetRequestAt(Date.now());
+        setResetCooldown(60);
         setIsForgotPassword(false);
         setForgotEmail('');
       }
@@ -382,12 +401,13 @@ export default function Auth() {
                     type="button"
                     variant="link"
                     className="w-full text-sm text-muted-foreground"
+                    disabled={resetCooldown > 0}
                     onClick={() => {
                       setIsForgotPassword(true);
                       setForgotEmail(loginForm.getValues('email'));
                     }}
                   >
-                    Забыли пароль?
+                    {resetCooldown > 0 ? `Забыли пароль? (${resetCooldown}с)` : 'Забыли пароль?'}
                   </Button>
                 </form>
               </Form>
