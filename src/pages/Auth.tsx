@@ -336,6 +336,17 @@ export default function Auth() {
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? t('common.loading') : t('auth.loginButton')}
                   </Button>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-sm text-muted-foreground"
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setForgotEmail(loginForm.getValues('email'));
+                    }}
+                  >
+                    Забыли пароль?
+                  </Button>
                 </form>
               </Form>
             ) : (
