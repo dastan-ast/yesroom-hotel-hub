@@ -93,7 +93,7 @@ export function BookingForm({ hotelId }: BookingFormProps) {
         query = query.eq('hotel_id', hotelId);
       }
       const { data } = await query;
-      if (data) setRoomTypes(data);
+      if (data) setRoomTypes(data as RoomType[]);
 
       // Fetch hotel settings if hotelId exists
       if (hotelId) {
