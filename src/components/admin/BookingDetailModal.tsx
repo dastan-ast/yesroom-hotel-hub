@@ -175,7 +175,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
         guest_count, guest_comment, room_id, room_type_id, is_half_day, client_id,
         additional_info,
         rooms(room_number),
-        room_types(name, price_per_night, price_half_day)
+        room_types(name, price_per_night, price_weekend, price_half_day)
       `)
       .in('id', bookingIds);
 
