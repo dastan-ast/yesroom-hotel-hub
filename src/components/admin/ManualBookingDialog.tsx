@@ -177,9 +177,9 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess, hotelId, pr
   const fetchRoomTypes = async () => {
     const { data } = await supabase
       .from('room_types')
-      .select('id, name, price_per_night, price_half_day')
+      .select('id, name, price_per_night, price_weekend, price_half_day')
       .eq('hotel_id', hotelId);
-    if (data) setRoomTypes(data);
+    if (data) setRoomTypes(data as RoomType[]);
   };
 
   // Client search
