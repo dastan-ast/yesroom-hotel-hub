@@ -16,6 +16,7 @@ interface RoomCardProps {
   name: string;
   description: string | null;
   price?: number;
+  priceWeekend?: number | null;
   capacity: number;
   amenities: string[] | null;
   images: string[] | null;
