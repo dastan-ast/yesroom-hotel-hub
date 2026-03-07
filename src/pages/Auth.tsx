@@ -401,12 +401,13 @@ export default function Auth() {
                     type="button"
                     variant="link"
                     className="w-full text-sm text-muted-foreground"
+                    disabled={resetCooldown > 0}
                     onClick={() => {
                       setIsForgotPassword(true);
                       setForgotEmail(loginForm.getValues('email'));
                     }}
                   >
-                    Забыли пароль?
+                    {resetCooldown > 0 ? `Забыли пароль? (${resetCooldown}с)` : 'Забыли пароль?'}
                   </Button>
                 </form>
               </Form>
