@@ -22,6 +22,22 @@ const statusLabelsRu: Record<BookingStatus, string> = {
   cancelled: "Отменено",
 };
 
+const statusBg: Record<BookingStatus, string> = {
+  pending: "bg-yellow-500",
+  approved: "bg-blue-500",
+  checked_in: "bg-green-500",
+  checked_out: "bg-gray-400",
+  cancelled: "bg-red-400",
+};
+
+const statusBgHex: Record<BookingStatus, string> = {
+  pending: "#eab308",
+  approved: "#3b82f6",
+  checked_in: "#22c55e",
+  checked_out: "#9ca3af",
+  cancelled: "#ef4444",
+};
+
 interface Room {
   id: string;
   room_number: string;
@@ -46,14 +62,6 @@ interface BookingRoomEntry {
   bookings: Booking | null;
 }
 
-const statusBgHex: Record<BookingStatus, string> = {
-  pending: "#eab308cc",
-  approved: "#3b82f6cc",
-  checked_in: "#22c55ecc",
-  checked_out: "#6b728080",
-  cancelled: "#ef444466",
-};
-
 interface Props {
   hotelId: string;
 }
@@ -66,21 +74,19 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   const [startDate, setStartDate] = useState(() => startOfDay(new Date()));
   const [loading, setLoading] = useState(true);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
-  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 4 : 10);
+  const [gridDays, setGridDays] = useState(window.innerWidth < 768 ? 7 : 14);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const handleResize = () => setGridDays(window.innerWidth < 768 ? 4 : 10);
+    const handleResize = () => setGridDays(window.innerWidth < 768 ? 7 : 14);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const days = useMemo(() => {
-    return Array.from({ length: gridDays }, (_, i) => addDays(startDate, i));
-  }, [startDate, gridDays]);
+  const days = useMemo(() => Array.from({ length: gridDays }, (_, i) => addDays(startDate, i)), [startDate, gridDays]);
 
   const dailyStats = useMemo(() => {
     const targetDate = hoveredDate || new Date();
@@ -95,13 +101,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     return { occupancy, checkIns, checkOuts, total: dayBookings.length, date: targetDate };
   }, [bookings, rooms, hoveredDate]);
 
-  const groupedByFloor = useMemo(() => {
-    const map = new Map<number, Room[]>();
-    rooms.forEach((r) => {
-      if (!map.has(r.floor)) map.set(r.floor, []);
-      map.get(r.floor)!.push(r);
-    });
-    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  const sortedRooms = useMemo(() => {
+    return [...rooms].sort((a, b) => a.floor - b.floor || a.room_number.localeCompare(b.room_number));
   }, [rooms]);
 
   useEffect(() => {
@@ -127,9 +128,7 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         .lte("check_in_date", format(endDate, "yyyy-MM-dd")),
       supabase
         .from("booking_rooms")
-        .select(
-          "booking_id, room_id, bookings(id, room_id, check_in_date, check_out_date, status, guest_name, is_half_day)",
-        )
+        .select("booking_id, room_id, bookings(id, room_id, check_in_date, check_out_date, status, guest_name, is_half_day)")
         .eq("hotel_id", hotelId),
     ]);
 
@@ -167,41 +166,27 @@ export function ShahmatkaGrid({ hotelId }: Props) {
     setLoading(false);
   };
 
-  const getCellBookings = (roomId: string, date: Date): { left: Booking | null; right: Booking | null } => {
+  const getCellData = (roomId: string, day: Date) => {
     const bookingIds = bookingRoomMap.get(roomId);
     const candidates =
       bookingIds && bookingIds.size > 0
-        ? (Array.from(bookingIds)
-            .map((id) => bookings.find((b) => b.id === id))
-            .filter(Boolean) as Booking[])
+        ? (Array.from(bookingIds).map((id) => bookings.find((b) => b.id === id)).filter(Boolean) as Booking[])
         : bookings.filter((b) => b.room_id === roomId);
 
-    let leftBooking: Booking | null = null;
-    let rightBooking: Booking | null = null;
+    let checkInBooking: Booking | null = null;
+    let checkOutBooking: Booking | null = null;
+    let midBooking: Booking | null = null;
 
     for (const booking of candidates) {
       if (showOnlyActive && !["pending", "approved", "checked_in"].includes(booking.status)) continue;
+      const ci = parseISO(booking.check_in_date);
+      const co = parseISO(booking.check_out_date);
 
-      const checkIn = parseISO(booking.check_in_date);
-      const checkOut = parseISO(booking.check_out_date);
-
-      if (booking.is_half_day) {
-        if (isSameDay(date, checkIn)) rightBooking = booking;
-        continue;
-      }
-
-      const isCheckInDay = isSameDay(date, checkIn);
-      const isCheckOutDay = isSameDay(date, checkOut);
-      const isBetween = date > checkIn && date < checkOut;
-
-      if (isCheckOutDay) leftBooking = booking;
-      if (isCheckInDay) rightBooking = booking;
-      if (isBetween) {
-        leftBooking = booking;
-        rightBooking = booking;
-      }
+      if (isSameDay(day, ci)) checkInBooking = booking;
+      if (isSameDay(day, co)) checkOutBooking = booking;
+      if (day > ci && day < co) midBooking = booking;
     }
-    return { left: leftBooking, right: rightBooking };
+    return { checkInBooking, checkOutBooking, midBooking };
   };
 
   const handleCellClick = (booking: Booking | null) => {
@@ -217,138 +202,80 @@ export function ShahmatkaGrid({ hotelId }: Props) {
 
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
 
-  const renderRoomRow = (room: Room) => (
-    <tr key={room.id} className="h-12 hover:bg-slate-50/50 transition-colors">
-      <td className="border-b border-r p-2 text-xs font-black sticky left-0 bg-white z-20 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] w-20">
-        <div className="leading-tight">
-          <div>{room.room_number}</div>
-          <div className="text-[9px] font-normal text-muted-foreground truncate">{room.room_types?.name}</div>
-        </div>
-      </td>
-      {days.map((day) => {
-        const { left, right } = getCellBookings(room.id, day);
-        const isSame = left && right && left.id === right.id;
-
-        const renderTooltipBlock = (booking: Booking | null, side: "left" | "right") => {
-          const isFullWidth = isSame;
-          const baseClass = cn(
-            "h-full rounded-sm flex items-center justify-center cursor-pointer overflow-hidden hover:brightness-95 transition-all",
-            isFullWidth ? "w-full" : "w-1/2",
-          );
-
-          if (!booking) {
-            return <div className={baseClass} style={{ backgroundColor: "#f8fafc" }} />;
-          }
-
-          return (
-            <Tooltip key={`${booking.id}-${side}`}>
-              <TooltipTrigger asChild>
-                <div
-                  className={baseClass}
-                  style={{ backgroundColor: statusBgHex[booking.status] }}
-                  onClick={() => handleCellClick(booking)}
-                >
-                  <span className="text-[10px] font-bold text-white truncate px-1">
-                    {booking.guest_name.split(" ")[0]}
-                  </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                <p className="font-semibold">{booking.guest_name}</p>
-                <p className="text-muted-foreground">{statusLabelsRu[booking.status]}</p>
-                <p className="text-muted-foreground">
-                  {format(parseISO(booking.check_in_date), "dd.MM")} —{" "}
-                  {format(parseISO(booking.check_out_date), "dd.MM.yy")}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          );
-        };
-
-        return (
-          <td
-            key={day.toISOString()}
-            className={cn("border-b border-r p-0 relative", isSameDay(day, new Date()) && "bg-primary/[0.02]")}
-          >
-            <div className="flex h-full w-full gap-0.5 p-0.5">
-              {isSame ? (
-                renderTooltipBlock(left, "left")
-              ) : (
-                <>
-                  {renderTooltipBlock(left, "left")}
-                  {renderTooltipBlock(right, "right")}
-                </>
-              )}
-            </div>
-          </td>
-        );
-      })}
-    </tr>
-  );
-
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="flex flex-col h-[calc(100vh-140px)] space-y-3 overflow-hidden px-1">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-xl shadow-sm text-white">
-            <p className="text-[10px] font-bold uppercase opacity-80">Загрузка на {format(dailyStats.date, "dd.MM")}</p>
-            <p className="text-2xl font-black">{dailyStats.occupancy}%</p>
+    <TooltipProvider delayDuration={100}>
+      <div className="flex flex-col h-[calc(100vh-140px)] space-y-2 overflow-hidden px-1">
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-2 shrink-0">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 px-3 py-2 rounded-lg shadow-sm text-white">
+            <p className="text-[9px] font-bold uppercase opacity-80">Загрузка {format(dailyStats.date, "dd.MM")}</p>
+            <p className="text-xl font-black leading-tight">{dailyStats.occupancy}%</p>
           </div>
-          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-green-500">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Заезды</p>
-            <p className="text-2xl font-black text-slate-800">{dailyStats.checkIns}</p>
+          <div className="bg-card px-3 py-2 rounded-lg border shadow-sm border-l-4 border-l-green-500">
+            <p className="text-[9px] text-muted-foreground font-bold uppercase">Заезды</p>
+            <p className="text-xl font-black leading-tight">{dailyStats.checkIns}</p>
           </div>
-          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-orange-400">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Выезды</p>
-            <p className="text-2xl font-black text-slate-800">{dailyStats.checkOuts}</p>
+          <div className="bg-card px-3 py-2 rounded-lg border shadow-sm border-l-4 border-l-orange-400">
+            <p className="text-[9px] text-muted-foreground font-bold uppercase">Выезды</p>
+            <p className="text-xl font-black leading-tight">{dailyStats.checkOuts}</p>
           </div>
-          <div className="bg-white p-3 rounded-xl border shadow-sm border-l-4 border-l-blue-400">
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Проживают</p>
-            <p className="text-2xl font-black text-slate-800">{dailyStats.total}</p>
+          <div className="bg-card px-3 py-2 rounded-lg border shadow-sm border-l-4 border-l-blue-400">
+            <p className="text-[9px] text-muted-foreground font-bold uppercase">Проживают</p>
+            <p className="text-xl font-black leading-tight">{dailyStats.total}</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between bg-slate-100/50 p-1.5 rounded-xl border shrink-0">
+        {/* Controls */}
+        <div className="flex items-center justify-between bg-muted/50 p-1.5 rounded-lg border shrink-0">
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-8 shadow-sm">
-              <Plus className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Бронировать</span>
+            <Button size="sm" onClick={() => setBookingDialogOpen(true)} className="h-7 text-xs shadow-sm">
+              <Plus className="h-3.5 w-3.5 mr-1" /> <span className="hidden sm:inline">Бронировать</span>
             </Button>
-            <div className="flex items-center bg-white rounded-lg p-0.5 shadow-sm border">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrev}>
-                <ChevronLeft className="h-4 w-4" />
+            <div className="flex items-center bg-card rounded-md p-0.5 shadow-sm border">
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handlePrev}>
+                <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
-              <Button variant="ghost" className="h-7 px-3 text-[10px] font-black uppercase" onClick={handleToday}>
+              <Button variant="ghost" className="h-6 px-2 text-[9px] font-black uppercase" onClick={handleToday}>
                 Сегодня
               </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNext}>
-                <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleNext}>
+                <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
-
-          {/* ВОЗВРАЩЕННАЯ КНОПКА АКТИВНОСТИ */}
-          <div className="flex items-center gap-3 bg-white px-3 py-1 rounded-lg border shadow-sm">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="active-filter"
-                checked={showOnlyActive}
-                onCheckedChange={setShowOnlyActive}
-                className="scale-75 data-[state=checked]:bg-green-500"
-              />
-              <Label htmlFor="active-filter" className="text-[10px] font-black text-slate-500 uppercase cursor-pointer">
-                Только активные
-              </Label>
-            </div>
+          <div className="flex items-center gap-2 bg-card px-2 py-1 rounded-md border shadow-sm">
+            <Switch
+              id="active-filter"
+              checked={showOnlyActive}
+              onCheckedChange={setShowOnlyActive}
+              className="scale-75 data-[state=checked]:bg-green-500"
+            />
+            <Label htmlFor="active-filter" className="text-[9px] font-bold text-muted-foreground uppercase cursor-pointer">
+              Активные
+            </Label>
           </div>
         </div>
 
-        <div className="flex-1 relative border rounded-2xl bg-white shadow-xl overflow-hidden min-h-0">
-          <div className="absolute inset-0 overflow-auto scrollbar-thin scrollbar-thumb-slate-200">
-            <table className="w-full border-separate border-spacing-0 table-fixed">
+        {/* Legend */}
+        <div className="flex items-center gap-3 text-[9px] shrink-0 px-1">
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-green-500" /> Заселён</div>
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-blue-500" /> Подтверждён</div>
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-yellow-500" /> Ожидает</div>
+          <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-gray-400" /> Выселен</div>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-sm flex overflow-hidden"><div className="w-1/2 bg-gray-400" /><div className="w-1/2 bg-green-500" /></div>
+            Заезд/выезд
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="flex-1 relative border rounded-xl bg-card shadow-sm overflow-hidden min-h-0">
+          <div className="absolute inset-0 overflow-auto">
+            <table className="text-[10px] border-collapse w-full table-fixed">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-white/95 backdrop-blur-md">
-                  <th className="w-[60px] md:w-[90px] border-b border-r p-2 sticky left-0 z-20 bg-slate-50">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">Room</span>
+                <tr className="bg-muted/80 backdrop-blur-sm">
+                  <th className="sticky left-0 z-20 bg-muted border-b border-r px-2 py-1 text-left font-bold text-muted-foreground uppercase w-[56px] min-w-[56px]">
+                    №
                   </th>
                   {days.map((day) => (
                     <th
@@ -356,39 +283,158 @@ export function ShahmatkaGrid({ hotelId }: Props) {
                       onMouseEnter={() => setHoveredDate(day)}
                       onMouseLeave={() => setHoveredDate(null)}
                       className={cn(
-                        "border-b border-r p-2 text-center transition-all cursor-pointer",
-                        isSameDay(day, new Date()) ? "bg-blue-50" : "hover:bg-slate-50",
-                        hoveredDate && isSameDay(day, hoveredDate) && "bg-blue-100/50",
+                        "border-b border-r px-0 py-1 text-center cursor-pointer min-w-[28px]",
+                        isSameDay(day, new Date()) ? "bg-blue-50 dark:bg-blue-950/30" : "hover:bg-muted/60",
+                        hoveredDate && isSameDay(day, hoveredDate) && "bg-blue-100/50 dark:bg-blue-900/30",
                       )}
                     >
-                      <div className="text-[9px] text-slate-400 font-bold uppercase">
+                      <div className="text-[8px] text-muted-foreground font-medium uppercase leading-tight">
                         {format(day, "EEE", { locale: ru })}
                       </div>
-                      <div
-                        className={cn(
-                          "text-xs md:text-sm font-black",
-                          isSameDay(day, new Date()) ? "text-blue-600" : "text-slate-700",
-                        )}
-                      >
-                        {format(day, "d MMM", { locale: ru })}
+                      <div className={cn(
+                        "text-[11px] font-black leading-tight",
+                        isSameDay(day, new Date()) ? "text-blue-600" : "",
+                      )}>
+                        {format(day, "d", { locale: ru })}
                       </div>
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {groupedByFloor.map(([floor, floorRooms]) => (
-                  <React.Fragment key={`floor-${floor}`}>
-                    <tr>
-                      <td
-                        colSpan={gridDays + 1}
-                        className="bg-slate-50/80 text-[10px] font-black px-4 py-1.5 border-b text-slate-400 uppercase tracking-widest sticky left-0 z-[5] backdrop-blur-sm"
-                      >
-                        Этаж {floor}
-                      </td>
-                    </tr>
-                    {floorRooms.map(renderRoomRow)}
-                  </React.Fragment>
+              <tbody>
+                {sortedRooms.map((room) => (
+                  <tr key={room.id} className="hover:bg-muted/30 transition-colors">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <td className="sticky left-0 z-[5] bg-card border-b border-r px-2 py-0 font-bold whitespace-nowrap w-[56px] cursor-default">
+                          {room.room_number}
+                        </td>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="text-xs">
+                        <p className="font-semibold">{room.room_number}</p>
+                        <p className="text-muted-foreground">{room.room_types?.name || "—"}</p>
+                        <p className="text-muted-foreground">Этаж {room.floor}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    {days.map((day) => {
+                      const { checkInBooking, checkOutBooking, midBooking } = getCellData(room.id, day);
+
+                      // Mid-stay: full cell
+                      if (midBooking) {
+                        return (
+                          <Tooltip key={day.toISOString()}>
+                            <TooltipTrigger asChild>
+                              <td
+                                className="border-b border-r p-0 h-[22px] cursor-pointer"
+                                onClick={() => handleCellClick(midBooking)}
+                              >
+                                <div
+                                  className={`w-full h-full ${statusBg[midBooking.status]} opacity-80 flex items-center justify-center`}
+                                >
+                                  <span className="text-[8px] font-bold text-white truncate px-0.5 leading-none">
+                                    {midBooking.guest_name.split(" ")[0]}
+                                  </span>
+                                </div>
+                              </td>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p className="font-semibold">{midBooking.guest_name}</p>
+                              <p className="text-muted-foreground">{statusLabelsRu[midBooking.status]}</p>
+                              <p className="text-muted-foreground">
+                                {format(parseISO(midBooking.check_in_date), "dd.MM")} — {format(parseISO(midBooking.check_out_date), "dd.MM.yy")}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+
+                      // Check-out + check-in same day (split)
+                      if (checkOutBooking && checkInBooking && checkOutBooking.id !== checkInBooking.id) {
+                        return (
+                          <td key={day.toISOString()} className="border-b border-r p-0 h-[22px]">
+                            <div className="flex w-full h-full">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className={`w-1/2 h-full ${statusBg[checkOutBooking.status]} opacity-60 cursor-pointer`}
+                                    onClick={() => handleCellClick(checkOutBooking)}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  <p className="font-semibold">Выезд: {checkOutBooking.guest_name}</p>
+                                  <p className="text-muted-foreground">{statusLabelsRu[checkOutBooking.status]}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className={`w-1/2 h-full ${statusBg[checkInBooking.status]} opacity-80 cursor-pointer`}
+                                    onClick={() => handleCellClick(checkInBooking)}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  <p className="font-semibold">Заезд: {checkInBooking.guest_name}</p>
+                                  <p className="text-muted-foreground">{statusLabelsRu[checkInBooking.status]}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      // Check-in only (right half)
+                      if (checkInBooking) {
+                        return (
+                          <Tooltip key={day.toISOString()}>
+                            <TooltipTrigger asChild>
+                              <td
+                                className="border-b border-r p-0 h-[22px] cursor-pointer"
+                                onClick={() => handleCellClick(checkInBooking)}
+                              >
+                                <div className="flex w-full h-full">
+                                  <div className="w-1/2 h-full" />
+                                  <div className={`w-1/2 h-full ${statusBg[checkInBooking.status]} opacity-80 rounded-l-sm`} />
+                                </div>
+                              </td>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p className="font-semibold">Заезд: {checkInBooking.guest_name}</p>
+                              <p className="text-muted-foreground">{statusLabelsRu[checkInBooking.status]}</p>
+                              <p className="text-muted-foreground">
+                                {format(parseISO(checkInBooking.check_in_date), "dd.MM")} — {format(parseISO(checkInBooking.check_out_date), "dd.MM.yy")}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+
+                      // Check-out only (left half)
+                      if (checkOutBooking) {
+                        return (
+                          <Tooltip key={day.toISOString()}>
+                            <TooltipTrigger asChild>
+                              <td
+                                className="border-b border-r p-0 h-[22px] cursor-pointer"
+                                onClick={() => handleCellClick(checkOutBooking)}
+                              >
+                                <div className="flex w-full h-full">
+                                  <div className={`w-1/2 h-full ${statusBg[checkOutBooking.status]} opacity-60 rounded-r-sm`} />
+                                  <div className="w-1/2 h-full" />
+                                </div>
+                              </td>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              <p className="font-semibold">Выезд: {checkOutBooking.guest_name}</p>
+                              <p className="text-muted-foreground">{statusLabelsRu[checkOutBooking.status]}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+
+                      // Empty cell
+                      return <td key={day.toISOString()} className="border-b border-r p-0 h-[22px]" />;
+                    })}
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -396,7 +442,6 @@ export function ShahmatkaGrid({ hotelId }: Props) {
         </div>
       </div>
 
-      {/* МОДАЛЬНЫЕ ОКНА ДЛЯ РАБОТЫ КАРТОЧЕК */}
       <ManualBookingDialog
         open={bookingDialogOpen}
         onOpenChange={setBookingDialogOpen}
