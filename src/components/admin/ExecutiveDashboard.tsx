@@ -444,13 +444,7 @@ export function ExecutiveDashboard({ hotelId }: Props) {
     return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">{value} ({percent}%)</text>;
   };
 
-  const getBookingForCell = (roomId: string, day: Date) => {
-    if (!monthlyReportData) return null;
-    return monthlyReportData.shahmatkaBookings.find((b: any) => {
-      if (b.room_id !== roomId) return false;
-      return parseISO(b.check_in_date) <= day && parseISO(b.check_out_date) > day;
-    });
-  };
+  // Removed getBookingForCell — now handled inline with half-day logic
 
   const statusColor = (status: string) => {
     switch (status) { case 'checked_in': return 'bg-green-500'; case 'approved': return 'bg-blue-500'; case 'checked_out': return 'bg-gray-400'; default: return 'bg-yellow-500'; }
