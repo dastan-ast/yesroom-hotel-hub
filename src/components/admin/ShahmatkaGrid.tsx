@@ -304,18 +304,20 @@ export function ShahmatkaGrid({ hotelId }: Props) {
               <tbody>
                 {sortedRooms.map((room) => (
                   <tr key={room.id} className="hover:bg-muted/30 transition-colors">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <td className="sticky left-0 z-[5] bg-card border-b border-r px-2 py-0 font-bold whitespace-nowrap w-[56px] cursor-default">
-                          {room.room_number}
-                        </td>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="text-xs">
-                        <p className="font-semibold">{room.room_number}</p>
-                        <p className="text-muted-foreground">{room.room_types?.name || "—"}</p>
-                        <p className="text-muted-foreground">Этаж {room.floor}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    <td className="sticky left-0 z-[5] bg-card border-b border-r px-0 py-0 font-bold whitespace-nowrap w-[56px]">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="px-2 py-0 w-full h-full cursor-default">
+                            {room.room_number}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="text-xs">
+                          <p className="font-semibold">{room.room_number}</p>
+                          <p className="text-muted-foreground">{room.room_types?.name || "—"}</p>
+                          <p className="text-muted-foreground">Этаж {room.floor}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </td>
                     {days.map((day) => {
                       const { checkInBooking, checkOutBooking, midBooking } = getCellData(room.id, day);
 
