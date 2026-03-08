@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, startOfMonth, endOfMonth, addDays, subDays, parseISO, differenceInDays, startOfDay, eachDayOfInterval, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addDays, subDays, parseISO, differenceInDays, startOfDay, eachDayOfInterval, subMonths, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
