@@ -858,7 +858,26 @@ export function ExecutiveDashboard({ hotelId }: Props) {
             </CardContent>
           </Card>
 
-          {/* Mini Shahmatka */}
+          {/* Recommendations - moved to top */}
+          {d.recs.length > 0 && (
+            <div>
+              <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> Рекомендации</h3>
+              <div className="space-y-3">
+                {d.recs.map((rec: any, i: number) => (
+                  <Card key={i} className={`border-l-4 ${rec.priority === 'high' ? 'border-l-destructive' : rec.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-primary'}`}>
+                    <CardContent className="py-4 flex gap-4">
+                      <div className={`p-2 rounded-lg shrink-0 ${rec.priority === 'high' ? 'bg-destructive/10' : rec.priority === 'medium' ? 'bg-yellow-500/10' : 'bg-primary/10'}`}>
+                        <rec.icon className={`h-5 w-5 ${rec.priority === 'high' ? 'text-destructive' : rec.priority === 'medium' ? 'text-yellow-600' : 'text-primary'}`} />
+                      </div>
+                      <div><h4 className="font-semibold text-sm">{rec.title}</h4><p className="text-sm text-muted-foreground mt-1">{rec.text}</p></div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Mini Shahmatka with half-day coloring */}
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Шахматка — {monthLabel}</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto">
@@ -873,15 +892,51 @@ export function ExecutiveDashboard({ hotelId }: Props) {
                   {d.rooms.slice().sort((a: any, b: any) => a.floor - b.floor || a.room_number.localeCompare(b.room_number)).map((room: any, ri: number, arr: any[]) => {
                     const prevFloor = ri > 0 ? arr[ri - 1].floor : room.floor;
                     return (
-                      <>{room.floor !== prevFloor && <tr key={`f-${room.floor}`}><td colSpan={d.days.length + 1} className="bg-muted/50 border px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">Этаж {room.floor}</td></tr>}
-                        <tr key={room.id}>
+                      <React.Fragment key={room.id}>
+                        {room.floor !== prevFloor && <tr key={`f-${room.floor}`}><td colSpan={d.days.length + 1} className="bg-muted/50 border px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">Этаж {room.floor}</td></tr>}
+                        <tr>
                           <td className="sticky left-0 z-10 bg-background border px-2 py-0.5 font-medium whitespace-nowrap">{room.room_number} <span className="text-muted-foreground font-normal">{room.room_types?.name}</span></td>
                           {d.days.map((day: Date) => {
-                            const b = getBookingForCell(room.id, day);
-                            return <td key={day.toISOString()} className="border p-0 h-5">{b ? <div className={`w-full h-full ${statusColor(b.status)} opacity-80`} title={`${b.guest_name} (${b.status})`} /> : null}</td>;
+                            const dayBookings = d.shahmatkaBookings.filter((b: any) => b.room_id === room.id);
+                            const isCheckIn = dayBookings.find((b: any) => isSameDay(parseISO(b.check_in_date), day));
+                            const isCheckOut = dayBookings.find((b: any) => isSameDay(parseISO(b.check_out_date), day));
+                            const isMid = dayBookings.find((b: any) => parseISO(b.check_in_date) < day && parseISO(b.check_out_date) > day);
+
+                            if (isMid) {
+                              // Full day occupied
+                              return <td key={day.toISOString()} className="border p-0 h-5"><div className={`w-full h-full ${statusColor(isMid.status)} opacity-80`} title={`${isMid.guest_name}`} /></td>;
+                            }
+                            if (isCheckIn && isCheckOut) {
+                              // Check-out morning + check-in afternoon (two different bookings)
+                              return <td key={day.toISOString()} className="border p-0 h-5">
+                                <div className="flex w-full h-full">
+                                  <div className={`w-1/2 h-full ${statusColor(isCheckOut.status)} opacity-60`} title={`Выезд: ${isCheckOut.guest_name}`} />
+                                  <div className={`w-1/2 h-full ${statusColor(isCheckIn.status)} opacity-80`} title={`Заезд: ${isCheckIn.guest_name}`} />
+                                </div>
+                              </td>;
+                            }
+                            if (isCheckIn) {
+                              // Afternoon only (check-in)
+                              return <td key={day.toISOString()} className="border p-0 h-5">
+                                <div className="flex w-full h-full">
+                                  <div className="w-1/2 h-full" />
+                                  <div className={`w-1/2 h-full ${statusColor(isCheckIn.status)} opacity-80 rounded-l-sm`} title={`Заезд: ${isCheckIn.guest_name}`} />
+                                </div>
+                              </td>;
+                            }
+                            if (isCheckOut) {
+                              // Morning only (check-out)
+                              return <td key={day.toISOString()} className="border p-0 h-5">
+                                <div className="flex w-full h-full">
+                                  <div className={`w-1/2 h-full ${statusColor(isCheckOut.status)} opacity-60 rounded-r-sm`} title={`Выезд: ${isCheckOut.guest_name}`} />
+                                  <div className="w-1/2 h-full" />
+                                </div>
+                              </td>;
+                            }
+                            return <td key={day.toISOString()} className="border p-0 h-5" />;
                           })}
                         </tr>
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -890,26 +945,13 @@ export function ExecutiveDashboard({ hotelId }: Props) {
                 <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" /> Заселён</div>
                 <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Подтверждён</div>
                 <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-400" /> Выселен</div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded flex"><div className="w-1/2 bg-gray-400 rounded-l" /><div className="w-1/2 bg-green-500 rounded-r" /></div>
+                  Заезд/выезд
+                </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* Recommendations */}
-          <div>
-            <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> Рекомендации</h3>
-            <div className="space-y-3">
-              {d.recs.map((rec: any, i: number) => (
-                <Card key={i} className={`border-l-4 ${rec.priority === 'high' ? 'border-l-destructive' : rec.priority === 'medium' ? 'border-l-yellow-500' : 'border-l-primary'}`}>
-                  <CardContent className="py-4 flex gap-4">
-                    <div className={`p-2 rounded-lg shrink-0 ${rec.priority === 'high' ? 'bg-destructive/10' : rec.priority === 'medium' ? 'bg-yellow-500/10' : 'bg-primary/10'}`}>
-                      <rec.icon className={`h-5 w-5 ${rec.priority === 'high' ? 'text-destructive' : rec.priority === 'medium' ? 'text-yellow-600' : 'text-primary'}`} />
-                    </div>
-                    <div><h4 className="font-semibold text-sm">{rec.title}</h4><p className="text-sm text-muted-foreground mt-1">{rec.text}</p></div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
 
           {/* Footer */}
           <div className="text-center text-xs text-muted-foreground border-t pt-4">
