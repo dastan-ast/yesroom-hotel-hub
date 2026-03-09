@@ -20,6 +20,7 @@ interface HotelSettings {
 interface HotelData {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   location: string | null;
   logo_url: string | null;
