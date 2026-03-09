@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
 import Onboarding from "./pages/Onboarding";
 import PublicBooking from "./pages/PublicBooking";
+import InstagramBooking from "./pages/InstagramBooking";
 import PendingApproval from "./pages/PendingApproval";
 import HotelProfile from "./pages/HotelProfile";
 import Contacts from "./pages/Contacts";
@@ -35,6 +36,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/book/:hotelSlug" element={<PublicBooking />} />
+              <Route path="/i/:hotelSlug" element={<InstagramBooking />} />
               <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/onboarding" element={<Onboarding />} />

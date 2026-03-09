@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { ImageUpload } from './ImageUpload';
+import { QrCodeWidget } from './QrCodeWidget';
 import { Loader2, CreditCard, MessageCircle } from 'lucide-react';
 
 interface HotelSettings {
@@ -19,6 +20,7 @@ interface HotelSettings {
 interface HotelData {
   id: string;
   name: string;
+  slug: string;
   description: string | null;
   location: string | null;
   logo_url: string | null;
@@ -50,7 +52,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from('hotels')
-      .select('id, name, description, location, logo_url, settings')
+      .select('id, name, slug, description, location, logo_url, settings')
       .eq('id', hotelId)
       .single();
 
@@ -222,6 +224,8 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
         Сохранить
       </Button>
+
+      {hotel && <QrCodeWidget hotelSlug={hotel.slug} hotelName={hotel.name} />}
     </div>
   );
 }
