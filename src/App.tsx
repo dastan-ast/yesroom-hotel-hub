@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
 import Onboarding from "./pages/Onboarding";
 import PublicBooking from "./pages/PublicBooking";
+import InstagramBooking from "./pages/InstagramBooking";
 import PendingApproval from "./pages/PendingApproval";
 import HotelProfile from "./pages/HotelProfile";
 import Contacts from "./pages/Contacts";
