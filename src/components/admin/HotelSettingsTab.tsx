@@ -224,6 +224,8 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
         Сохранить
       </Button>
+
+      {hotel && <QrCodeWidget hotelSlug={hotel.slug} hotelName={hotel.name} />}
     </div>
   );
 }
