@@ -36,6 +36,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/book/:hotelSlug" element={<PublicBooking />} />
+              <Route path="/i/:hotelSlug" element={<InstagramBooking />} />
               <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/onboarding" element={<Onboarding />} />
