@@ -203,8 +203,8 @@ export function ShahmatkaGrid({ hotelId }: Props) {
   if (loading) return <div className="py-8 text-center text-muted-foreground">Загрузка...</div>;
 
   return (
-    <TooltipProvider delayDuration={100}>
-      <div className="flex flex-col h-[calc(100vh-140px)] space-y-2 overflow-hidden px-1">
+    <TooltipProvider delayDuration={200}>
+      <div className="flex flex-col space-y-2 px-1">
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-2 shrink-0">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 px-3 py-2 rounded-lg shadow-sm text-white">
@@ -268,13 +268,12 @@ export function ShahmatkaGrid({ hotelId }: Props) {
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="flex-1 relative border rounded-xl bg-card shadow-sm overflow-hidden min-h-0">
-          <div className="absolute inset-0 overflow-auto">
+        {/* Grid - no scroll, stretches naturally */}
+        <div className="border rounded-xl bg-card shadow-sm overflow-x-auto">
             <table className="text-[10px] border-collapse w-full table-fixed">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-muted/80 backdrop-blur-sm">
-                  <th className="sticky left-0 z-20 bg-muted border-b border-r px-2 py-1 text-left font-bold text-muted-foreground uppercase w-[56px] min-w-[56px]">
+              <thead>
+                <tr className="bg-muted/80">
+                  <th className="bg-muted border-b border-r px-2 py-1 text-left font-bold text-muted-foreground uppercase w-[56px] min-w-[56px]">
                     №
                   </th>
                   {days.map((day) => (
