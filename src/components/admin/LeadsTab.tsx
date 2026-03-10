@@ -112,7 +112,7 @@ export function LeadsTab({ hotelId }: Props) {
       });
       setLeads(sorted as Lead[]);
     }
-    if (allData) setAllLeads(allData as Lead[]);
+    if (allData) setAllLeads(allData as unknown as Lead[]);
     setLoading(false);
   }, [hotelId, statusFilter]);
 
