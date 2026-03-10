@@ -282,6 +282,74 @@ export function LeadsTab({ hotelId }: Props) {
         </Card>
       )}
 
+      {/* UTM Analytics */}
+      {showAnalytics && allLeads.length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <Globe className="h-4 w-4" /> Источники лидов
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {(() => {
+                const sourceCounts: Record<string, number> = {};
+                allLeads.forEach(l => {
+                  sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1;
+                });
+                const sourceLabels: Record<string, string> = {
+                  whatsapp: 'WhatsApp', telegram: 'Telegram', phone: 'Телефон',
+                  walk_in: 'Личный визит', website: 'Сайт', instagram: 'Instagram', other: 'Другое',
+                };
+                return Object.entries(sourceCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([src, count]) => (
+                    <div key={src} className="p-3 bg-muted/50 rounded-lg text-center">
+                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-xs text-muted-foreground">{sourceLabels[src] || src}</div>
+                    </div>
+                  ));
+              })()}
+            </div>
+            {(() => {
+              const utmSources: Record<string, number> = {};
+              const utmCampaigns: Record<string, number> = {};
+              allLeads.forEach(l => {
+                const utm = (l as any).utm_data;
+                if (utm?.utm_source) utmSources[utm.utm_source] = (utmSources[utm.utm_source] || 0) + 1;
+                if (utm?.utm_campaign) utmCampaigns[utm.utm_campaign] = (utmCampaigns[utm.utm_campaign] || 0) + 1;
+              });
+              if (Object.keys(utmSources).length === 0) return null;
+              return (
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase">UTM-метки</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">utm_source</p>
+                      {Object.entries(utmSources).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                        <div key={k} className="flex justify-between text-sm py-0.5">
+                          <span>{k}</span>
+                          <Badge variant="secondary" className="text-[10px]">{v}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(utmCampaigns).length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">utm_campaign</p>
+                        {Object.entries(utmCampaigns).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                          <div key={k} className="flex justify-between text-sm py-0.5">
+                            <span>{k}</span>
+                            <Badge variant="secondary" className="text-[10px]">{v}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Status filters */}
       <div className="flex gap-2 flex-wrap">
         {STATUS_FILTERS.map(f => (
