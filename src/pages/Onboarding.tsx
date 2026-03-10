@@ -138,7 +138,32 @@ export default function Onboarding() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Название отеля *</Label>
+              <Label htmlFor="propertyType">Тип размещения *</Label>
+              <Select
+                value={formData.propertyType}
+                onValueChange={(v) => setFormData({ ...formData, propertyType: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите тип" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map(pt => {
+                    const Icon = pt.icon;
+                    return (
+                      <SelectItem key={pt.value} value={pt.value}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {pt.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Название *</Label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
