@@ -85,15 +85,22 @@ export function LeadsTab({ hotelId }: Props) {
   }, []);
 
   const fetchLeads = useCallback(async () => {
-    const { data } = await supabase
-      .from('leads' as any)
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .eq('status', statusFilter)
-      .order('created_at', { ascending: false });
+    const [{ data }, { data: allData }] = await Promise.all([
+      supabase
+        .from('leads' as any)
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('status', statusFilter)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('leads' as any)
+        .select('id, source, utm_data, created_at, status')
+        .eq('hotel_id', hotelId)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+    ]);
     
     if (data) {
-      // Sort: SLA-violated first for 'new' status
       const sorted = (data as any[]).sort((a, b) => {
         if (statusFilter === 'new') {
           const aViolated = getSlaMinutes(a.created_at) > SLA_MINUTES;
@@ -105,6 +112,7 @@ export function LeadsTab({ hotelId }: Props) {
       });
       setLeads(sorted as Lead[]);
     }
+    if (allData) setAllLeads(allData as Lead[]);
     setLoading(false);
   }, [hotelId, statusFilter]);
 
