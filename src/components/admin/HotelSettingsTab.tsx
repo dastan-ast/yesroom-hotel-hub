@@ -153,12 +153,37 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label>Тип размещения</Label>
+              <Select
+                value={form.property_type}
+                onValueChange={(v) => setForm({ ...form, property_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map(pt => {
+                    const Icon = pt.icon;
+                    return (
+                      <SelectItem key={pt.value} value={pt.value}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {pt.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="name">Название *</Label>
               <Input
                 id="name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Название отеля"
+                placeholder="Название"
               />
             </div>
 
