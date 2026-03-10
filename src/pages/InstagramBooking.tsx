@@ -85,14 +85,15 @@ export default function InstagramBooking() {
       const { error } = await supabase.from('bookings').insert(bookingData);
       if (error) throw error;
 
-      // Create lead with instagram source
+      // Create lead with instagram source + UTM data
       await supabase.from('leads').insert({
         hotel_id: hotel.id,
         phone: phoneMask.value,
         name: guestName.trim() || null,
         source: 'instagram',
         status: 'new',
-      });
+        utm_data: utmData || {},
+      } as any);
 
       setIsSuccess(true);
     } catch {
