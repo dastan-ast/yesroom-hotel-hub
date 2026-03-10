@@ -10,6 +10,7 @@ interface LeadRequest {
   name?: string;
   source?: string;
   notes?: string;
+  utm_data?: Record<string, string>;
 }
 
 Deno.serve(async (req) => {
