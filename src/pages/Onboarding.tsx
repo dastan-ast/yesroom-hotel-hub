@@ -79,6 +79,7 @@ export default function Onboarding() {
           location: formData.location,
           description: formData.description,
           owner_id: user.id,
+          property_type: formData.propertyType,
           settings: { room_count: parseInt(formData.roomCount) || 0 }
         }] as any)
         .select()
