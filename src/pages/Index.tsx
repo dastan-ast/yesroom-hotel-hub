@@ -17,6 +17,7 @@ interface Hotel {
   location: string | null;
   description: string | null;
   logo_url: string | null;
+  property_type: string;
 }
 
 interface HotelWithPrice extends Hotel {
