@@ -9,7 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'sonner';
 import { ImageUpload } from './ImageUpload';
 import { QrCodeWidget } from './QrCodeWidget';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
 import { Loader2, CreditCard, MessageCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface HotelSettings {
   kaspi_id?: string;
