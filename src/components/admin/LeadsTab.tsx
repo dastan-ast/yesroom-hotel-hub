@@ -57,12 +57,14 @@ interface Props {
 export function LeadsTab({ hotelId }: Props) {
   const { user, profile } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('new');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // New lead form
   const [showNewForm, setShowNewForm] = useState(false);
