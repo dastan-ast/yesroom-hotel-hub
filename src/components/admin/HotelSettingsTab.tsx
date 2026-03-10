@@ -49,6 +49,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     description: '',
     location: '',
     logo_url: '' as string | null,
+    property_type: 'hotel',
     kaspi_id: '',
     whatsapp_phone: '',
   });
