@@ -32,6 +32,7 @@ interface HotelData {
   description: string | null;
   location: string | null;
   logo_url: string | null;
+  property_type: string;
   settings: HotelSettings | null;
 }
 
