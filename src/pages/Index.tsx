@@ -187,6 +187,10 @@ const Index = () => {
     return params.toString();
   };
 
+  const filteredHotels = categoryFilter
+    ? hotels.filter(h => h.property_type === categoryFilter)
+    : hotels;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
