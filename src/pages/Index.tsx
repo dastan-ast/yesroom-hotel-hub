@@ -22,6 +22,7 @@ interface Hotel {
 
 interface HotelWithPrice extends Hotel {
   minPrice: number | null;
+  property_type: string;
 }
 
 const Index = () => {
