@@ -63,7 +63,7 @@ const Index = () => {
     // Fetch active hotels from public view (excludes sensitive fields like owner_id)
     const { data: hotelsData, error: hotelsError } = await supabase
       .from('hotels_public')
-      .select('id, name, slug, location, description, logo_url') as any;
+      .select('id, name, slug, location, description, logo_url, property_type') as any;
 
     if (hotelsError) {
       setLoading(false);
