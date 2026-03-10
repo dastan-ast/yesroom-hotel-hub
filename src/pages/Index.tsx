@@ -8,6 +8,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { HotelCard } from '@/components/HotelCard';
 import { Button } from '@/components/ui/button';
 import { Building2, ArrowRight, Star } from 'lucide-react';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
 
 interface Hotel {
   id: string;
