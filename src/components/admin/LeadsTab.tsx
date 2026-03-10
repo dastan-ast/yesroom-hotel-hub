@@ -27,6 +27,7 @@ interface Lead {
   completed_at: string | null;
   booking_id: string | null;
   notes: string | null;
+  utm_data?: Record<string, string> | null;
 }
 
 interface Comment {
