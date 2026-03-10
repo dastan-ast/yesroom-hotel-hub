@@ -71,6 +71,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     } else if (data) {
       const hotelData: HotelData = {
         ...data,
+        property_type: (data as any).property_type || 'hotel',
         settings: data.settings as HotelSettings | null,
       };
       setHotel(hotelData);
@@ -80,6 +81,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         description: hotelData.description || '',
         location: hotelData.location || '',
         logo_url: hotelData.logo_url,
+        property_type: hotelData.property_type || 'hotel',
         kaspi_id: settings.kaspi_id || '',
         whatsapp_phone: settings.whatsapp_phone || '',
       });
