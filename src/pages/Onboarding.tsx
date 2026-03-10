@@ -30,7 +30,8 @@ export default function Onboarding() {
     name: '',
     location: '',
     description: '',
-    roomCount: ''
+    roomCount: '',
+    propertyType: 'hotel',
   });
 
   // Защита страницы: редирект если не авторизован или уже есть отель
