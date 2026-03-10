@@ -128,6 +128,7 @@ Deno.serve(async (req) => {
         source,
         notes: body.notes?.trim() || null,
         status: "new",
+        utm_data: body.utm_data || {},
       })
       .select("id, status")
       .single();
