@@ -62,7 +62,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from('hotels')
-      .select('id, name, slug, description, location, logo_url, settings')
+      .select('id, name, slug, description, location, logo_url, settings, property_type')
       .eq('id', hotelId)
       .single();
 
