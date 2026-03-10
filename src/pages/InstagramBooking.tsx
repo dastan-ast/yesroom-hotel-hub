@@ -27,6 +27,7 @@ interface Hotel {
 export default function InstagramBooking() {
   const { hotelSlug } = useParams();
   const phoneMask = usePhoneMask();
+  const utmData = useUtmParams();
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
