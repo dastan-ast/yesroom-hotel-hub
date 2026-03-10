@@ -109,8 +109,9 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         logo_url: form.logo_url,
+        property_type: form.property_type,
         settings: Object.keys(settings).length > 0 ? settings : null,
-      })
+      } as any)
       .eq('id', hotelId);
 
     if (error) {
