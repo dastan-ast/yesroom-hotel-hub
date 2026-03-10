@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { usePhoneMask } from '@/hooks/usePhoneMask';
+import { useUtmParams } from '@/hooks/useUtmParams';
 import { BookingSuccess } from '@/components/BookingSuccess';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ interface Hotel {
 export default function InstagramBooking() {
   const { hotelSlug } = useParams();
   const phoneMask = usePhoneMask();
+  const utmData = useUtmParams();
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -83,14 +85,15 @@ export default function InstagramBooking() {
       const { error } = await supabase.from('bookings').insert(bookingData);
       if (error) throw error;
 
-      // Create lead with instagram source
+      // Create lead with instagram source + UTM data
       await supabase.from('leads').insert({
         hotel_id: hotel.id,
         phone: phoneMask.value,
         name: guestName.trim() || null,
         source: 'instagram',
         status: 'new',
-      });
+        utm_data: utmData || {},
+      } as any);
 
       setIsSuccess(true);
     } catch {

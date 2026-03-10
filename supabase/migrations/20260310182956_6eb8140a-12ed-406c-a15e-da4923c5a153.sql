@@ -1,0 +1,1 @@
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS utm_data jsonb DEFAULT '{}'::jsonb;

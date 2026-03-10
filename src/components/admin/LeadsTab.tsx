@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { MessageCircle, Phone, Clock, UserCheck, X, Plus, Send, Eye, EyeOff } from 'lucide-react';
+import { MessageCircle, Phone, Clock, UserCheck, X, Plus, Send, Eye, EyeOff, BarChart3, Globe } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -27,6 +27,7 @@ interface Lead {
   completed_at: string | null;
   booking_id: string | null;
   notes: string | null;
+  utm_data?: Record<string, string> | null;
 }
 
 interface Comment {
@@ -56,12 +57,14 @@ interface Props {
 export function LeadsTab({ hotelId }: Props) {
   const { user, profile } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('new');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // New lead form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -82,15 +85,22 @@ export function LeadsTab({ hotelId }: Props) {
   }, []);
 
   const fetchLeads = useCallback(async () => {
-    const { data } = await supabase
-      .from('leads' as any)
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .eq('status', statusFilter)
-      .order('created_at', { ascending: false });
+    const [{ data }, { data: allData }] = await Promise.all([
+      supabase
+        .from('leads' as any)
+        .select('*')
+        .eq('hotel_id', hotelId)
+        .eq('status', statusFilter)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('leads' as any)
+        .select('id, source, utm_data, created_at, status')
+        .eq('hotel_id', hotelId)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+    ]);
     
     if (data) {
-      // Sort: SLA-violated first for 'new' status
       const sorted = (data as any[]).sort((a, b) => {
         if (statusFilter === 'new') {
           const aViolated = getSlaMinutes(a.created_at) > SLA_MINUTES;
@@ -102,6 +112,7 @@ export function LeadsTab({ hotelId }: Props) {
       });
       setLeads(sorted as Lead[]);
     }
+    if (allData) setAllLeads(allData as unknown as Lead[]);
     setLoading(false);
   }, [hotelId, statusFilter]);
 
@@ -229,9 +240,14 @@ export function LeadsTab({ hotelId }: Props) {
         <h2 className="text-2xl font-display font-bold flex items-center gap-2">
           <MessageCircle className="h-6 w-6" /> Лиды
         </h2>
-        <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
-          <Plus className="h-4 w-4 mr-1" /> Новый лид
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowAnalytics(!showAnalytics)}>
+            <BarChart3 className="h-4 w-4 mr-1" /> Аналитика
+          </Button>
+          <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
+            <Plus className="h-4 w-4 mr-1" /> Новый лид
+          </Button>
+        </div>
       </div>
 
       {/* New lead form */}
@@ -262,6 +278,74 @@ export function LeadsTab({ hotelId }: Props) {
               <Button size="sm" onClick={handleCreateLead} disabled={creating}>Создать</Button>
               <Button size="sm" variant="outline" onClick={() => setShowNewForm(false)}>Отмена</Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* UTM Analytics */}
+      {showAnalytics && allLeads.length > 0 && (
+        <Card>
+          <CardContent className="pt-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <Globe className="h-4 w-4" /> Источники лидов
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {(() => {
+                const sourceCounts: Record<string, number> = {};
+                allLeads.forEach(l => {
+                  sourceCounts[l.source] = (sourceCounts[l.source] || 0) + 1;
+                });
+                const sourceLabels: Record<string, string> = {
+                  whatsapp: 'WhatsApp', telegram: 'Telegram', phone: 'Телефон',
+                  walk_in: 'Личный визит', website: 'Сайт', instagram: 'Instagram', other: 'Другое',
+                };
+                return Object.entries(sourceCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([src, count]) => (
+                    <div key={src} className="p-3 bg-muted/50 rounded-lg text-center">
+                      <div className="text-2xl font-bold">{count}</div>
+                      <div className="text-xs text-muted-foreground">{sourceLabels[src] || src}</div>
+                    </div>
+                  ));
+              })()}
+            </div>
+            {(() => {
+              const utmSources: Record<string, number> = {};
+              const utmCampaigns: Record<string, number> = {};
+              allLeads.forEach(l => {
+                const utm = (l as any).utm_data;
+                if (utm?.utm_source) utmSources[utm.utm_source] = (utmSources[utm.utm_source] || 0) + 1;
+                if (utm?.utm_campaign) utmCampaigns[utm.utm_campaign] = (utmCampaigns[utm.utm_campaign] || 0) + 1;
+              });
+              if (Object.keys(utmSources).length === 0) return null;
+              return (
+                <div className="mt-4 space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase">UTM-метки</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">utm_source</p>
+                      {Object.entries(utmSources).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                        <div key={k} className="flex justify-between text-sm py-0.5">
+                          <span>{k}</span>
+                          <Badge variant="secondary" className="text-[10px]">{v}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                    {Object.keys(utmCampaigns).length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">utm_campaign</p>
+                        {Object.entries(utmCampaigns).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                          <div key={k} className="flex justify-between text-sm py-0.5">
+                            <span>{k}</span>
+                            <Badge variant="secondary" className="text-[10px]">{v}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
@@ -374,6 +458,21 @@ export function LeadsTab({ hotelId }: Props) {
                     </div>
                   )}
                 </div>
+
+                {/* UTM data */}
+                {selectedLead.utm_data && Object.keys(selectedLead.utm_data).length > 0 && (
+                  <div className="p-2 bg-muted/50 rounded text-xs space-y-1">
+                    <span className="font-medium flex items-center gap-1">
+                      <Globe className="h-3 w-3" /> UTM-метки
+                    </span>
+                    {Object.entries(selectedLead.utm_data).map(([k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <span className="text-muted-foreground">{k}:</span>
+                        <span>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-2 flex-wrap">

@@ -642,6 +642,7 @@ export type Database = {
           phone: string
           source: string
           status: string
+          utm_data: Json | null
         }
         Insert: {
           admin_id?: string | null
@@ -656,6 +657,7 @@ export type Database = {
           phone: string
           source?: string
           status?: string
+          utm_data?: Json | null
         }
         Update: {
           admin_id?: string | null
@@ -670,6 +672,7 @@ export type Database = {
           phone?: string
           source?: string
           status?: string
+          utm_data?: Json | null
         }
         Relationships: [
           {
