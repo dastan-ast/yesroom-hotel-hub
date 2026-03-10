@@ -8,6 +8,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { HotelCard } from '@/components/HotelCard';
 import { Button } from '@/components/ui/button';
 import { Building2, ArrowRight, Star } from 'lucide-react';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
 
 interface Hotel {
   id: string;
@@ -16,10 +17,12 @@ interface Hotel {
   location: string | null;
   description: string | null;
   logo_url: string | null;
+  property_type: string;
 }
 
 interface HotelWithPrice extends Hotel {
   minPrice: number | null;
+  property_type: string;
 }
 
 const Index = () => {
@@ -28,6 +31,7 @@ const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // Редирект удалён - теперь происходит централизованно из Auth.tsx
 
@@ -60,7 +64,7 @@ const Index = () => {
     // Fetch active hotels from public view (excludes sensitive fields like owner_id)
     const { data: hotelsData, error: hotelsError } = await supabase
       .from('hotels_public')
-      .select('id, name, slug, location, description, logo_url') as any;
+      .select('id, name, slug, location, description, logo_url, property_type') as any;
 
     if (hotelsError) {
       setLoading(false);
@@ -184,6 +188,10 @@ const Index = () => {
     return params.toString();
   };
 
+  const filteredHotels = categoryFilter
+    ? hotels.filter(h => h.property_type === categoryFilter)
+    : hotels;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -270,15 +278,46 @@ const Index = () => {
       {/* Hotels Grid */}
       <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-2xl md:text-3xl font-display font-bold">
-                Доступные отели
+                Доступные варианты
               </h2>
               <p className="text-muted-foreground mt-1">
-                {hotels.length} {hotels.length === 1 ? 'отель' : hotels.length < 5 ? 'отеля' : 'отелей'} найдено
+                {filteredHotels.length} {filteredHotels.length === 1 ? 'вариант' : filteredHotels.length < 5 ? 'варианта' : 'вариантов'} найдено
               </p>
             </div>
+          </div>
+
+          {/* Category filter tabs */}
+          <div className="flex gap-2 flex-wrap mb-8">
+            <Button
+              size="sm"
+              variant={categoryFilter === null ? 'default' : 'outline'}
+              onClick={() => setCategoryFilter(null)}
+              className="gap-1.5"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              Все
+            </Button>
+            {PROPERTY_TYPES.map(pt => {
+              const Icon = pt.icon;
+              const count = hotels.filter(h => h.property_type === pt.value).length;
+              if (count === 0) return null;
+              return (
+                <Button
+                  key={pt.value}
+                  size="sm"
+                  variant={categoryFilter === pt.value ? 'default' : 'outline'}
+                  onClick={() => setCategoryFilter(pt.value)}
+                  className="gap-1.5"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {pt.label}
+                  <span className="text-xs opacity-70">({count})</span>
+                </Button>
+              );
+            })}
           </div>
 
           {loading ? (
@@ -294,9 +333,9 @@ const Index = () => {
                 </div>
               ))}
             </div>
-          ) : hotels.length > 0 ? (
+          ) : filteredHotels.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-              {hotels.map((hotel, index) => (
+              {filteredHotels.map((hotel, index) => (
                 <div
                   key={hotel.id}
                   className="animate-fade-in"
@@ -310,6 +349,7 @@ const Index = () => {
                     description={hotel.description}
                     logoUrl={hotel.logo_url}
                     minPrice={hotel.minPrice}
+                    propertyType={hotel.property_type}
                     searchParams={getSearchParamsString()}
                   />
                 </div>

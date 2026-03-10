@@ -1,0 +1,1 @@
+ALTER TABLE public.hotels ADD COLUMN property_type text NOT NULL DEFAULT 'hotel';

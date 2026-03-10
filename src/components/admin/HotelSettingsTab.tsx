@@ -9,7 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'sonner';
 import { ImageUpload } from './ImageUpload';
 import { QrCodeWidget } from './QrCodeWidget';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
 import { Loader2, CreditCard, MessageCircle } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface HotelSettings {
   kaspi_id?: string;
@@ -24,6 +32,7 @@ interface HotelData {
   description: string | null;
   location: string | null;
   logo_url: string | null;
+  property_type: string;
   settings: HotelSettings | null;
 }
 
@@ -40,6 +49,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     description: '',
     location: '',
     logo_url: '' as string | null,
+    property_type: 'hotel',
     kaspi_id: '',
     whatsapp_phone: '',
   });
@@ -52,7 +62,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     setLoading(true);
     const { data, error } = await supabase
       .from('hotels')
-      .select('id, name, slug, description, location, logo_url, settings')
+      .select('id, name, slug, description, location, logo_url, settings, property_type')
       .eq('id', hotelId)
       .single();
 
@@ -61,6 +71,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
     } else if (data) {
       const hotelData: HotelData = {
         ...data,
+        property_type: (data as any).property_type || 'hotel',
         settings: data.settings as HotelSettings | null,
       };
       setHotel(hotelData);
@@ -70,6 +81,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         description: hotelData.description || '',
         location: hotelData.location || '',
         logo_url: hotelData.logo_url,
+        property_type: hotelData.property_type || 'hotel',
         kaspi_id: settings.kaspi_id || '',
         whatsapp_phone: settings.whatsapp_phone || '',
       });
@@ -97,8 +109,9 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
         description: form.description.trim() || null,
         location: form.location.trim() || null,
         logo_url: form.logo_url,
+        property_type: form.property_type,
         settings: Object.keys(settings).length > 0 ? settings : null,
-      })
+      } as any)
       .eq('id', hotelId);
 
     if (error) {
@@ -140,12 +153,37 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label>Тип размещения</Label>
+              <Select
+                value={form.property_type}
+                onValueChange={(v) => setForm({ ...form, property_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map(pt => {
+                    const Icon = pt.icon;
+                    return (
+                      <SelectItem key={pt.value} value={pt.value}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {pt.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="name">Название *</Label>
               <Input
                 id="name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Название отеля"
+                placeholder="Название"
               />
             </div>
 

@@ -11,6 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast';
 import { Building2, MapPin, Hash } from 'lucide-react';
 import { OnboardingStepper } from '@/components/OnboardingStepper';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function Onboarding() {
   const { t } = useTranslation();
@@ -22,7 +30,8 @@ export default function Onboarding() {
     name: '',
     location: '',
     description: '',
-    roomCount: ''
+    roomCount: '',
+    propertyType: 'hotel',
   });
 
   // Защита страницы: редирект если не авторизован или уже есть отель
@@ -70,6 +79,7 @@ export default function Onboarding() {
           location: formData.location,
           description: formData.description,
           owner_id: user.id,
+          property_type: formData.propertyType,
           settings: { room_count: parseInt(formData.roomCount) || 0 }
         }] as any)
         .select()
@@ -128,7 +138,32 @@ export default function Onboarding() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Название отеля *</Label>
+              <Label htmlFor="propertyType">Тип размещения *</Label>
+              <Select
+                value={formData.propertyType}
+                onValueChange={(v) => setFormData({ ...formData, propertyType: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите тип" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map(pt => {
+                    const Icon = pt.icon;
+                    return (
+                      <SelectItem key={pt.value} value={pt.value}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4" />
+                          {pt.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Название *</Label>
               <div className="relative">
                 <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input

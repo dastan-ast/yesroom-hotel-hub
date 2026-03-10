@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Building2, MapPin } from 'lucide-react';
+import { getPropertyTypeLabel, getPropertyTypeIcon } from '@/lib/propertyTypes';
 
 interface HotelCardProps {
   id: string;
@@ -11,6 +12,7 @@ interface HotelCardProps {
   description: string | null;
   logoUrl: string | null;
   minPrice: number | null;
+  propertyType?: string;
   searchParams?: string;
 }
 
@@ -22,9 +24,11 @@ export function HotelCard({
   description,
   logoUrl,
   minPrice,
+  propertyType = 'hotel',
   searchParams = '',
 }: HotelCardProps) {
   const hotelUrl = `/hotels/${slug}${searchParams ? `?${searchParams}` : ''}`;
+  const TypeIcon = getPropertyTypeIcon(propertyType);
 
   return (
     <Link to={hotelUrl} className="block h-full">
@@ -41,6 +45,10 @@ export function HotelCard({
               <Building2 className="h-16 w-16 text-muted-foreground/50" />
             </div>
           )}
+          <Badge variant="secondary" className="absolute top-3 left-3 text-[10px] gap-1">
+            <TypeIcon className="h-3 w-3" />
+            {getPropertyTypeLabel(propertyType)}
+          </Badge>
           {minPrice && (
             <Badge className="absolute bottom-3 right-3 bg-accent text-accent-foreground shadow-lg">
               от {minPrice.toLocaleString()} ₸

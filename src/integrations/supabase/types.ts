@@ -589,6 +589,7 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_id: string | null
+          property_type: string
           settings: Json | null
           slug: string
           status: string
@@ -604,6 +605,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           owner_id?: string | null
+          property_type?: string
           settings?: Json | null
           slug: string
           status?: string
@@ -619,6 +621,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           owner_id?: string | null
+          property_type?: string
           settings?: Json | null
           slug?: string
           status?: string
@@ -1147,6 +1150,7 @@ export type Database = {
           location: string | null
           logo_url: string | null
           name: string | null
+          property_type: string | null
           settings: Json | null
           slug: string | null
           status: string | null
@@ -1160,7 +1164,8 @@ export type Database = {
           location?: string | null
           logo_url?: string | null
           name?: string | null
-          settings?: never
+          property_type?: string | null
+          settings?: Json | null
           slug?: string | null
           status?: string | null
           subscription_status?: string | null
@@ -1173,7 +1178,8 @@ export type Database = {
           location?: string | null
           logo_url?: string | null
           name?: string | null
-          settings?: never
+          property_type?: string | null
+          settings?: Json | null
           slug?: string | null
           status?: string | null
           subscription_status?: string | null
