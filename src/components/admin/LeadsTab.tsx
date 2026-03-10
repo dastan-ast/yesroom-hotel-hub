@@ -459,6 +459,21 @@ export function LeadsTab({ hotelId }: Props) {
                   )}
                 </div>
 
+                {/* UTM data */}
+                {selectedLead.utm_data && Object.keys(selectedLead.utm_data).length > 0 && (
+                  <div className="p-2 bg-muted/50 rounded text-xs space-y-1">
+                    <span className="font-medium flex items-center gap-1">
+                      <Globe className="h-3 w-3" /> UTM-метки
+                    </span>
+                    {Object.entries(selectedLead.utm_data).map(([k, v]) => (
+                      <div key={k} className="flex gap-2">
+                        <span className="text-muted-foreground">{k}:</span>
+                        <span>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-2 flex-wrap">
                   {selectedLead.status === 'new' && (
