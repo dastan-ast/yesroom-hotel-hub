@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { MessageCircle, Phone, Clock, UserCheck, X, Plus, Send, Eye, EyeOff } from 'lucide-react';
+import { MessageCircle, Phone, Clock, UserCheck, X, Plus, Send, Eye, EyeOff, BarChart3, Globe } from 'lucide-react';
 import { ManualBookingDialog } from './ManualBookingDialog';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
