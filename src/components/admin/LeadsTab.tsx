@@ -240,9 +240,14 @@ export function LeadsTab({ hotelId }: Props) {
         <h2 className="text-2xl font-display font-bold flex items-center gap-2">
           <MessageCircle className="h-6 w-6" /> Лиды
         </h2>
-        <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
-          <Plus className="h-4 w-4 mr-1" /> Новый лид
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowAnalytics(!showAnalytics)}>
+            <BarChart3 className="h-4 w-4 mr-1" /> Аналитика
+          </Button>
+          <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
+            <Plus className="h-4 w-4 mr-1" /> Новый лид
+          </Button>
+        </div>
       </div>
 
       {/* New lead form */}
