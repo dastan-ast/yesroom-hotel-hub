@@ -30,6 +30,7 @@ const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [hotels, setHotels] = useState<HotelWithPrice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   // Редирект удалён - теперь происходит централизованно из Auth.tsx
 
