@@ -11,6 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast';
 import { Building2, MapPin, Hash } from 'lucide-react';
 import { OnboardingStepper } from '@/components/OnboardingStepper';
+import { PROPERTY_TYPES } from '@/lib/propertyTypes';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function Onboarding() {
   const { t } = useTranslation();
