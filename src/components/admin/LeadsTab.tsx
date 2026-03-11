@@ -280,7 +280,7 @@ export function LeadsTab({ hotelId }: Props) {
       )}
 
       {/* UTM Analytics */}
-      {showAnalytics && allLeads.length > 0 && (
+      {allLeads.length > 0 && (
         <Card>
           <CardContent className="pt-4">
             <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
