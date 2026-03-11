@@ -429,19 +429,7 @@ function AdminDashboardContent({
                 )}
 
                 {activeTab === 'services' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ServiceLogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {activeTab === 'service-catalog' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ServiceCatalogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
+                  <ServiceLogWithCatalog hotelId={hotelId} />
                 )}
 
                 {activeTab === 'integrations' && (
