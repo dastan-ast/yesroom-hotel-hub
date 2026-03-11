@@ -64,7 +64,7 @@ export function LeadsTab({ hotelId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  
 
   // New lead form
   const [showNewForm, setShowNewForm] = useState(false);
@@ -241,9 +241,6 @@ export function LeadsTab({ hotelId }: Props) {
           <MessageCircle className="h-6 w-6" /> Лиды
         </h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowAnalytics(!showAnalytics)}>
-            <BarChart3 className="h-4 w-4 mr-1" /> Аналитика
-          </Button>
           <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
             <Plus className="h-4 w-4 mr-1" /> Новый лид
           </Button>
@@ -283,7 +280,7 @@ export function LeadsTab({ hotelId }: Props) {
       )}
 
       {/* UTM Analytics */}
-      {showAnalytics && allLeads.length > 0 && (
+      {allLeads.length > 0 && (
         <Card>
           <CardContent className="pt-4">
             <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">

@@ -7,7 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, BookOpen, Shield, BarChart3, CreditCard, ScrollText, MessageCircle } from 'lucide-react';
+import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, Shield, BarChart3, CreditCard, MessageCircle, List, BookOpen } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -24,7 +25,7 @@ import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
 import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
-import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
+
 import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
 import { LeadsTab } from '@/components/admin/LeadsTab';
 import { AdminKpiTab } from '@/components/admin/AdminKpiTab';
@@ -57,17 +58,14 @@ export default function AdminDashboard() {
     
     { id: 'leads', icon: MessageCircle, label: 'Лиды', permission: 'bookings' },
     { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
-    { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
     { id: 'rooms', icon: DoorOpen, label: t('admin.rooms'), permission: 'rooms' },
     { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes'), permission: 'room_types' },
     { id: 'clients', icon: Users, label: t('admin.clients'), permission: 'clients' },
-    { id: 'services', icon: Coffee, label: 'Журнал услуг', permission: 'services' },
-    { id: 'service-catalog', icon: BookOpen, label: 'Справочник услуг', permission: 'service_catalog' },
+    { id: 'services', icon: Coffee, label: 'Услуги', permission: 'services' },
     { id: 'integrations', icon: Key, label: 'Интеграции', permission: 'integrations' },
     { id: 'settings', icon: Settings, label: 'Настройки отеля', permission: 'settings' },
     { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
     { id: 'subscription', icon: CreditCard, label: 'Подписка', permission: null, ownerOnly: true },
-    { id: 'activity-log', icon: ScrollText, label: 'Журнал действий', permission: null, ownerOnly: true },
     { id: 'admin-kpi', icon: BarChart3, label: 'KPI Админов', permission: null, ownerOnly: true },
     { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
   ];
@@ -403,19 +401,7 @@ function AdminDashboardContent({
                   <LeadsTab hotelId={hotelId} />
                 )}
                 {activeTab === 'bookings' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <BookingsTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {activeTab === 'shahmatka' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ShahmatkaGrid hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
+                  <BookingsWithShahmatka hotelId={hotelId} />
                 )}
 
                 {activeTab === 'rooms' && (
@@ -443,19 +429,7 @@ function AdminDashboardContent({
                 )}
 
                 {activeTab === 'services' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ServiceLogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {activeTab === 'service-catalog' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ServiceCatalogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
+                  <ServiceLogWithCatalog hotelId={hotelId} />
                 )}
 
                 {activeTab === 'integrations' && (
@@ -478,13 +452,7 @@ function AdminDashboardContent({
                   <SubscriptionTab hotelId={hotelId} />
                 )}
 
-                {activeTab === 'activity-log' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ActivityLogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
+                
 
                 {activeTab === 'admin-kpi' && (
                   <AdminKpiTab hotelId={hotelId} />
@@ -504,5 +472,65 @@ function AdminDashboardContent({
           </div>
         </SidebarInset>
       </div>
+  );
+}
+
+/** Unified Bookings + Shahmatka with List/Grid toggle */
+function BookingsWithShahmatka({ hotelId }: { hotelId: string }) {
+  const [viewMode, setViewMode] = useState<string>('list');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v)} size="sm">
+          <ToggleGroupItem value="list" className="gap-1.5">
+            <List className="h-4 w-4" />
+            Список
+          </ToggleGroupItem>
+          <ToggleGroupItem value="grid" className="gap-1.5">
+            <Grid3X3 className="h-4 w-4" />
+            Сетка
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <Card>
+        <CardContent className="pt-6">
+          {viewMode === 'list' ? (
+            <BookingsTab hotelId={hotelId} />
+          ) : (
+            <ShahmatkaGrid hotelId={hotelId} />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/** Services tab with embedded catalog toggle */
+function ServiceLogWithCatalog({ hotelId }: { hotelId: string }) {
+  const [showCatalog, setShowCatalog] = useState(false);
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <ToggleGroup type="single" value={showCatalog ? 'catalog' : 'log'} onValueChange={(v) => v && setShowCatalog(v === 'catalog')} size="sm">
+            <ToggleGroupItem value="log" className="gap-1.5">
+              <Coffee className="h-4 w-4" />
+              Журнал
+            </ToggleGroupItem>
+            <ToggleGroupItem value="catalog" className="gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              Справочник
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        {showCatalog ? (
+          <ServiceCatalogTab hotelId={hotelId} />
+        ) : (
+          <ServiceLogTab hotelId={hotelId} />
+        )}
+      </CardContent>
+    </Card>
   );
 }
