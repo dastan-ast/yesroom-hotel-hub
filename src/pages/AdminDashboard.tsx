@@ -25,7 +25,7 @@ import { ServiceStatsWidget } from '@/components/admin/ServiceStatsWidget';
 import { ExecutiveDashboard } from '@/components/admin/ExecutiveDashboard';
 import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
-import { ActivityLogTab } from '@/components/admin/ActivityLogTab';
+
 import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
 import { LeadsTab } from '@/components/admin/LeadsTab';
 import { AdminKpiTab } from '@/components/admin/AdminKpiTab';
