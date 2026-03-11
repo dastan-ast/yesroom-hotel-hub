@@ -64,7 +64,7 @@ export function LeadsTab({ hotelId }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [sendingComment, setSendingComment] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  
 
   // New lead form
   const [showNewForm, setShowNewForm] = useState(false);
