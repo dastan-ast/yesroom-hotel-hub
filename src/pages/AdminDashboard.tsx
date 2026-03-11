@@ -452,13 +452,7 @@ function AdminDashboardContent({
                   <SubscriptionTab hotelId={hotelId} />
                 )}
 
-                {activeTab === 'activity-log' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ActivityLogTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
+                
 
                 {activeTab === 'admin-kpi' && (
                   <AdminKpiTab hotelId={hotelId} />
