@@ -57,17 +57,14 @@ export default function AdminDashboard() {
     
     { id: 'leads', icon: MessageCircle, label: 'Лиды', permission: 'bookings' },
     { id: 'bookings', icon: CalendarDays, label: t('admin.bookingQueue'), permission: 'bookings' },
-    { id: 'shahmatka', icon: Grid3X3, label: t('admin.shahmatka'), permission: 'shahmatka' },
     { id: 'rooms', icon: DoorOpen, label: t('admin.rooms'), permission: 'rooms' },
     { id: 'room-types', icon: BedDouble, label: t('admin.roomTypes'), permission: 'room_types' },
     { id: 'clients', icon: Users, label: t('admin.clients'), permission: 'clients' },
-    { id: 'services', icon: Coffee, label: 'Журнал услуг', permission: 'services' },
-    { id: 'service-catalog', icon: BookOpen, label: 'Справочник услуг', permission: 'service_catalog' },
+    { id: 'services', icon: Coffee, label: 'Услуги', permission: 'services' },
     { id: 'integrations', icon: Key, label: 'Интеграции', permission: 'integrations' },
     { id: 'settings', icon: Settings, label: 'Настройки отеля', permission: 'settings' },
     { id: 'staff', icon: Shield, label: 'Персонал', permission: 'staff', ownerOnly: true },
     { id: 'subscription', icon: CreditCard, label: 'Подписка', permission: null, ownerOnly: true },
-    { id: 'activity-log', icon: ScrollText, label: 'Журнал действий', permission: null, ownerOnly: true },
     { id: 'admin-kpi', icon: BarChart3, label: 'KPI Админов', permission: null, ownerOnly: true },
     { id: 'help', icon: HelpCircle, label: 'Справка', permission: null },
   ];
