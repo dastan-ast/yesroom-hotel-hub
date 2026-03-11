@@ -401,19 +401,7 @@ function AdminDashboardContent({
                   <LeadsTab hotelId={hotelId} />
                 )}
                 {activeTab === 'bookings' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <BookingsTab hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
-                )}
-
-                {activeTab === 'shahmatka' && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <ShahmatkaGrid hotelId={hotelId} />
-                    </CardContent>
-                  </Card>
+                  <BookingsWithShahmatka hotelId={hotelId} />
                 )}
 
                 {activeTab === 'rooms' && (
