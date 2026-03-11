@@ -241,9 +241,6 @@ export function LeadsTab({ hotelId }: Props) {
           <MessageCircle className="h-6 w-6" /> Лиды
         </h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowAnalytics(!showAnalytics)}>
-            <BarChart3 className="h-4 w-4 mr-1" /> Аналитика
-          </Button>
           <Button size="sm" onClick={() => setShowNewForm(!showNewForm)}>
             <Plus className="h-4 w-4 mr-1" /> Новый лид
           </Button>
