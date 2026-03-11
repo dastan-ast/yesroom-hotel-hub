@@ -474,3 +474,63 @@ function AdminDashboardContent({
       </div>
   );
 }
+
+/** Unified Bookings + Shahmatka with List/Grid toggle */
+function BookingsWithShahmatka({ hotelId }: { hotelId: string }) {
+  const [viewMode, setViewMode] = useState<string>('list');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v)} size="sm">
+          <ToggleGroupItem value="list" className="gap-1.5">
+            <List className="h-4 w-4" />
+            Список
+          </ToggleGroupItem>
+          <ToggleGroupItem value="grid" className="gap-1.5">
+            <Grid3X3 className="h-4 w-4" />
+            Сетка
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <Card>
+        <CardContent className="pt-6">
+          {viewMode === 'list' ? (
+            <BookingsTab hotelId={hotelId} />
+          ) : (
+            <ShahmatkaGrid hotelId={hotelId} />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/** Services tab with embedded catalog toggle */
+function ServiceLogWithCatalog({ hotelId }: { hotelId: string }) {
+  const [showCatalog, setShowCatalog] = useState(false);
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <ToggleGroup type="single" value={showCatalog ? 'catalog' : 'log'} onValueChange={(v) => v && setShowCatalog(v === 'catalog')} size="sm">
+            <ToggleGroupItem value="log" className="gap-1.5">
+              <Coffee className="h-4 w-4" />
+              Журнал
+            </ToggleGroupItem>
+            <ToggleGroupItem value="catalog" className="gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              Справочник
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        {showCatalog ? (
+          <ServiceCatalogTab hotelId={hotelId} />
+        ) : (
+          <ServiceLogTab hotelId={hotelId} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
