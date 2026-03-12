@@ -452,9 +452,22 @@ function AdminDashboardContent({
 
               {showLiveFeed && (
                 <div className="w-80 border-l p-4 hidden lg:block">
-                  <LiveFeedSidebar hotelId={hotelId} onBookingUpdated={fetchStats} />
+                  <LiveFeedSidebar hotelId={hotelId} onBookingUpdated={fetchStats} onBookingClick={handleBookingClick} />
                 </div>
               )}
+            </main>
+          </div>
+
+          {/* Global Booking Detail Modal */}
+          {detailBookingId && (
+            <BookingDetailModal
+              open={!!detailBookingId}
+              onOpenChange={(open) => { if (!open) setDetailBookingId(null); }}
+              bookingIds={[detailBookingId]}
+              hotelId={hotelId}
+              onUpdate={fetchStats}
+            />
+          )}
             </main>
           </div>
         </SidebarInset>
