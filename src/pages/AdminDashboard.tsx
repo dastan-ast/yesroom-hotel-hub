@@ -202,11 +202,22 @@ function AdminDashboardContent({
   subscriptionStatus, trialEndsAt, canAccessModule, fetchStats, t,
 }: any) {
   const { setOpen } = useSidebar();
+  const [detailBookingId, setDetailBookingId] = useState<string | null>(null);
+  const [bookingsFilter, setBookingsFilter] = useState<string | undefined>(undefined);
 
   const handleMenuClick = (id: string) => {
     setActiveTab(id);
     setOpen(false);
   };
+
+  const handleBookingClick = useCallback((bookingId: string) => {
+    setDetailBookingId(bookingId);
+  }, []);
+
+  const handleOverdueNavigate = useCallback(() => {
+    setBookingsFilter('overdue');
+    setActiveTab('bookings');
+  }, [setActiveTab]);
 
   return (
     <div className="min-h-screen flex w-full">
