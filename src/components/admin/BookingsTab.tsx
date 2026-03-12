@@ -37,6 +37,7 @@ import { BookingDetailModal } from './BookingDetailModal';
 import { checkRoomAvailability } from '@/lib/checkRoomAvailability';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
+type FilterStatus = BookingStatus | 'all' | 'overdue';
 
 interface Booking {
   id: string;
