@@ -225,11 +225,11 @@ export function LiveFeedSidebar({ hotelId, onBookingUpdated, onBookingClick }: P
           overdue ? 'bg-destructive/10 border-destructive/50' : 'bg-muted/50 border-border'
         }`}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+      <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 cursor-pointer" onClick={() => onBookingClick?.(booking.id)}>
             <div className="flex items-center gap-1">
               {overdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
-              <p className={`font-medium text-sm truncate ${overdue ? 'text-destructive' : ''}`}>{booking.guest_name}</p>
+              <p className={`font-medium text-sm truncate hover:underline ${overdue ? 'text-destructive' : ''}`}>{booking.guest_name}</p>
             </div>
             {booking.guest_phone ? (
               <a href={`tel:${formatPhone(booking.guest_phone)}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1">
