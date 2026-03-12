@@ -635,6 +635,7 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
       <div className="flex flex-wrap gap-1.5">
         {([
           { value: 'all' as const, label: 'Все', badge: undefined as number | undefined },
+          { value: 'overdue' as const, label: '⚠ Просрочено', badge: overdueCount > 0 ? overdueCount : undefined as number | undefined },
           { value: 'pending' as const, label: 'Ожидает', badge: pendingCount as number | undefined },
           { value: 'approved' as const, label: 'Подтверждено', badge: undefined as number | undefined },
           { value: 'checked_in' as const, label: 'Заселён', badge: undefined as number | undefined },
