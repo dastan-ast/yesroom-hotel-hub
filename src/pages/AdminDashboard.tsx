@@ -350,43 +350,15 @@ function AdminDashboardContent({
                       </Card>
                     </div>
 
-                    {/* Owner: checkout amount adjustments */}
+                    {/* Approval & attention widgets */}
                     {isOwner && hotelId && (
-                      <CheckoutAdjustmentsWidget hotelId={hotelId} />
+                      <ApprovalRequiredWidget hotelId={hotelId} />
                     )}
 
+                    <NeedsAttentionWidget hotelId={hotelId} onNavigate={setActiveTab} />
+
                     <div className="grid lg:grid-cols-2 gap-6">
-                      <Card>
-                        <CardContent className="pt-6">
-                          <h3 className="font-semibold mb-4">{t('admin.bookingQueue')}</h3>
-                          <div className="grid grid-cols-2 gap-2">
-                            {canAccessModule('bookings') && (
-                              <Button variant="outline" onClick={() => setActiveTab('bookings')}>
-                                <CalendarDays className="h-4 w-4 mr-2" />
-                                {t('admin.bookingQueue')}
-                              </Button>
-                            )}
-                            {canAccessModule('shahmatka') && (
-                              <Button variant="outline" onClick={() => setActiveTab('shahmatka')}>
-                                <Grid3X3 className="h-4 w-4 mr-2" />
-                                {t('admin.shahmatka')}
-                              </Button>
-                            )}
-                            {canAccessModule('rooms') && (
-                              <Button variant="outline" onClick={() => setActiveTab('rooms')}>
-                                <DoorOpen className="h-4 w-4 mr-2" />
-                                {t('admin.rooms')}
-                              </Button>
-                            )}
-                            {canAccessModule('clients') && (
-                              <Button variant="outline" onClick={() => setActiveTab('clients')}>
-                                <Users className="h-4 w-4 mr-2" />
-                                {t('admin.clients')}
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <MiniShahmatka hotelId={hotelId} onNavigate={setActiveTab} />
                       
                       {canAccessModule('services') && (
                         <ServiceStatsWidget hotelId={hotelId} onNavigate={setActiveTab} />
