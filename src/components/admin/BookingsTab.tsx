@@ -473,12 +473,19 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
   };
 
   const isOverdue = (booking: Booking) => {
-    if (booking.status !== 'checked_in') return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const checkOut = new Date(booking.check_out_date);
-    checkOut.setHours(0, 0, 0, 0);
-    return checkOut < today;
+    if (booking.status === 'checked_in') {
+      const checkOut = new Date(booking.check_out_date);
+      checkOut.setHours(0, 0, 0, 0);
+      return checkOut < today;
+    }
+    if (booking.status === 'pending' || booking.status === 'approved') {
+      const checkIn = new Date(booking.check_in_date);
+      checkIn.setHours(0, 0, 0, 0);
+      return checkIn < today;
+    }
+    return false;
   };
 
   const isGroupOverdue = (group: BookingGroup) => group.bookings.some(isOverdue);
