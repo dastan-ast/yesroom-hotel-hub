@@ -476,7 +476,7 @@ function AdminDashboardContent({
 }
 
 /** Unified Bookings + Shahmatka with List/Grid toggle */
-function BookingsWithShahmatka({ hotelId }: { hotelId: string }) {
+function BookingsWithShahmatka({ hotelId, initialFilter, onClearFilter }: { hotelId: string; initialFilter?: string; onClearFilter?: () => void }) {
   const [viewMode, setViewMode] = useState<string>('list');
 
   return (
