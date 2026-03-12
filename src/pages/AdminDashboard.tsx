@@ -468,8 +468,6 @@ function AdminDashboardContent({
               onUpdate={fetchStats}
             />
           )}
-            </main>
-          </div>
         </SidebarInset>
       </div>
   );
