@@ -494,7 +494,7 @@ function BookingsWithShahmatka({ hotelId, initialFilter, onClearFilter }: { hote
       <Card>
         <CardContent className="pt-6">
           {viewMode === 'list' ? (
-            <BookingsTab hotelId={hotelId} />
+            <BookingsTab hotelId={hotelId} initialFilter={initialFilter as any} />
           ) : (
             <ShahmatkaGrid hotelId={hotelId} />
           )}
