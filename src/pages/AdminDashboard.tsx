@@ -388,7 +388,7 @@ function AdminDashboardContent({
                   <LeadsTab hotelId={hotelId} />
                 )}
                 {activeTab === 'bookings' && (
-                  <BookingsWithShahmatka hotelId={hotelId} />
+                  <BookingsWithShahmatka hotelId={hotelId} initialFilter={bookingsFilter} onClearFilter={() => setBookingsFilter(undefined)} />
                 )}
 
                 {activeTab === 'rooms' && (
