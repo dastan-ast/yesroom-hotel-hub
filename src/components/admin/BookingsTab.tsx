@@ -84,7 +84,7 @@ const statusPriority: Record<BookingStatus, number> = {
 
 const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'approved', 'checked_in'];
 
-export function BookingsTab({ hotelId }: { hotelId: string }) {
+export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initialFilter?: FilterStatus }) {
   const { t } = useTranslation();
   const { isOwner, user, profile } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
