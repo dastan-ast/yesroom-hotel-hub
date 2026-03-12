@@ -95,8 +95,13 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
   const [historyPhone, setHistoryPhone] = useState<string | null>(null);
   
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>(initialFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Sync with external initialFilter changes
+  useEffect(() => {
+    if (initialFilter) setStatusFilter(initialFilter);
+  }, [initialFilter]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
   
