@@ -15,7 +15,7 @@ interface AttentionItem {
   date: string;
 }
 
-export function NeedsAttentionWidget({ hotelId, onNavigate }: { hotelId: string; onNavigate?: (tab: string) => void }) {
+export function NeedsAttentionWidget({ hotelId, onNavigate, onBookingClick }: { hotelId: string; onNavigate?: (tab: string) => void; onBookingClick?: (bookingId: string) => void }) {
   const [items, setItems] = useState<AttentionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
