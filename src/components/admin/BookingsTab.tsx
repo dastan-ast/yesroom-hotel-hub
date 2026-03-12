@@ -673,11 +673,14 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
       </div>
 
       {/* Overdue alert */}
-      {overdueCount > 0 && (
-        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
+      {overdueCount > 0 && statusFilter !== 'overdue' && (
+        <div 
+          className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-destructive/20 transition-colors"
+          onClick={() => setStatusFilter('overdue')}
+        >
           <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
           <span className="text-sm font-medium text-destructive">
-            {overdueCount} {overdueCount === 1 ? 'гость' : overdueCount < 5 ? 'гостя' : 'гостей'} просрочили дату выезда! Необходимо выселить или продлить.
+            {overdueCount} просроченных {overdueCount === 1 ? 'бронирование' : overdueCount < 5 ? 'бронирования' : 'бронирований'}! Нажмите для просмотра.
           </span>
         </div>
       )}
