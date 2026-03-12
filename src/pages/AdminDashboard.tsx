@@ -29,6 +29,9 @@ import { SubscriptionTab } from '@/components/admin/SubscriptionTab';
 import { CheckoutAdjustmentsWidget } from '@/components/admin/CheckoutAdjustmentsWidget';
 import { LeadsTab } from '@/components/admin/LeadsTab';
 import { AdminKpiTab } from '@/components/admin/AdminKpiTab';
+import { MiniShahmatka } from '@/components/admin/MiniShahmatka';
+import { NeedsAttentionWidget } from '@/components/admin/NeedsAttentionWidget';
+import { ApprovalRequiredWidget } from '@/components/admin/ApprovalRequiredWidget';
 
 
 export default function AdminDashboard() {
