@@ -152,7 +152,13 @@ export function NeedsAttentionWidget({ hotelId, onNavigate, onBookingClick }: { 
           <div
             key={`${item.type}-${item.id}`}
             className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-            onClick={() => onNavigate?.(navMap[item.type])}
+            onClick={() => {
+              if (onBookingClick && (item.type === 'overdue_checkin' || item.type === 'overdue_checkout' || item.type === 'pending_booking')) {
+                onBookingClick(item.id);
+              } else {
+                onNavigate?.(navMap[item.type]);
+              }
+            }}
           >
             <div className="mt-0.5">{iconMap[item.type]}</div>
             <div className="min-w-0 flex-1">
