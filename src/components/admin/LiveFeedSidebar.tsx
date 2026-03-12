@@ -42,7 +42,7 @@ interface Props {
 // Show bookings within this many days from today
 const UPCOMING_DAYS = 3;
 
-export function LiveFeedSidebar({ hotelId, onBookingUpdated }: Props) {
+export function LiveFeedSidebar({ hotelId, onBookingUpdated, onBookingClick }: Props) {
   const { t } = useTranslation();
   const { isOwner } = useAuth();
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
