@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, DoorOpen, Clock, LayoutDashboard, BedDouble, Users, Building2, Settings, LogOut, ChevronRight, Grid3X3, Bell, Coffee, Key, HelpCircle, Shield, BarChart3, CreditCard, MessageCircle, List, BookOpen } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { BookingDetailModal } from '@/components/admin/BookingDetailModal';
 import { BookingsTab } from '@/components/admin/BookingsTab';
 import { RoomsTab } from '@/components/admin/RoomsTab';
 import { RoomTypesTab } from '@/components/admin/RoomTypesTab';
@@ -201,11 +202,22 @@ function AdminDashboardContent({
   subscriptionStatus, trialEndsAt, canAccessModule, fetchStats, t,
 }: any) {
   const { setOpen } = useSidebar();
+  const [detailBookingId, setDetailBookingId] = useState<string | null>(null);
+  const [bookingsFilter, setBookingsFilter] = useState<string | undefined>(undefined);
 
   const handleMenuClick = (id: string) => {
     setActiveTab(id);
     setOpen(false);
   };
+
+  const handleBookingClick = useCallback((bookingId: string) => {
+    setDetailBookingId(bookingId);
+  }, []);
+
+  const handleOverdueNavigate = useCallback(() => {
+    setBookingsFilter('overdue');
+    setActiveTab('bookings');
+  }, [setActiveTab]);
 
   return (
     <div className="min-h-screen flex w-full">
@@ -355,7 +367,7 @@ function AdminDashboardContent({
                       <ApprovalRequiredWidget hotelId={hotelId} />
                     )}
 
-                    <NeedsAttentionWidget hotelId={hotelId} onNavigate={setActiveTab} />
+                    <NeedsAttentionWidget hotelId={hotelId} onNavigate={setActiveTab} onBookingClick={handleBookingClick} />
 
                     <div className="grid lg:grid-cols-2 gap-6">
                       <MiniShahmatka hotelId={hotelId} onNavigate={setActiveTab} />
@@ -376,7 +388,7 @@ function AdminDashboardContent({
                   <LeadsTab hotelId={hotelId} />
                 )}
                 {activeTab === 'bookings' && (
-                  <BookingsWithShahmatka hotelId={hotelId} />
+                  <BookingsWithShahmatka hotelId={hotelId} initialFilter={bookingsFilter} onClearFilter={() => setBookingsFilter(undefined)} />
                 )}
 
                 {activeTab === 'rooms' && (
@@ -440,18 +452,29 @@ function AdminDashboardContent({
 
               {showLiveFeed && (
                 <div className="w-80 border-l p-4 hidden lg:block">
-                  <LiveFeedSidebar hotelId={hotelId} onBookingUpdated={fetchStats} />
+                  <LiveFeedSidebar hotelId={hotelId} onBookingUpdated={fetchStats} onBookingClick={handleBookingClick} />
                 </div>
               )}
             </main>
           </div>
+
+          {/* Global Booking Detail Modal */}
+          {detailBookingId && (
+            <BookingDetailModal
+              open={!!detailBookingId}
+              onOpenChange={(open) => { if (!open) setDetailBookingId(null); }}
+              bookingIds={[detailBookingId]}
+              hotelId={hotelId}
+              onUpdate={fetchStats}
+            />
+          )}
         </SidebarInset>
       </div>
   );
 }
 
 /** Unified Bookings + Shahmatka with List/Grid toggle */
-function BookingsWithShahmatka({ hotelId }: { hotelId: string }) {
+function BookingsWithShahmatka({ hotelId, initialFilter, onClearFilter }: { hotelId: string; initialFilter?: string; onClearFilter?: () => void }) {
   const [viewMode, setViewMode] = useState<string>('list');
 
   return (
@@ -471,7 +494,7 @@ function BookingsWithShahmatka({ hotelId }: { hotelId: string }) {
       <Card>
         <CardContent className="pt-6">
           {viewMode === 'list' ? (
-            <BookingsTab hotelId={hotelId} />
+            <BookingsTab hotelId={hotelId} initialFilter={initialFilter as any} />
           ) : (
             <ShahmatkaGrid hotelId={hotelId} />
           )}

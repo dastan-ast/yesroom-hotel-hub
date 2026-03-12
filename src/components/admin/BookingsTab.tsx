@@ -37,6 +37,7 @@ import { BookingDetailModal } from './BookingDetailModal';
 import { checkRoomAvailability } from '@/lib/checkRoomAvailability';
 
 type BookingStatus = 'pending' | 'approved' | 'checked_in' | 'checked_out' | 'cancelled';
+type FilterStatus = BookingStatus | 'all' | 'overdue';
 
 interface Booking {
   id: string;
@@ -83,7 +84,7 @@ const statusPriority: Record<BookingStatus, number> = {
 
 const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'approved', 'checked_in'];
 
-export function BookingsTab({ hotelId }: { hotelId: string }) {
+export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initialFilter?: FilterStatus }) {
   const { t } = useTranslation();
   const { isOwner, user, profile } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -94,8 +95,13 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const [historyPhone, setHistoryPhone] = useState<string | null>(null);
   
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>(initialFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Sync with external initialFilter changes
+  useEffect(() => {
+    if (initialFilter) setStatusFilter(initialFilter);
+  }, [initialFilter]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
   
@@ -467,12 +473,19 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   };
 
   const isOverdue = (booking: Booking) => {
-    if (booking.status !== 'checked_in') return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const checkOut = new Date(booking.check_out_date);
-    checkOut.setHours(0, 0, 0, 0);
-    return checkOut < today;
+    if (booking.status === 'checked_in') {
+      const checkOut = new Date(booking.check_out_date);
+      checkOut.setHours(0, 0, 0, 0);
+      return checkOut < today;
+    }
+    if (booking.status === 'pending' || booking.status === 'approved') {
+      const checkIn = new Date(booking.check_in_date);
+      checkIn.setHours(0, 0, 0, 0);
+      return checkIn < today;
+    }
+    return false;
   };
 
   const isGroupOverdue = (group: BookingGroup) => group.bookings.some(isOverdue);
@@ -520,7 +533,9 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
   const filteredGroups = useMemo(() => {
     let result = [...groupedBookings];
 
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'overdue') {
+      result = result.filter(g => g.bookings.some(isOverdue));
+    } else if (statusFilter !== 'all') {
       result = result.filter(g => g.primary.status === statusFilter);
     }
 
@@ -620,6 +635,7 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       <div className="flex flex-wrap gap-1.5">
         {([
           { value: 'all' as const, label: 'Все', badge: undefined as number | undefined },
+          { value: 'overdue' as const, label: '⚠ Просрочено', badge: overdueCount > 0 ? overdueCount : undefined as number | undefined },
           { value: 'pending' as const, label: 'Ожидает', badge: pendingCount as number | undefined },
           { value: 'approved' as const, label: 'Подтверждено', badge: undefined as number | undefined },
           { value: 'checked_in' as const, label: 'Заселён', badge: undefined as number | undefined },
@@ -634,6 +650,8 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
               statusFilter === value
                 ? value === 'all'
                   ? 'bg-foreground text-background border-foreground'
+                  : value === 'overdue'
+                  ? 'bg-destructive text-destructive-foreground border-destructive'
                   : value === 'pending'
                   ? 'bg-yellow-500 text-white border-yellow-500'
                   : value === 'approved'
@@ -655,11 +673,14 @@ export function BookingsTab({ hotelId }: { hotelId: string }) {
       </div>
 
       {/* Overdue alert */}
-      {overdueCount > 0 && (
-        <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2">
+      {overdueCount > 0 && statusFilter !== 'overdue' && (
+        <div 
+          className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 cursor-pointer hover:bg-destructive/20 transition-colors"
+          onClick={() => setStatusFilter('overdue')}
+        >
           <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
           <span className="text-sm font-medium text-destructive">
-            {overdueCount} {overdueCount === 1 ? 'гость' : overdueCount < 5 ? 'гостя' : 'гостей'} просрочили дату выезда! Необходимо выселить или продлить.
+            {overdueCount} просроченных {overdueCount === 1 ? 'бронирование' : overdueCount < 5 ? 'бронирования' : 'бронирований'}! Нажмите для просмотра.
           </span>
         </div>
       )}

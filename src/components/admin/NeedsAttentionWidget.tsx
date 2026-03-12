@@ -15,7 +15,7 @@ interface AttentionItem {
   date: string;
 }
 
-export function NeedsAttentionWidget({ hotelId, onNavigate }: { hotelId: string; onNavigate?: (tab: string) => void }) {
+export function NeedsAttentionWidget({ hotelId, onNavigate, onBookingClick }: { hotelId: string; onNavigate?: (tab: string) => void; onBookingClick?: (bookingId: string) => void }) {
   const [items, setItems] = useState<AttentionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -152,7 +152,13 @@ export function NeedsAttentionWidget({ hotelId, onNavigate }: { hotelId: string;
           <div
             key={`${item.type}-${item.id}`}
             className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-            onClick={() => onNavigate?.(navMap[item.type])}
+            onClick={() => {
+              if (onBookingClick && (item.type === 'overdue_checkin' || item.type === 'overdue_checkout' || item.type === 'pending_booking')) {
+                onBookingClick(item.id);
+              } else {
+                onNavigate?.(navMap[item.type]);
+              }
+            }}
           >
             <div className="mt-0.5">{iconMap[item.type]}</div>
             <div className="min-w-0 flex-1">
