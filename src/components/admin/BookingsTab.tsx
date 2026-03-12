@@ -650,6 +650,8 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
               statusFilter === value
                 ? value === 'all'
                   ? 'bg-foreground text-background border-foreground'
+                  : value === 'overdue'
+                  ? 'bg-destructive text-destructive-foreground border-destructive'
                   : value === 'pending'
                   ? 'bg-yellow-500 text-white border-yellow-500'
                   : value === 'approved'
