@@ -367,7 +367,7 @@ function AdminDashboardContent({
                       <ApprovalRequiredWidget hotelId={hotelId} />
                     )}
 
-                    <NeedsAttentionWidget hotelId={hotelId} onNavigate={setActiveTab} />
+                    <NeedsAttentionWidget hotelId={hotelId} onNavigate={setActiveTab} onBookingClick={handleBookingClick} />
 
                     <div className="grid lg:grid-cols-2 gap-6">
                       <MiniShahmatka hotelId={hotelId} onNavigate={setActiveTab} />
