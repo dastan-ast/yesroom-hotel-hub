@@ -533,7 +533,9 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
   const filteredGroups = useMemo(() => {
     let result = [...groupedBookings];
 
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'overdue') {
+      result = result.filter(g => g.bookings.some(isOverdue));
+    } else if (statusFilter !== 'all') {
       result = result.filter(g => g.primary.status === statusFilter);
     }
 
