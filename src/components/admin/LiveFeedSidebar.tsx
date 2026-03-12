@@ -36,6 +36,7 @@ interface PendingBooking {
 interface Props {
   hotelId: string;
   onBookingUpdated?: () => void;
+  onBookingClick?: (bookingId: string) => void;
 }
 
 // Show bookings within this many days from today
