@@ -108,14 +108,14 @@ export function SystemReportsTab() {
   const fetchActivityLog = async () => {
     // Fetch last 2 months of admin activity
     const { data } = await supabase
-      .from('admin_activity_log' as any)
+      .from('admin_activity_log')
       .select('action, entity_type, details, created_at, user_name')
       .gte('created_at', twoMonthsAgo.toISOString())
       .order('created_at', { ascending: false })
       .limit(500);
 
     if (data && Array.isArray(data)) {
-      const changes = summarizeActivity(data as ActivityEntry[]);
+      const changes = summarizeActivity(data as unknown as ActivityEntry[]);
       setRecentChanges(changes);
     }
   };
