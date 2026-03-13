@@ -17,6 +17,8 @@ import { UsersTab } from '@/components/superadmin/UsersTab';
 import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
 import { SubscriptionsTab } from '@/components/superadmin/SubscriptionsTab';
 import { SettingsTab } from '@/components/superadmin/SettingsTab';
+import { SystemReportsTab } from '@/components/superadmin/SystemReportsTab';
+import { SystemMonitoringTab } from '@/components/superadmin/SystemMonitoringTab';
 
 interface Hotel {
   id: string;
