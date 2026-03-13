@@ -38,7 +38,7 @@ export default function SuperAdmin() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0, pending: 0 });
-  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings' | 'reports' | 'monitoring'>('requests');
 
   useEffect(() => {
     if (isSuperAdmin) {
