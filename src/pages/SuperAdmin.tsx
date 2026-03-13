@@ -324,6 +324,10 @@ export default function SuperAdmin() {
             {activeTab === 'subscriptions' && <SubscriptionsTab />}
 
             {activeTab === 'settings' && <SettingsTab />}
+
+            {activeTab === 'reports' && <SystemReportsTab />}
+
+            {activeTab === 'monitoring' && <SystemMonitoringTab />}
           </main>
         </SidebarInset>
       </div>
