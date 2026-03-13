@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck } from 'lucide-react';
+import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck, FileText, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UsersTab } from '@/components/superadmin/UsersTab';
