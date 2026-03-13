@@ -10,13 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck } from 'lucide-react';
+import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck, FileText, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UsersTab } from '@/components/superadmin/UsersTab';
 import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
 import { SubscriptionsTab } from '@/components/superadmin/SubscriptionsTab';
 import { SettingsTab } from '@/components/superadmin/SettingsTab';
+import { SystemReportsTab } from '@/components/superadmin/SystemReportsTab';
+import { SystemMonitoringTab } from '@/components/superadmin/SystemMonitoringTab';
 
 interface Hotel {
   id: string;
@@ -36,7 +38,7 @@ export default function SuperAdmin() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0, pending: 0 });
-  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings' | 'reports' | 'monitoring'>('requests');
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -161,6 +163,24 @@ export default function SuperAdmin() {
                 >
                   <Settings className="h-4 w-4" />
                   <span>Настройки</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === 'reports'}
+                  onClick={() => setActiveTab('reports')}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Отчёты</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === 'monitoring'}
+                  onClick={() => setActiveTab('monitoring')}
+                >
+                  <Activity className="h-4 w-4" />
+                  <span>Мониторинг</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -304,6 +324,10 @@ export default function SuperAdmin() {
             {activeTab === 'subscriptions' && <SubscriptionsTab />}
 
             {activeTab === 'settings' && <SettingsTab />}
+
+            {activeTab === 'reports' && <SystemReportsTab />}
+
+            {activeTab === 'monitoring' && <SystemMonitoringTab />}
           </main>
         </SidebarInset>
       </div>
