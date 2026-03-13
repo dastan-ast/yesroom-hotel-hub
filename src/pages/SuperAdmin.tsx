@@ -165,6 +165,24 @@ export default function SuperAdmin() {
                   <span>Настройки</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === 'reports'}
+                  onClick={() => setActiveTab('reports')}
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Отчёты</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === 'monitoring'}
+                  onClick={() => setActiveTab('monitoring')}
+                >
+                  <Activity className="h-4 w-4" />
+                  <span>Мониторинг</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
           <div className="mt-auto p-4 border-t">
