@@ -65,6 +65,66 @@ export type Database = {
           },
         ]
       }
+      alert_config: {
+        Row: {
+          alert_on_error: boolean
+          alert_on_recovery: boolean
+          alert_on_warning: boolean
+          id: number
+          is_enabled: boolean
+          last_alert_at: string | null
+          telegram_chat_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          alert_on_error?: boolean
+          alert_on_recovery?: boolean
+          alert_on_warning?: boolean
+          id: number
+          is_enabled?: boolean
+          last_alert_at?: string | null
+          telegram_chat_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alert_on_error?: boolean
+          alert_on_recovery?: boolean
+          alert_on_warning?: boolean
+          id?: number
+          is_enabled?: boolean
+          last_alert_at?: string | null
+          telegram_chat_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      alert_history: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          message: string
+          sent_via: string
+          service_name: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          message: string
+          sent_via?: string
+          service_name: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          sent_via?: string
+          service_name?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1116,6 +1176,33 @@ export type Database = {
           previous_status?: string | null
           previous_trial_ends_at?: string | null
           reason?: string | null
+        }
+        Relationships: []
+      }
+      uptime_checks: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          response_time_ms: number | null
+          service_name: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          response_time_ms?: number | null
+          service_name: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          response_time_ms?: number | null
+          service_name?: string
+          status?: string
         }
         Relationships: []
       }
