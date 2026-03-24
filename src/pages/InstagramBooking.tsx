@@ -21,7 +21,6 @@ interface Hotel {
   id: string;
   name: string;
   logo_url: string | null;
-  settings: any;
 }
 
 export default function InstagramBooking() {
