@@ -46,7 +46,7 @@ export default function InstagramBooking() {
       if (!hotelSlug) { setNotFound(true); setLoading(false); return; }
       const { data, error } = await supabase
         .from('hotels_public')
-        .select('id, name, logo_url, settings')
+        .select('id, name, logo_url')
         .eq('slug', hotelSlug)
         .maybeSingle() as any;
       if (error || !data) { setNotFound(true); } else { setHotel(data); }
