@@ -3,8 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { BarChart3, Clock, Users, TrendingUp, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -44,87 +42,31 @@ export function AdminKpiTab({ hotelId }: Props) {
   const fetchData = async () => {
     setLoading(true);
 
-    // Fetch all leads with admin_id for this hotel
-    const { data: leads } = await supabase
-      .from('leads' as any)
-      .select('admin_id, claimed_at, created_at, status')
-      .eq('hotel_id', hotelId)
-      .not('admin_id', 'is', null);
+    // Use server-side RPC for KPI calculations
+    const [kpiResult, auditsResult] = await Promise.all([
+      supabase.rpc('get_admin_kpi_metrics', { _hotel_id: hotelId }),
+      supabase
+        .from('admin_activity_log')
+        .select('id, created_at, user_name, action, entity_type, details')
+        .eq('hotel_id', hotelId)
+        .order('created_at', { ascending: false })
+        .limit(50),
+    ]);
 
-    // Fetch admin profiles
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, full_name')
-      .eq('hotel_id', hotelId);
+    if (kpiResult.data) {
+      const data = kpiResult.data as any;
+      setMetrics((data.metrics || []).map((m: any) => ({
+        adminId: m.adminId,
+        adminName: m.adminName,
+        totalClaimed: m.totalClaimed,
+        totalConverted: m.totalConverted,
+        avgResponseMinutes: m.avgResponseMinutes,
+        conversionRate: m.conversionRate,
+        avgBookingProcessMinutes: m.avgBookingProcessMinutes,
+      })));
+    }
 
-    // Fetch bookings with additional_info for processing time calculation
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('id, created_at, status, additional_info')
-      .eq('hotel_id', hotelId)
-      .in('status', ['checked_in', 'checked_out']);
-
-    const profileMap = new Map<string, string>();
-    (profiles || []).forEach(p => profileMap.set(p.user_id, p.full_name || 'Неизвестный'));
-
-    // Calculate avg booking processing time (created -> checked_in)
-    const bookingProcessTimes: number[] = [];
-    ((bookings as any[]) || []).forEach(b => {
-      const info = b.additional_info as any;
-      if (info?.checked_in_at && b.created_at) {
-        const diff = (new Date(info.checked_in_at).getTime() - new Date(b.created_at).getTime()) / 60000;
-        if (diff >= 0) bookingProcessTimes.push(diff);
-      }
-    });
-    const avgBookingProcess = bookingProcessTimes.length > 0
-      ? bookingProcessTimes.reduce((a, b) => a + b, 0) / bookingProcessTimes.length
-      : 0;
-
-    // Calculate metrics per admin
-    const adminMap = new Map<string, { claimed: number; converted: number; responseTimes: number[] }>();
-    
-    ((leads as any[]) || []).forEach(lead => {
-      if (!lead.admin_id) return;
-      if (!adminMap.has(lead.admin_id)) {
-        adminMap.set(lead.admin_id, { claimed: 0, converted: 0, responseTimes: [] });
-      }
-      const m = adminMap.get(lead.admin_id)!;
-      m.claimed++;
-      if (lead.status === 'converted') m.converted++;
-      if (lead.claimed_at && lead.created_at) {
-        const diff = (new Date(lead.claimed_at).getTime() - new Date(lead.created_at).getTime()) / 60000;
-        if (diff >= 0) m.responseTimes.push(diff);
-      }
-    });
-
-    const metricsArr: AdminMetrics[] = [];
-    adminMap.forEach((val, adminId) => {
-      const avg = val.responseTimes.length > 0
-        ? val.responseTimes.reduce((a, b) => a + b, 0) / val.responseTimes.length
-        : 0;
-      metricsArr.push({
-        adminId,
-        adminName: profileMap.get(adminId) || 'Неизвестный',
-        totalClaimed: val.claimed,
-        totalConverted: val.converted,
-        avgResponseMinutes: Math.round(avg * 10) / 10,
-        conversionRate: val.claimed > 0 ? Math.round((val.converted / val.claimed) * 100) : 0,
-        avgBookingProcessMinutes: Math.round(avgBookingProcess * 10) / 10,
-      });
-    });
-
-    metricsArr.sort((a, b) => a.avgResponseMinutes - b.avgResponseMinutes);
-    setMetrics(metricsArr);
-
-    // Fetch audit logs
-    const { data: audits } = await supabase
-      .from('audit_logs' as any)
-      .select('id, created_at, user_name, action, entity_type, details')
-      .eq('hotel_id', hotelId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    setAuditLogs((audits as unknown as AuditEntry[]) || []);
+    setAuditLogs((auditsResult.data as unknown as AuditEntry[]) || []);
     setLoading(false);
   };
 
@@ -146,7 +88,6 @@ export function AdminKpiTab({ hotelId }: Props) {
         <BarChart3 className="h-6 w-6" /> KPI Администраторов
       </h2>
 
-      {/* Overall metrics */}
       {metrics.length > 0 && (
         <div className="grid sm:grid-cols-2 gap-4">
           <Card>
@@ -172,7 +113,6 @@ export function AdminKpiTab({ hotelId }: Props) {
         </div>
       )}
 
-      {/* Metrics table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -223,7 +163,6 @@ export function AdminKpiTab({ hotelId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Audit log */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">

@@ -29,26 +29,39 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (hotelId) {
       fetchClients();
     }
-  }, [hotelId]);
+  }, [hotelId, search, currentPage]);
 
   const fetchClients = async () => {
     if (!hotelId) return;
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('clients')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('hotel_id', hotelId)
       .order('full_name');
+
+    if (search.trim()) {
+      query = query.or(`full_name.ilike.%${search.trim()}%,phone.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%,document_number.ilike.%${search.trim()}%`);
+    }
+
+    const from = (currentPage - 1) * PAGE_SIZE;
+    query = query.range(from, from + PAGE_SIZE - 1);
+    
+    const { data, count, error } = await query;
     
     if (error) {
       toast.error(t('common.error'));
     } else {
       setClients(data || []);
+      setTotalCount(count || 0);
     }
     setLoading(false);
   };
