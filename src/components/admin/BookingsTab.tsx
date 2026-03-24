@@ -133,22 +133,49 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
     setCurrentPage(1);
   }, [statusFilter, searchQuery]);
 
+  const [totalCount, setTotalCount] = useState(0);
+
   useEffect(() => {
     if (hotelId) {
       fetchBookings();
     }
-  }, [hotelId]);
+  }, [hotelId, statusFilter, searchQuery, currentPage]);
 
   const fetchBookings = async () => {
     setLoading(true);
-    const { data } = await supabase
+    
+    // Build server-side query with filters
+    let query = supabase
       .from('bookings')
-      .select('*, room_types(name), room_id, room_type_id, additional_info, group_id')
+      .select('*, room_types(name), room_id, room_type_id, additional_info, group_id', { count: 'exact' })
       .eq('hotel_id', hotelId)
-      .order('created_at', { ascending: false })
-      .limit(500);
+      .order('created_at', { ascending: false });
+
+    // Apply status filter server-side
+    if (statusFilter !== 'all' && statusFilter !== 'overdue') {
+      query = query.eq('status', statusFilter);
+    }
+    if (statusFilter === 'overdue') {
+      const today = new Date().toISOString().split('T')[0];
+      query = query.or(
+        `and(status.eq.checked_in,check_out_date.lt.${today}),and(status.in.(pending,approved),check_in_date.lt.${today})`
+      );
+    }
+
+    // Apply search server-side
+    if (searchQuery.trim()) {
+      query = query.or(`guest_name.ilike.%${searchQuery.trim()}%,guest_phone.ilike.%${searchQuery.trim()}%`);
+    }
+
+    // Server-side pagination
+    const from = (currentPage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    query = query.range(from, to);
+
+    const { data, count } = await query;
     
     if (data) setBookings(data as Booking[]);
+    setTotalCount(count || 0);
     setSelectedIds(new Set());
     setLoading(false);
   };
@@ -529,23 +556,9 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
     return groups;
   }, [bookings]);
 
-  // Filtered and sorted groups
+  // Filtering is now done server-side, just sort groups
   const filteredGroups = useMemo(() => {
     let result = [...groupedBookings];
-
-    if (statusFilter === 'overdue') {
-      result = result.filter(g => g.bookings.some(isOverdue));
-    } else if (statusFilter !== 'all') {
-      result = result.filter(g => g.primary.status === statusFilter);
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(g => 
-        g.primary.guest_name.toLowerCase().includes(query) ||
-        (g.primary.guest_phone || '').includes(query)
-      );
-    }
 
     result.sort((a, b) => {
       const aOverdue = isGroupOverdue(a) ? -1 : 0;
@@ -555,14 +568,15 @@ export function BookingsTab({ hotelId, initialFilter }: { hotelId: string; initi
     });
 
     return result;
-  }, [groupedBookings, statusFilter, searchQuery]);
+  }, [groupedBookings]);
 
   const overdueCount = useMemo(() => bookings.filter(isOverdue).length, [bookings]);
 
   const pendingCount = useMemo(() => bookings.filter(b => b.status === 'pending').length, [bookings]);
 
-  const totalPages = Math.ceil(filteredGroups.length / PAGE_SIZE);
-  const paginatedGroups = filteredGroups.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  // No client-side slicing — data is already paginated from server
+  const paginatedGroups = filteredGroups;
 
   const getStatusLabel = (status: BookingStatus) => {
     const labels: Record<BookingStatus, string> = {

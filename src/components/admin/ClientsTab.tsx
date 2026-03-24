@@ -29,26 +29,39 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (hotelId) {
       fetchClients();
     }
-  }, [hotelId]);
+  }, [hotelId, search, currentPage]);
 
   const fetchClients = async () => {
     if (!hotelId) return;
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('clients')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('hotel_id', hotelId)
       .order('full_name');
+
+    if (search.trim()) {
+      query = query.or(`full_name.ilike.%${search.trim()}%,phone.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%,document_number.ilike.%${search.trim()}%`);
+    }
+
+    const from = (currentPage - 1) * PAGE_SIZE;
+    query = query.range(from, from + PAGE_SIZE - 1);
+    
+    const { data, count, error } = await query;
     
     if (error) {
       toast.error(t('common.error'));
     } else {
       setClients(data || []);
+      setTotalCount(count || 0);
     }
     setLoading(false);
   };
@@ -99,17 +112,11 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
     fetchClients();
   };
 
-  const filteredClients = clients.filter(
-    (c) => {
-      const s = search.toLowerCase();
-      return (
-        c.full_name.toLowerCase().includes(s) ||
-        (c.phone || '').toLowerCase().includes(s) ||
-        (c.email || '').toLowerCase().includes(s) ||
-        (c.document_number || '').toLowerCase().includes(s)
-      );
-    }
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
@@ -136,42 +143,59 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
         </div>
       </div>
 
-      {filteredClients.length === 0 ? (
+      {clients.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {search ? 'Клиенты не найдены' : 'База клиентов пуста'}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ФИО</TableHead>
-              <TableHead>Телефон</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Документ</TableHead>
-              <TableHead className="w-[100px]">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredClients.map((client) => (
-              <TableRow key={client.id}>
-                <TableCell className="font-medium">{client.full_name}</TableCell>
-                <TableCell>{client.phone}</TableCell>
-                <TableCell>{client.email || '—'}</TableCell>
-                <TableCell>{client.document_number || '—'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => handleEdit(client)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleHistory(client)}>
-                      <History className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ФИО</TableHead>
+                <TableHead>Телефон</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Документ</TableHead>
+                <TableHead className="w-[100px]">Действия</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {clients.map((client) => (
+                <TableRow key={client.id}>
+                  <TableCell className="font-medium">{client.full_name}</TableCell>
+                  <TableCell>{client.phone}</TableCell>
+                  <TableCell>{client.email || '—'}</TableCell>
+                  <TableCell>{client.document_number || '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => handleEdit(client)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleHistory(client)}>
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-sm text-muted-foreground">
+                {totalCount} клиентов, стр. {currentPage} из {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  Назад
+                </Button>
+                <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                  Далее
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <ClientDialog

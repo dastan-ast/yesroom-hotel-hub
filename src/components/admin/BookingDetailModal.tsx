@@ -566,7 +566,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
       // Audit: if actual_check_out_at was already set (system-recorded), log the manual override
       const existingCheckOutAt = (booking.additional_info as any)?.actual_check_out_at;
       if (existingCheckOutAt) {
-        await supabase.from('audit_logs' as any).insert({
+        await supabase.from('admin_activity_log').insert({
           hotel_id: hotelId,
           user_id: user.id,
           user_name: profile?.full_name || '',
@@ -643,7 +643,7 @@ export function BookingDetailModal({ open, onOpenChange, bookingIds, hotelId, on
     } else {
       // Audit log for date changes on checked_in/checked_out bookings
       if (['checked_in', 'checked_out'].includes(booking.status)) {
-        await supabase.from('audit_logs' as any).insert({
+        await supabase.from('admin_activity_log').insert({
           hotel_id: hotelId,
           user_id: user.id,
           user_name: profile?.full_name || '',
