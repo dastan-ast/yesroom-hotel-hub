@@ -99,12 +99,11 @@ export function BookingForm({ hotelId }: BookingFormProps) {
       if (hotelId) {
         const { data: hotelData } = await supabase
           .from('hotels_public')
-          .select('name, settings')
+          .select('name')
           .eq('id', hotelId)
           .maybeSingle() as any;
         if (hotelData) {
           setHotelName(hotelData.name);
-          setHotelSettings(hotelData.settings as HotelSettings | null);
         }
       }
     };

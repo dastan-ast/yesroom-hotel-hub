@@ -21,7 +21,6 @@ interface Hotel {
   id: string;
   name: string;
   logo_url: string | null;
-  settings: any;
 }
 
 export default function InstagramBooking() {
@@ -46,7 +45,7 @@ export default function InstagramBooking() {
       if (!hotelSlug) { setNotFound(true); setLoading(false); return; }
       const { data, error } = await supabase
         .from('hotels_public')
-        .select('id, name, logo_url, settings')
+        .select('id, name, logo_url')
         .eq('slug', hotelSlug)
         .maybeSingle() as any;
       if (error || !data) { setNotFound(true); } else { setHotel(data); }
@@ -127,7 +126,7 @@ export default function InstagramBooking() {
       <div className="min-h-[100dvh] bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <BookingSuccess
-            hotelSettings={hotel.settings as { kaspi_id?: string; whatsapp_phone?: string } | null}
+            hotelSettings={null}
             hotelName={hotel.name}
           />
         </div>

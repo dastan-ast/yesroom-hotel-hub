@@ -25,7 +25,6 @@ interface Hotel {
   location: string | null;
   description: string | null;
   logo_url: string | null;
-  settings: any;
 }
 
 interface RoomType {
@@ -63,7 +62,7 @@ export default function HotelProfile() {
       // Use public view to exclude sensitive fields like owner_id
       const { data: hotelData, error: hotelError } = await supabase
         .from('hotels_public')
-        .select('id, name, slug, location, description, logo_url, settings')
+        .select('id, name, slug, location, description, logo_url')
         .eq('slug', hotelSlug)
         .maybeSingle() as any;
 
@@ -239,7 +238,7 @@ export default function HotelProfile() {
         onOpenChange={setBookingModalOpen}
         hotelId={hotel.id}
         hotelName={hotel.name}
-        hotelSettings={hotel.settings as { kaspi_id?: string; whatsapp_phone?: string } | null}
+        hotelSettings={null}
         roomTypes={roomTypes}
         preselectedRoomTypeId={preselectedRoomType}
       />
