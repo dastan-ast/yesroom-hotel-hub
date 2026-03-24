@@ -125,57 +125,6 @@ export type Database = {
         }
         Relationships: []
       }
-      audit_logs: {
-        Row: {
-          action: string
-          created_at: string
-          details: Json | null
-          entity_id: string | null
-          entity_type: string
-          hotel_id: string
-          id: string
-          user_id: string
-          user_name: string
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          details?: Json | null
-          entity_id?: string | null
-          entity_type: string
-          hotel_id: string
-          id?: string
-          user_id: string
-          user_name?: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          details?: Json | null
-          entity_id?: string | null
-          entity_type?: string
-          hotel_id?: string
-          id?: string
-          user_id?: string
-          user_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_logs_hotel_id_fkey"
-            columns: ["hotel_id"]
-            isOneToOne: false
-            referencedRelation: "hotels_public"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       booking_rooms: {
         Row: {
           booking_id: string
@@ -1292,6 +1241,7 @@ export type Database = {
         Args: { _permission: string; _user_id: string }
         Returns: boolean
       }
+      get_admin_kpi_metrics: { Args: { _hotel_id: string }; Returns: Json }
       get_user_hotel_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
