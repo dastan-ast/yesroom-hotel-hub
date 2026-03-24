@@ -15,75 +15,19 @@ import { SettingsTab } from '@/components/superadmin/SettingsTab';
 import { SystemReportsTab } from '@/components/superadmin/SystemReportsTab';
 import { SystemMonitoringTab } from '@/components/superadmin/SystemMonitoringTab';
 
-interface Hotel {
-  id: string;
-  name: string;
-  slug: string;
-  location: string | null;
-  subscription_status: string;
-  trial_ends_at: string | null;
-  created_at: string;
-  owner_id: string | null;
-}
-
 export default function SuperAdmin() {
   const { t } = useTranslation();
   const { user, isSuperAdmin, loading, signOut } = useAuth();
-  const [hotels, setHotels] = useState<Hotel[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [stats, setStats] = useState({ total: 0, trial: 0, active: 0, expired: 0, pending: 0 });
+  const [stats, setStats] = useState({ pending: 0 });
   const [activeTab, setActiveTab] = useState<'requests' | 'hotels' | 'users' | 'subscriptions' | 'settings' | 'reports' | 'monitoring'>('requests');
 
   useEffect(() => {
     if (isSuperAdmin) {
-      fetchHotels();
-    }
-  }, [isSuperAdmin]);
-
-  const fetchHotels = async () => {
-    const { data } = await supabase
-      .from('hotels')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (data) {
-      setHotels(data);
-      setStats({
-        total: data.length,
-        trial: data.filter(h => h.subscription_status === 'trial').length,
-        active: data.filter(h => h.subscription_status === 'active').length,
-        expired: data.filter(h => h.subscription_status === 'expired').length,
-        pending: data.filter(h => (h as any).status === 'pending').length
+      supabase.from('hotels').select('status').then(({ data }) => {
+        if (data) setStats({ pending: data.filter(h => h.status === 'pending').length });
       });
     }
-  };
-
-  const updateHotelStatus = async (hotelId: string, status: string) => {
-    await supabase
-      .from('hotels')
-      .update({ subscription_status: status })
-      .eq('id', hotelId);
-    fetchHotels();
-  };
-
-  const filteredHotels = hotels.filter(hotel => {
-    const matchesSearch = hotel.name.toLowerCase().includes(search.toLowerCase()) ||
-                         hotel.location?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || hotel.subscription_status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      trial: { variant: 'secondary', label: 'Пробный' },
-      active: { variant: 'default', label: 'Активный' },
-      expired: { variant: 'destructive', label: 'Истёк' },
-      suspended: { variant: 'outline', label: 'Приостановлен' }
-    };
-    const config = variants[status] || { variant: 'outline' as const, label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  }, [isSuperAdmin]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
