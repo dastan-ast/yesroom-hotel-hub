@@ -147,7 +147,7 @@ export default function PublicBooking() {
                     amenities={room.amenities}
                     images={room.images}
                     imageUrl={room.image_url}
-                    showPrice={true}
+                    showPrice={false}
                   />
                 ))}
               </div>

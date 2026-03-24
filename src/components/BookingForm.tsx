@@ -113,16 +113,6 @@ export function BookingForm({ hotelId }: BookingFormProps) {
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
     try {
-      // Calculate total price with weekday/weekend pricing
-      const selectedType = roomTypes.find(rt => rt.id === data.roomTypeId);
-      let totalPrice: number | null = null;
-      if (selectedType) {
-        const { totalPrice: calcTotal } = calculateStayPrice(
-          data.checkInDate, data.checkOutDate, selectedType
-        );
-        totalPrice = calcTotal;
-      }
-
       const { error } = await supabase.from('bookings').insert({
         guest_name: data.guestName,
         guest_phone: data.guestPhone,
@@ -134,7 +124,6 @@ export function BookingForm({ hotelId }: BookingFormProps) {
         source: 'web',
         status: 'pending',
         hotel_id: hotelId || null,
-        total_price: totalPrice,
       });
 
       if (error) throw error;

@@ -399,21 +399,7 @@ export function BookingModal({
               />
             </div>
 
-            {/* Price Summary */}
-            {totalPrice && nights > 0 && (
-              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {Number(selectedRoom?.price_per_night).toLocaleString()} ₸ × {nights} {nights === 1 ? 'ночь' : nights < 5 ? 'ночи' : 'ночей'}
-                  </span>
-                  <span>{totalPrice.toLocaleString()} ₸</span>
-                </div>
-                <div className="flex justify-between font-semibold pt-1 border-t border-border">
-                  <span>Итого</span>
-                  <span className="text-primary">{totalPrice.toLocaleString()} ₸</span>
-                </div>
-              </div>
-            )}
+            
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? t('common.loading') : t('booking.submit')}
