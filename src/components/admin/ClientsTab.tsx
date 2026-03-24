@@ -112,17 +112,11 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
     fetchClients();
   };
 
-  const filteredClients = clients.filter(
-    (c) => {
-      const s = search.toLowerCase();
-      return (
-        c.full_name.toLowerCase().includes(s) ||
-        (c.phone || '').toLowerCase().includes(s) ||
-        (c.email || '').toLowerCase().includes(s) ||
-        (c.document_number || '').toLowerCase().includes(s)
-      );
-    }
-  );
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   if (loading) {
     return <div className="py-8 text-center text-muted-foreground">{t('common.loading')}</div>;
