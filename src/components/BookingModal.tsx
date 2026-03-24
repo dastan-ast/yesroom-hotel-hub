@@ -360,7 +360,7 @@ export function BookingModal({
                 <SelectContent>
                   {roomTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
-                      {type.name} — {Number(type.price_per_night).toLocaleString()} ₸
+                      {type.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
