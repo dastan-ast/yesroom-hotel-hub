@@ -4,15 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Users, CreditCard, Settings, Search, LogOut, ClipboardCheck, FileText, Activity } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { Building2, Users, CreditCard, Settings, LogOut, ClipboardCheck, FileText, Activity } from 'lucide-react';
+
 import { UsersTab } from '@/components/superadmin/UsersTab';
 import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
 import { HotelsManagementTab } from '@/components/superadmin/HotelsManagementTab';
