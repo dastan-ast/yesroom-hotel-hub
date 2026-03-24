@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UsersTab } from '@/components/superadmin/UsersTab';
 import { HotelRequestsTab } from '@/components/superadmin/HotelRequestsTab';
+import { HotelsManagementTab } from '@/components/superadmin/HotelsManagementTab';
 import { SubscriptionsTab } from '@/components/superadmin/SubscriptionsTab';
 import { SettingsTab } from '@/components/superadmin/SettingsTab';
 import { SystemReportsTab } from '@/components/superadmin/SystemReportsTab';
