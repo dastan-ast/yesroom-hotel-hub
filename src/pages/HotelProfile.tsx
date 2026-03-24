@@ -175,13 +175,7 @@ export default function HotelProfile() {
                   <p className="text-muted-foreground mt-4 max-w-2xl">{hotel.description}</p>
                 )}
               </div>
-              {minPrice && (
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">от</p>
-                  <p className="text-3xl font-bold text-primary">{minPrice.toLocaleString()} ₸</p>
-                  <p className="text-sm text-muted-foreground">{t('rooms.perNight')}</p>
-                </div>
-              )}
+              
             </div>
 
             <div className="flex flex-wrap gap-2 mt-6">
@@ -213,7 +207,7 @@ export default function HotelProfile() {
                 id={room.id}
                 name={room.name}
                 description={room.description}
-                price={Number(room.price_per_night)}
+                showPrice={false}
                 capacity={room.capacity}
                 amenities={room.amenities}
                 images={room.images}

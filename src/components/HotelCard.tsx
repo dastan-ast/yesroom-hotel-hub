@@ -49,11 +49,7 @@ export function HotelCard({
             <TypeIcon className="h-3 w-3" />
             {getPropertyTypeLabel(propertyType)}
           </Badge>
-          {minPrice && (
-            <Badge className="absolute bottom-3 right-3 bg-accent text-accent-foreground shadow-lg">
-              от {minPrice.toLocaleString()} ₸
-            </Badge>
-          )}
+        
         </div>
         <CardContent className="p-5 flex flex-col flex-grow">
           <h3 className="font-display font-semibold text-lg mb-1 group-hover:text-primary transition-colors line-clamp-1">
