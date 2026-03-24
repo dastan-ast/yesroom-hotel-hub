@@ -126,7 +126,7 @@ export default function InstagramBooking() {
       <div className="min-h-[100dvh] bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <BookingSuccess
-            hotelSettings={hotel.settings as { kaspi_id?: string; whatsapp_phone?: string } | null}
+            hotelSettings={null}
             hotelName={hotel.name}
           />
         </div>

@@ -238,7 +238,7 @@ export default function HotelProfile() {
         onOpenChange={setBookingModalOpen}
         hotelId={hotel.id}
         hotelName={hotel.name}
-        hotelSettings={hotel.settings as { kaspi_id?: string; whatsapp_phone?: string } | null}
+        hotelSettings={null}
         roomTypes={roomTypes}
         preselectedRoomTypeId={preselectedRoomType}
       />
