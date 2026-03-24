@@ -143,42 +143,59 @@ export function ClientsTab({ hotelId }: { hotelId?: string }) {
         </div>
       </div>
 
-      {filteredClients.length === 0 ? (
+      {clients.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {search ? 'Клиенты не найдены' : 'База клиентов пуста'}
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ФИО</TableHead>
-              <TableHead>Телефон</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Документ</TableHead>
-              <TableHead className="w-[100px]">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredClients.map((client) => (
-              <TableRow key={client.id}>
-                <TableCell className="font-medium">{client.full_name}</TableCell>
-                <TableCell>{client.phone}</TableCell>
-                <TableCell>{client.email || '—'}</TableCell>
-                <TableCell>{client.document_number || '—'}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => handleEdit(client)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleHistory(client)}>
-                      <History className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+        <>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ФИО</TableHead>
+                <TableHead>Телефон</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Документ</TableHead>
+                <TableHead className="w-[100px]">Действия</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {clients.map((client) => (
+                <TableRow key={client.id}>
+                  <TableCell className="font-medium">{client.full_name}</TableCell>
+                  <TableCell>{client.phone}</TableCell>
+                  <TableCell>{client.email || '—'}</TableCell>
+                  <TableCell>{client.document_number || '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => handleEdit(client)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleHistory(client)}>
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-sm text-muted-foreground">
+                {totalCount} клиентов, стр. {currentPage} из {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  Назад
+                </Button>
+                <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                  Далее
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <ClientDialog
