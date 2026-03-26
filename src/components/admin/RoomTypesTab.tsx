@@ -20,6 +20,7 @@ interface RoomType {
   amenities: string[] | null;
   image_url: string | null;
   images: string[] | null;
+  roomCount?: number;
 }
 
 export function RoomTypesTab({ hotelId }: { hotelId: string }) {
@@ -38,16 +39,19 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
 
   const fetchRoomTypes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('room_types')
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .order('price_per_night', { ascending: true });
+    const [typesRes, roomsRes] = await Promise.all([
+      supabase.from('room_types').select('*').eq('hotel_id', hotelId).order('price_per_night', { ascending: true }),
+      supabase.from('rooms').select('id, room_type_id').eq('hotel_id', hotelId),
+    ]);
     
-    if (error) {
+    if (typesRes.error) {
       toast.error(t('common.error'));
     } else {
-      setRoomTypes(data || []);
+      const roomCounts: Record<string, number> = {};
+      (roomsRes.data || []).forEach((r: any) => {
+        roomCounts[r.room_type_id] = (roomCounts[r.room_type_id] || 0) + 1;
+      });
+      setRoomTypes((typesRes.data || []).map((rt: any) => ({ ...rt, roomCount: roomCounts[rt.id] || 0 })));
     }
     setLoading(false);
   };
@@ -162,6 +166,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
               <TableHead>Выходные</TableHead>
               <TableHead>Полсутки</TableHead>
               <TableHead>Вместимость</TableHead>
+              <TableHead>Номеров</TableHead>
               <TableHead>Удобства</TableHead>
               <TableHead className="w-[100px]">Действия</TableHead>
             </TableRow>
@@ -191,6 +196,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                 <TableCell>{type.price_weekend ? `${type.price_weekend.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">= будни</span>}</TableCell>
                 <TableCell>{type.price_half_day ? `${type.price_half_day.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">50%</span>}</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
+                <TableCell>{type.roomCount ?? 0}</TableCell>
                 <TableCell className="max-w-[200px] truncate">
                   {type.amenities?.join(', ') || '—'}
                 </TableCell>
