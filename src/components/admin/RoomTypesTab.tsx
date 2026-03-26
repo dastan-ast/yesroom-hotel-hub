@@ -20,6 +20,7 @@ interface RoomType {
   amenities: string[] | null;
   image_url: string | null;
   images: string[] | null;
+  roomCount?: number;
 }
 
 export function RoomTypesTab({ hotelId }: { hotelId: string }) {
