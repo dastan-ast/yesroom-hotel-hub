@@ -38,16 +38,19 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
 
   const fetchRoomTypes = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('room_types')
-      .select('*')
-      .eq('hotel_id', hotelId)
-      .order('price_per_night', { ascending: true });
+    const [typesRes, roomsRes] = await Promise.all([
+      supabase.from('room_types').select('*').eq('hotel_id', hotelId).order('price_per_night', { ascending: true }),
+      supabase.from('rooms').select('id, room_type_id').eq('hotel_id', hotelId),
+    ]);
     
-    if (error) {
+    if (typesRes.error) {
       toast.error(t('common.error'));
     } else {
-      setRoomTypes(data || []);
+      const roomCounts: Record<string, number> = {};
+      (roomsRes.data || []).forEach((r: any) => {
+        roomCounts[r.room_type_id] = (roomCounts[r.room_type_id] || 0) + 1;
+      });
+      setRoomTypes((typesRes.data || []).map((rt: any) => ({ ...rt, roomCount: roomCounts[rt.id] || 0 })));
     }
     setLoading(false);
   };
