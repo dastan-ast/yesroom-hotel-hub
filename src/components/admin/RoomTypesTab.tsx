@@ -247,6 +247,65 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         roomType={editingType}
         onSave={handleSave}
       />
+
+      <Dialog open={!!quickAddTypeId} onOpenChange={(open) => !open && setQuickAddTypeId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Добавить номер</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!quickRoomNumber.trim() || !quickAddTypeId) return;
+              setQuickAdding(true);
+              const { error } = await supabase.from('rooms').insert({
+                room_number: quickRoomNumber.trim(),
+                floor: quickFloor,
+                room_type_id: quickAddTypeId,
+                hotel_id: hotelId,
+                status: 'available',
+              } as any);
+              setQuickAdding(false);
+              if (error) {
+                toast.error(error.message);
+              } else {
+                toast.success(`Номер ${quickRoomNumber} создан`);
+                setQuickAddTypeId(null);
+                fetchRoomTypes();
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <Label>Номер комнаты</Label>
+              <Input
+                placeholder="101"
+                value={quickRoomNumber}
+                onChange={(e) => setQuickRoomNumber(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label>Этаж</Label>
+              <Input
+                type="number"
+                min={1}
+                value={quickFloor}
+                onChange={(e) => setQuickFloor(Number(e.target.value))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setQuickAddTypeId(null)}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" disabled={quickAdding || !quickRoomNumber.trim()}>
+                <Plus className="h-4 w-4 mr-1" />
+                Создать
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
