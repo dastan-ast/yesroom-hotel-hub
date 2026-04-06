@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Upload, Clock, AlertCircle, CreditCard, Plus, Trash2 } from 'lucide-react';
+import { Database, RefreshCw, CheckCircle2, XCircle, Loader2, Upload, Clock, AlertCircle, CreditCard, Plus, Trash2 } from 'lucide-react';
 import type { Json } from '@/integrations/supabase/types';
 
 interface ExternalSupabaseSettings {
