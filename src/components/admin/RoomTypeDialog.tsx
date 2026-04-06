@@ -53,9 +53,12 @@ interface Props {
   onRoomCreated?: () => void;
 }
 
-export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
+export function RoomTypeDialog({ open, onOpenChange, roomType, onSave, hotelId, onRoomCreated }: Props) {
   const { t } = useTranslation();
   const [images, setImages] = useState<string[]>([]);
+  const [quickRoomNumber, setQuickRoomNumber] = useState('');
+  const [quickFloor, setQuickFloor] = useState(1);
+  const [quickAdding, setQuickAdding] = useState(false);
   
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
