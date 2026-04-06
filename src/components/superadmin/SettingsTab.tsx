@@ -403,7 +403,7 @@ export function SettingsTab() {
         <CardContent className="space-y-4">
           <Button 
             onClick={syncAllData} 
-            disabled={syncing || !settings.sync_enabled || !settings.url || !settings.anon_key}
+            disabled={syncing || !settings.sync_enabled}
             className="w-full"
             size="lg"
           >
