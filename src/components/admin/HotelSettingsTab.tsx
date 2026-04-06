@@ -143,6 +143,7 @@ export function HotelSettingsTab({ hotelId }: { hotelId: string }) {
               onRemove={() => setForm({ ...form, logo_url: null })}
               folder="hotels"
               itemId={hotelId}
+              hotelId={hotelId}
             />
           </CardContent>
         </Card>

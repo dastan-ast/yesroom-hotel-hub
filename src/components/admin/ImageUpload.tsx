@@ -11,9 +11,10 @@ interface ImageUploadProps {
   onRemove: () => void;
   folder: string;
   itemId: string;
+  hotelId: string;
 }
 
-export function ImageUpload({ currentUrl, onUpload, onRemove, folder, itemId }: ImageUploadProps) {
+export function ImageUpload({ currentUrl, onUpload, onRemove, folder, itemId, hotelId }: ImageUploadProps) {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +36,7 @@ export function ImageUpload({ currentUrl, onUpload, onRemove, folder, itemId }: 
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const filePath = `${folder}/${itemId}/image.${fileExt}`;
+      const filePath = `${hotelId}/${folder}/${itemId}/image.${fileExt}`;
 
       // Delete old file if exists
       if (currentUrl) {
