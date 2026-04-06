@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { GalleryUpload } from './GalleryUpload';
+import { Separator } from '@/components/ui/separator';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
 
 const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
@@ -45,6 +49,8 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   roomType: RoomType | null;
   onSave: (data: Partial<RoomType>) => void;
+  hotelId?: string;
+  onRoomCreated?: () => void;
 }
 
 export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
