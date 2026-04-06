@@ -306,44 +306,17 @@ export function SettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Connection Settings */}
+          {/* Connection Status */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="supabase-url">Project URL</Label>
-              <Input
-                id="supabase-url"
-                placeholder="https://your-project.supabase.co"
-                value={settings.url}
-                onChange={(e) => setSettings(prev => ({ ...prev, url: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="anon-key">Anon API Key</Label>
-              <div className="relative">
-                <Input
-                  id="anon-key"
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={settings.anon_key}
-                  onChange={(e) => setSettings(prev => ({ ...prev, anon_key: e.target.value }))}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Учётные данные подключения настраиваются через переменные окружения (EXTERNAL_SUPABASE_URL, EXTERNAL_SUPABASE_ANON_KEY).
+            </p>
 
             <div className="flex items-center gap-4">
               <Button 
                 variant="outline" 
                 onClick={testConnection}
-                disabled={testing || !settings.url || !settings.anon_key}
+                disabled={testing}
               >
                 {testing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
