@@ -251,6 +251,61 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave, hotelId, 
                 )}
               />
               
+              {roomType && hotelId && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Быстрое добавление номера</p>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="text-xs text-muted-foreground">Номер</label>
+                        <Input
+                          placeholder="101"
+                          value={quickRoomNumber}
+                          onChange={(e) => setQuickRoomNumber(e.target.value)}
+                        />
+                      </div>
+                      <div className="w-20">
+                        <label className="text-xs text-muted-foreground">Этаж</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={quickFloor}
+                          onChange={(e) => setQuickFloor(Number(e.target.value))}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={quickAdding || !quickRoomNumber.trim()}
+                        onClick={async () => {
+                          if (!quickRoomNumber.trim()) return;
+                          setQuickAdding(true);
+                          const { error } = await supabase.from('rooms').insert({
+                            room_number: quickRoomNumber.trim(),
+                            floor: quickFloor,
+                            room_type_id: roomType.id,
+                            hotel_id: hotelId,
+                            status: 'available',
+                          } as any);
+                          setQuickAdding(false);
+                          if (error) {
+                            toast.error(error.message);
+                          } else {
+                            toast.success(`Номер ${quickRoomNumber} создан`);
+                            setQuickRoomNumber('');
+                            onRoomCreated?.();
+                          }
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Добавить
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   {t('common.cancel')}
