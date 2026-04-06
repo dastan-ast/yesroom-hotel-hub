@@ -44,10 +44,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roomType: RoomType | null;
+  hotelId: string;
   onSave: (data: Partial<RoomType>) => void;
 }
 
-export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
+export function RoomTypeDialog({ open, onOpenChange, roomType, hotelId, onSave }: Props) {
   const { t } = useTranslation();
   const [images, setImages] = useState<string[]>([]);
   
@@ -134,6 +135,7 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) 
               onChange={setImages}
               folder="room-types"
               itemId={itemId}
+              hotelId={hotelId}
               maxImages={10}
             />
           </div>
