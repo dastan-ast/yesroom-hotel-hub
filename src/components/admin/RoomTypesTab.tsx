@@ -6,11 +6,8 @@ import { logAdminAction } from '@/lib/activityLog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, DoorOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { RoomTypeDialog } from './RoomTypeDialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 interface RoomType {
   id: string;
@@ -33,10 +30,6 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
-  const [quickAddTypeId, setQuickAddTypeId] = useState<string | null>(null);
-  const [quickRoomNumber, setQuickRoomNumber] = useState('');
-  const [quickFloor, setQuickFloor] = useState(1);
-  const [quickAdding, setQuickAdding] = useState(false);
 
   useEffect(() => {
     if (hotelId) {
@@ -203,24 +196,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                 <TableCell>{type.price_weekend ? `${type.price_weekend.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">= будни</span>}</TableCell>
                 <TableCell>{type.price_half_day ? `${type.price_half_day.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">50%</span>}</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <span>{type.roomCount ?? 0}</span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      title="Добавить номер"
-                      onClick={() => {
-                        setQuickAddTypeId(type.id);
-                        setQuickRoomNumber('');
-                        setQuickFloor(1);
-                      }}
-                    >
-                      <DoorOpen className="h-3.5 w-3.5 text-primary" />
-                    </Button>
-                  </div>
-                </TableCell>
+                <TableCell>{type.roomCount ?? 0}</TableCell>
                 <TableCell className="max-w-[200px] truncate">
                   {type.amenities?.join(', ') || '—'}
                 </TableCell>
@@ -246,66 +222,9 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         onOpenChange={setDialogOpen}
         roomType={editingType}
         onSave={handleSave}
+        hotelId={hotelId}
+        onRoomCreated={fetchRoomTypes}
       />
-
-      <Dialog open={!!quickAddTypeId} onOpenChange={(open) => !open && setQuickAddTypeId(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Добавить номер</DialogTitle>
-          </DialogHeader>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!quickRoomNumber.trim() || !quickAddTypeId) return;
-              setQuickAdding(true);
-              const { error } = await supabase.from('rooms').insert({
-                room_number: quickRoomNumber.trim(),
-                floor: quickFloor,
-                room_type_id: quickAddTypeId,
-                hotel_id: hotelId,
-                status: 'available',
-              } as any);
-              setQuickAdding(false);
-              if (error) {
-                toast.error(error.message);
-              } else {
-                toast.success(`Номер ${quickRoomNumber} создан`);
-                setQuickAddTypeId(null);
-                fetchRoomTypes();
-              }
-            }}
-            className="space-y-4"
-          >
-            <div>
-              <Label>Номер комнаты</Label>
-              <Input
-                placeholder="101"
-                value={quickRoomNumber}
-                onChange={(e) => setQuickRoomNumber(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div>
-              <Label>Этаж</Label>
-              <Input
-                type="number"
-                min={1}
-                value={quickFloor}
-                onChange={(e) => setQuickFloor(Number(e.target.value))}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setQuickAddTypeId(null)}>
-                {t('common.cancel')}
-              </Button>
-              <Button type="submit" disabled={quickAdding || !quickRoomNumber.trim()}>
-                <Plus className="h-4 w-4 mr-1" />
-                Создать
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
