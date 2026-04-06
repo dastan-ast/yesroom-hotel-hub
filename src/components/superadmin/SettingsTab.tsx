@@ -12,8 +12,6 @@ import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Uploa
 import type { Json } from '@/integrations/supabase/types';
 
 interface ExternalSupabaseSettings {
-  url: string;
-  anon_key: string;
   sync_enabled: boolean;
   sync_tables: string[];
   last_sync_at?: string;
