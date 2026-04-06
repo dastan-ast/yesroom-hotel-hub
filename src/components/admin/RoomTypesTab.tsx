@@ -203,7 +203,24 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
                 <TableCell>{type.price_weekend ? `${type.price_weekend.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">= будни</span>}</TableCell>
                 <TableCell>{type.price_half_day ? `${type.price_half_day.toLocaleString()} ₸` : <span className="text-muted-foreground text-xs">50%</span>}</TableCell>
                 <TableCell>{type.capacity} чел.</TableCell>
-                <TableCell>{type.roomCount ?? 0}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <span>{type.roomCount ?? 0}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      title="Добавить номер"
+                      onClick={() => {
+                        setQuickAddTypeId(type.id);
+                        setQuickRoomNumber('');
+                        setQuickFloor(1);
+                      }}
+                    >
+                      <DoorOpen className="h-3.5 w-3.5 text-primary" />
+                    </Button>
+                  </div>
+                </TableCell>
                 <TableCell className="max-w-[200px] truncate">
                   {type.amenities?.join(', ') || '—'}
                 </TableCell>
