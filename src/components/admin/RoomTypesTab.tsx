@@ -221,6 +221,7 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         roomType={editingType}
+        hotelId={hotelId}
         onSave={handleSave}
       />
     </div>
