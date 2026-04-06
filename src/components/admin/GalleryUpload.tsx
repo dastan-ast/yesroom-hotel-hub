@@ -9,10 +9,11 @@ interface GalleryUploadProps {
   onChange: (images: string[]) => void;
   folder: string;
   itemId: string;
+  hotelId: string;
   maxImages?: number;
 }
 
-export function GalleryUpload({ images, onChange, folder, itemId, maxImages = 10 }: GalleryUploadProps) {
+export function GalleryUpload({ images, onChange, folder, itemId, hotelId, maxImages = 10 }: GalleryUploadProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +45,7 @@ export function GalleryUpload({ images, onChange, folder, itemId, maxImages = 10
       for (const file of files) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${folder}/${itemId}/${fileName}`;
+        const filePath = `${hotelId}/${folder}/${itemId}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('hotel-images')

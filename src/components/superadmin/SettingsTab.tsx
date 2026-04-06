@@ -8,12 +8,10 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Database, RefreshCw, CheckCircle2, XCircle, Eye, EyeOff, Loader2, Upload, Clock, AlertCircle, CreditCard, Plus, Trash2 } from 'lucide-react';
+import { Database, RefreshCw, CheckCircle2, XCircle, Loader2, Upload, Clock, AlertCircle, CreditCard, Plus, Trash2 } from 'lucide-react';
 import type { Json } from '@/integrations/supabase/types';
 
 interface ExternalSupabaseSettings {
-  url: string;
-  anon_key: string;
   sync_enabled: boolean;
   sync_tables: string[];
   last_sync_at?: string;
@@ -47,8 +45,6 @@ interface PricingPlan {
 
 export function SettingsTab() {
   const [settings, setSettings] = useState<ExternalSupabaseSettings>({
-    url: '',
-    anon_key: '',
     sync_enabled: false,
     sync_tables: ['hotels', 'bookings', 'clients', 'room_types'],
   });
@@ -58,7 +54,6 @@ export function SettingsTab() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
-  const [showKey, setShowKey] = useState(false);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -81,8 +76,6 @@ export function SettingsTab() {
       if (data?.value) {
         const value = data.value as unknown as ExternalSupabaseSettings;
         setSettings({
-          url: value.url || '',
-          anon_key: value.anon_key || '',
           sync_enabled: value.sync_enabled || false,
           sync_tables: value.sync_tables || ['hotels', 'bookings', 'clients', 'room_types'],
           last_sync_at: value.last_sync_at,
@@ -98,17 +91,12 @@ export function SettingsTab() {
   };
 
   const testConnection = async () => {
-    if (!settings.url || !settings.anon_key) {
-      toast.error('Введите URL и API Key');
-      return;
-    }
-
     setTesting(true);
     setConnectionStatus('unknown');
 
     try {
       const response = await supabase.functions.invoke('test-external-connection', {
-        body: { url: settings.url, anon_key: settings.anon_key },
+        body: {},
       });
 
       if (response.error) throw response.error;
@@ -132,11 +120,6 @@ export function SettingsTab() {
   const syncAllData = async () => {
     if (!settings.sync_enabled) {
       toast.error('Включите синхронизацию перед отправкой данных');
-      return;
-    }
-
-    if (!settings.url || !settings.anon_key) {
-      toast.error('Настройте подключение к внешнему Supabase');
       return;
     }
 
@@ -323,44 +306,17 @@ export function SettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Connection Settings */}
+          {/* Connection Status */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="supabase-url">Project URL</Label>
-              <Input
-                id="supabase-url"
-                placeholder="https://your-project.supabase.co"
-                value={settings.url}
-                onChange={(e) => setSettings(prev => ({ ...prev, url: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="anon-key">Anon API Key</Label>
-              <div className="relative">
-                <Input
-                  id="anon-key"
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={settings.anon_key}
-                  onChange={(e) => setSettings(prev => ({ ...prev, anon_key: e.target.value }))}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Учётные данные подключения настраиваются через переменные окружения (EXTERNAL_SUPABASE_URL, EXTERNAL_SUPABASE_ANON_KEY).
+            </p>
 
             <div className="flex items-center gap-4">
               <Button 
                 variant="outline" 
                 onClick={testConnection}
-                disabled={testing || !settings.url || !settings.anon_key}
+                disabled={testing}
               >
                 {testing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -447,7 +403,7 @@ export function SettingsTab() {
         <CardContent className="space-y-4">
           <Button 
             onClick={syncAllData} 
-            disabled={syncing || !settings.sync_enabled || !settings.url || !settings.anon_key}
+            disabled={syncing || !settings.sync_enabled}
             className="w-full"
             size="lg"
           >
