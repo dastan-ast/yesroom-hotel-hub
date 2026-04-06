@@ -45,8 +45,6 @@ interface PricingPlan {
 
 export function SettingsTab() {
   const [settings, setSettings] = useState<ExternalSupabaseSettings>({
-    url: '',
-    anon_key: '',
     sync_enabled: false,
     sync_tables: ['hotels', 'bookings', 'clients', 'room_types'],
   });
@@ -56,7 +54,6 @@ export function SettingsTab() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown');
-  const [showKey, setShowKey] = useState(false);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -79,8 +76,6 @@ export function SettingsTab() {
       if (data?.value) {
         const value = data.value as unknown as ExternalSupabaseSettings;
         setSettings({
-          url: value.url || '',
-          anon_key: value.anon_key || '',
           sync_enabled: value.sync_enabled || false,
           sync_tables: value.sync_tables || ['hotels', 'bookings', 'clients', 'room_types'],
           last_sync_at: value.last_sync_at,
@@ -96,17 +91,12 @@ export function SettingsTab() {
   };
 
   const testConnection = async () => {
-    if (!settings.url || !settings.anon_key) {
-      toast.error('Введите URL и API Key');
-      return;
-    }
-
     setTesting(true);
     setConnectionStatus('unknown');
 
     try {
       const response = await supabase.functions.invoke('test-external-connection', {
-        body: { url: settings.url, anon_key: settings.anon_key },
+        body: {},
       });
 
       if (response.error) throw response.error;
@@ -130,11 +120,6 @@ export function SettingsTab() {
   const syncAllData = async () => {
     if (!settings.sync_enabled) {
       toast.error('Включите синхронизацию перед отправкой данных');
-      return;
-    }
-
-    if (!settings.url || !settings.anon_key) {
-      toast.error('Настройте подключение к внешнему Supabase');
       return;
     }
 
