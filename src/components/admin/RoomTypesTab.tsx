@@ -222,8 +222,6 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
         onOpenChange={setDialogOpen}
         roomType={editingType}
         onSave={handleSave}
-        hotelId={hotelId}
-        onRoomCreated={fetchRoomTypes}
       />
     </div>
   );

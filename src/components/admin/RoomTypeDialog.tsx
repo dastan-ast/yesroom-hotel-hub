@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -15,9 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { GalleryUpload } from './GalleryUpload';
-import { Separator } from '@/components/ui/separator';
-import { Plus } from 'lucide-react';
-import { toast } from 'sonner';
 
 const schema = z.object({
   name: z.string().min(1, 'Обязательное поле'),
@@ -49,16 +45,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   roomType: RoomType | null;
   onSave: (data: Partial<RoomType>) => void;
-  hotelId?: string;
-  onRoomCreated?: () => void;
 }
 
-export function RoomTypeDialog({ open, onOpenChange, roomType, onSave, hotelId, onRoomCreated }: Props) {
+export function RoomTypeDialog({ open, onOpenChange, roomType, onSave }: Props) {
   const { t } = useTranslation();
   const [images, setImages] = useState<string[]>([]);
-  const [quickRoomNumber, setQuickRoomNumber] = useState('');
-  const [quickFloor, setQuickFloor] = useState(1);
-  const [quickAdding, setQuickAdding] = useState(false);
   
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -251,61 +242,6 @@ export function RoomTypeDialog({ open, onOpenChange, roomType, onSave, hotelId, 
                 )}
               />
               
-              {roomType && hotelId && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Быстрое добавление номера</p>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <label className="text-xs text-muted-foreground">Номер</label>
-                        <Input
-                          placeholder="101"
-                          value={quickRoomNumber}
-                          onChange={(e) => setQuickRoomNumber(e.target.value)}
-                        />
-                      </div>
-                      <div className="w-20">
-                        <label className="text-xs text-muted-foreground">Этаж</label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={quickFloor}
-                          onChange={(e) => setQuickFloor(Number(e.target.value))}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={quickAdding || !quickRoomNumber.trim()}
-                        onClick={async () => {
-                          if (!quickRoomNumber.trim()) return;
-                          setQuickAdding(true);
-                          const { error } = await supabase.from('rooms').insert({
-                            room_number: quickRoomNumber.trim(),
-                            floor: quickFloor,
-                            room_type_id: roomType.id,
-                            hotel_id: hotelId,
-                            status: 'available',
-                          } as any);
-                          setQuickAdding(false);
-                          if (error) {
-                            toast.error(error.message);
-                          } else {
-                            toast.success(`Номер ${quickRoomNumber} создан`);
-                            setQuickRoomNumber('');
-                            onRoomCreated?.();
-                          }
-                        }}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Добавить
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   {t('common.cancel')}
