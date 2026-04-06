@@ -30,10 +30,6 @@ export function RoomTypesTab({ hotelId }: { hotelId: string }) {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomType | null>(null);
-  const [quickAddTypeId, setQuickAddTypeId] = useState<string | null>(null);
-  const [quickRoomNumber, setQuickRoomNumber] = useState('');
-  const [quickFloor, setQuickFloor] = useState(1);
-  const [quickAdding, setQuickAdding] = useState(false);
 
   useEffect(() => {
     if (hotelId) {
