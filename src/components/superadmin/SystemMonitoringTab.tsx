@@ -276,10 +276,8 @@ export function SystemMonitoringTab() {
   }, [runHealthChecks, fetchDbMetrics, fetchActivity, fetchAlertConfig, fetchHistory]);
 
   useEffect(() => { refresh(); }, []);
-  useEffect(() => {
-    const interval = setInterval(refresh, 60000);
-    return () => clearInterval(interval);
-  }, [refresh]);
+  // Автообновление отключено для экономии ресурсов — обновление вручную кнопкой
+
 
   const statusIcon = (status: string) => {
     if (status === 'ok') return <CheckCircle2 className="h-5 w-5 text-green-500" />;
