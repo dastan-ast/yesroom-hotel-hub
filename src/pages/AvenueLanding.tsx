@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { BookingModal } from '@/components/BookingModal';
 import { ArrowRight, Coffee, Droplets, MapPin, MessageCircle, Trees, Tv, Users, Wifi } from 'lucide-react';
 import heroImg from '@/assets/avenue-hero.jpg';
@@ -25,6 +26,7 @@ interface RoomType {
 const fmt = (n: number) => new Intl.NumberFormat('ru-RU').format(n);
 
 export default function AvenueLanding() {
+  const { user } = useAuth();
   const [hotel, setHotel] = useState<{ id: string; name: string } | null>(null);
   const [rooms, setRooms] = useState<RoomType[]>([]);
   const [open, setOpen] = useState(false);
@@ -115,7 +117,8 @@ export default function AvenueLanding() {
                 <p className="text-xs tracking-[0.2em] text-accent">НОМЕРА</p>
                 <div>
                   <p className="font-display text-2xl mb-1">{featured.name}</p>
-                  {minPrice && <p className="text-primary-foreground/80">от <span className="text-3xl font-semibold text-primary-foreground">{fmt(minPrice)} ₸</span> / ночь</p>}
+                  {user && minPrice ? <p className="text-primary-foreground/80">от <span className="text-3xl font-semibold text-primary-foreground">{fmt(minPrice)} ₸</span> / ночь</p>
+                    : <p className="text-primary-foreground/80">Цена — по запросу или после входа</p>}
                 </div>
               </div>
             </button>
@@ -181,7 +184,13 @@ export default function AvenueLanding() {
                 <div className="p-5 flex flex-col flex-1">
                   <h3 className="font-display text-xl mb-2">{r.name}</h3>
                   <p className="text-sm text-primary-foreground/60 flex items-center gap-1 mb-4"><Users className="h-4 w-4" /> до {r.capacity} гостей</p>
-                  <p className="mt-auto mb-4">от <span className="text-xl font-semibold">{fmt(Number(r.price_per_night))} ₸</span></p>
+                  {user ? (
+                    <p className="mt-auto mb-4">от <span className="text-xl font-semibold">{fmt(Number(r.price_per_night))} ₸</span></p>
+                  ) : (
+                    <p className="mt-auto mb-4 text-sm text-primary-foreground/70">
+                      Цена по запросу · <Link to="/auth" className="text-accent underline">войдите</Link>, чтобы увидеть
+                    </p>
+                  )}
                   <button onClick={() => book(r.id)}
                     className="rounded-full bg-accent py-2.5 font-medium text-accent-foreground hover:opacity-90 transition">
                     Забронировать
