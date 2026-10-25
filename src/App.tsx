@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import "@/i18n";
 import Index from "./pages/Index";
+import AvenueLanding from "./pages/AvenueLanding";
 import Auth from "./pages/Auth";
 import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdmin from "./pages/SuperAdmin";
@@ -34,7 +35,8 @@ const App = () => (
         <ErrorBoundary>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<AvenueLanding />} />
+              <Route path="/catalog" element={<Index />} />
               <Route path="/book/:hotelSlug" element={<PublicBooking />} />
               <Route path="/i/:hotelSlug" element={<InstagramBooking />} />
               <Route path="/hotels/:hotelSlug" element={<HotelProfile />} />
